@@ -24,7 +24,7 @@ import { LocationPoint, RideRequest, RouteData } from '../types';
 import { searchAddress, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { RATE_PER_KM_TAKA, updatePassengerLiveLocation } from '../services/rideSync';
 import { searchBangladeshDistricts } from '../data/bangladeshDistricts';
-import { requestLiveCoordinates } from '../services/geolocation';
+import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
 
 interface RideRequestFormProps {
@@ -83,6 +83,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const [pinMode, setPinMode] = useState<PinMode>('pickup');
   const [userLiveGps, setUserLiveGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
+  const [isPickupLiveGps, setIsPickupLiveGps] = useState(true);
   const [showKeyModal, setShowKeyModal] = useState(false);
   const [tempApiKey, setTempApiKey] = useState(activeKey);
   const autoLocatedRef = useRef(false);
@@ -98,34 +99,50 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const dropoffContainerRef = useRef<HTMLDivElement>(null);
 
   // Automatic live GPS detection on entering dashboard
+  // Live location becomes the passenger's default pickup location
   useEffect(() => {
-    if (autoLocatedRef.current) return;
-    autoLocatedRef.current = true;
+    let isMounted = true;
 
     const autoDetectGps = async () => {
       setIsLocating(true);
       try {
         const res = await requestLiveCoordinates();
+        if (!isMounted) return;
         setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
 
         // Update real-time passenger location for rider telemetry
         updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
 
-        // Auto-type into pickup spot if not already set
-        if (!pickup) {
-          const point = await reverseGeocode(res.lat, res.lon, activeKey);
-          setPickup(point);
-          setPickupInput(point.formatted);
-        }
+        // Reverse-geocode user's live position and set as default pickup spot
+        const point = await reverseGeocode(res.lat, res.lon, activeKey);
+        if (!isMounted) return;
+        setPickup(point);
+        setPickupInput(point.formatted);
+        setIsPickupLiveGps(true);
       } catch (err) {
         console.warn('Auto GPS notice:', err);
       } finally {
-        setIsLocating(false);
+        if (isMounted) setIsLocating(false);
       }
     };
 
-    autoDetectGps();
-  }, [activeKey, pickup, setPickup]);
+    if (!autoLocatedRef.current) {
+      autoLocatedRef.current = true;
+      autoDetectGps();
+    }
+
+    // Subscribe to continuous live location updates
+    const unwatch = watchLiveCoordinates((res) => {
+      if (!isMounted) return;
+      setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
+      updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
+    });
+
+    return () => {
+      isMounted = false;
+      unwatch();
+    };
+  }, [activeKey, setPickup]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -151,8 +168,37 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   useEffect(() => {
     if (dropoff) {
       setDropoffInput(dropoff.formatted);
+    } else {
+      setDropoffInput('');
     }
   }, [dropoff]);
+
+  // Reset to passenger's live GPS spot for pickup
+  const handleResetToLiveGpsPickup = async () => {
+    setIsLocating(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await requestLiveCoordinates();
+      setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
+      updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
+
+      const point = await reverseGeocode(res.lat, res.lon, activeKey);
+      setPickup(point);
+      setPickupInput(point.formatted);
+      setIsPickupLiveGps(true);
+      setPickupSuggestions([]);
+      setIsPickupFocused(false);
+
+      if (res.message && res.isSimulatedBangladesh) {
+        setErrorMessage(res.message);
+      }
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Could not detect device GPS coordinates.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
 
   // Real-time search for Pickup Spot (Strictly Bangladesh only, instant on 1-2 keys)
   const handlePickupChange = (value: string) => {
@@ -635,38 +681,33 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
             {/* OPTION 1: PICKUP SPOT */}
             <div ref={pickupContainerRef} className="relative">
               <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="pickup-input"
-                  className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5"
-                >
+                <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  1. Pickup Spot (In Bangladesh)
-                </label>
+                  <label
+                    htmlFor="pickup-input"
+                    className="text-xs font-semibold text-zinc-300 uppercase tracking-wider"
+                  >
+                    1. Pickup Spot
+                  </label>
+                  {isPickupLiveGps && (
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Live Location (Default)
+                    </span>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2">
                   <button
-                    type="button"
-                    onClick={() => setPinMode('pickup')}
-                    className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
-                      pinMode === 'pickup'
-                        ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                        : 'text-zinc-400 hover:text-white border border-transparent hover:bg-zinc-900'
-                    }`}
-                    title="Pinpoint pickup location with arrow on map"
-                  >
-                    <MapPin className="w-3 h-3 text-emerald-400" />
-                    <span>Pin on Map</span>
-                  </button>
-
-                  <button
                     id="current-location-btn"
                     type="button"
-                    onClick={handleUseCurrentLocation}
+                    onClick={handleResetToLiveGpsPickup}
                     disabled={isLocating}
-                    className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50"
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50 font-semibold"
+                    title="Detect and use your real-time live GPS location"
                   >
-                    <LocateFixed className="w-3 h-3 text-emerald-400" />
-                    <span>{isLocating ? 'Detecting GPS...' : 'Current spot'}</span>
+                    <LocateFixed className="w-3.5 h-3.5 text-emerald-400" />
+                    <span>{isLocating ? 'Detecting GPS...' : isPickupLiveGps ? 'At Live Location' : 'Use My Live Spot'}</span>
                   </button>
                 </div>
               </div>
@@ -687,7 +728,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                       handlePickupChange(pickupInput);
                     }
                   }}
-                  placeholder="Search Bangladesh spot (e.g. Dhaka, Gulshan, Chittagong, Sylhet)..."
+                  placeholder="Click to change or search Bangladesh pickup spot..."
                   autoComplete="off"
                   className="w-full pl-10 pr-10 py-3.5 bg-black border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/40 transition-all font-medium"
                 />
@@ -703,9 +744,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                       onClick={() => {
                         setPickupInput('');
                         setPickup(null);
+                        setIsPickupLiveGps(false);
                         setPickupSuggestions([]);
                       }}
                       className="text-zinc-500 hover:text-white cursor-pointer"
+                      title="Clear pickup spot"
                     >
                       <X className="w-4 h-4" />
                     </button>
@@ -715,9 +758,24 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
               {/* Selected Confirmation Pill */}
               {pickup && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1 rounded-lg">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="truncate font-medium">Pickup: {pickup.formatted}</span>
+                <div className="mt-2 flex items-center justify-between gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1.5 rounded-lg">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate font-medium">Pickup: {pickup.formatted}</span>
+                  </div>
+                  {isPickupLiveGps ? (
+                    <span className="shrink-0 text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded">
+                      Live GPS
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResetToLiveGpsPickup}
+                      className="shrink-0 text-[10px] text-zinc-400 hover:text-emerald-300 underline cursor-pointer"
+                    >
+                      Reset to Live GPS
+                    </button>
+                  )}
                 </div>
               )}
 
@@ -761,7 +819,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               <button
                 type="button"
                 onClick={handleSwitchLocations}
-                className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-700/80 text-zinc-300 hover:text-white transition-all text-xs font-semibold shadow-md active:scale-95 cursor-pointer"
+                disabled={!pickup || !dropoff}
+                className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-zinc-900 border border-zinc-700/80 text-zinc-300 hover:text-white transition-all text-xs font-semibold shadow-md active:scale-95 cursor-pointer disabled:cursor-not-allowed"
                 title="Switch Pickup and Drop-off spots"
               >
                 <ArrowDownUp className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-180 transition-transform duration-300" />
@@ -780,20 +839,9 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                   2. Drop-off Spot (Destination in Bangladesh)
                 </label>
 
-                {/* Pin Drop-off on Map toggle button */}
-                <button
-                  type="button"
-                  onClick={() => setPinMode('dropoff')}
-                  className={`px-2 py-0.5 rounded text-[11px] font-bold transition-colors flex items-center gap-1 cursor-pointer ${
-                    pinMode === 'dropoff'
-                      ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                      : 'text-zinc-400 hover:text-white border border-transparent hover:bg-zinc-900'
-                  }`}
-                  title="Pinpoint drop-off spot on map (even unlisted locations)"
-                >
-                  <Navigation className="w-3 h-3 text-rose-400" />
-                  <span>Pin on Map</span>
-                </button>
+                <span className="text-[11px] text-zinc-500 font-medium">
+                  Type & select
+                </span>
               </div>
 
               <div className="relative">
@@ -812,7 +860,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                       handleDropoffChange(dropoffInput);
                     }
                   }}
-                  placeholder="Where to in Bangladesh? (Enter place or district)..."
+                  placeholder="Type destination in Bangladesh (e.g. Dhanmondi, Uttara, Agrabad)..."
                   autoComplete="off"
                   className="w-full pl-10 pr-10 py-3.5 bg-black border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/80 focus:ring-1 focus:ring-red-500/40 transition-all font-medium"
                 />
@@ -948,6 +996,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
           onPickupChange={(point) => {
             setPickup(point);
             setPickupInput(point.formatted);
+            setIsPickupLiveGps(false);
             setPickupSuggestions([]);
             setIsPickupFocused(false);
             setErrorMessage(null);
@@ -964,7 +1013,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
           onPinModeChange={setPinMode}
           routeData={routeData || null}
           isLocating={isLocating}
-          onLocateUser={handleUseCurrentLocation}
+          onLocateUser={handleResetToLiveGpsPickup}
           userLiveGps={userLiveGps}
         />
       </div>

@@ -67,25 +67,31 @@ export default function App() {
     const unsubscribe = subscribeToRideUpdates((ride) => {
       setActiveRide(ride);
 
-      // If active ride has been set and we're in passenger view, sync pickup/dropoff/route
-      if (ride) {
-        if (!pickup) setPickup(ride.pickup);
-        if (!dropoff) setDropoff(ride.dropoff);
-        if (ride.routeData && !routeData) setRouteData(ride.routeData);
+      // Only synchronize pickup, dropoff and route if there is an active in-flight ride
+      const isInFlight =
+        ride &&
+        (ride.status === 'requested' ||
+          ride.status === 'accepted' ||
+          ride.status === 'arrived_at_pickup' ||
+          ride.status === 'in_transit');
 
-        // When ride is in_transit, passenger can see navigation map
+      if (isInFlight) {
+        setPickup(ride.pickup);
+        setDropoff(ride.dropoff);
+        if (ride.routeData) setRouteData(ride.routeData);
+
         if (ride.status === 'in_transit' && ride.routeData) {
           setStage('navigation');
-        } else if (ride.status === 'completed' || ride.status === 'cancelled' || ride.status === 'declined') {
-          if (stage === 'navigation') {
-            setStage('request');
-          }
+        }
+      } else if (!ride || ride.status === 'completed' || ride.status === 'cancelled' || ride.status === 'declined') {
+        if (stage === 'navigation') {
+          setStage('request');
         }
       }
     });
 
     return () => unsubscribe();
-  }, [pickup, dropoff, routeData, stage]);
+  }, [stage]);
 
   const handleApiKeyChange = (newKey: string) => {
     setApiKey(newKey);

@@ -26,7 +26,7 @@ import {
   RATE_PER_KM_TAKA,
 } from '../services/rideSync';
 import { calculateRoute, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
-import { requestLiveCoordinates } from '../services/geolocation';
+import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
 
 interface RiderDashboardProps {
   riderId: string;
@@ -65,26 +65,40 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
   // 1. Automatically request live coordinates on mount
   useEffect(() => {
-    if (locationPrompted) return;
-    setLocationPrompted(true);
+    let isMounted = true;
 
     const acquireRiderGps = async () => {
       setIsLocating(true);
       try {
         const coords = await requestLiveCoordinates();
+        if (!isMounted) return;
         setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
 
         const point = await reverseGeocode(coords.lat, coords.lon, activeKey);
+        if (!isMounted) return;
         setRiderAddress(point.formatted);
       } catch (err: any) {
         console.warn('Rider GPS detection notice:', err);
-        setRiderAddress('Dhaka Central Hub, Bangladesh');
+        if (isMounted) setRiderAddress('Dhaka Central Hub, Bangladesh');
       } finally {
-        setIsLocating(false);
+        if (isMounted) setIsLocating(false);
       }
     };
 
-    acquireRiderGps();
+    if (!locationPrompted) {
+      setLocationPrompted(true);
+      acquireRiderGps();
+    }
+
+    const unwatch = watchLiveCoordinates((coords) => {
+      if (!isMounted) return;
+      setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+    });
+
+    return () => {
+      isMounted = false;
+      unwatch();
+    };
   }, [locationPrompted, activeKey]);
 
   // Re-acquire GPS manually

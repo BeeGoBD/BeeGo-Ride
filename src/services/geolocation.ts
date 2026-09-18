@@ -19,10 +19,9 @@ export const DEFAULT_BANGLADESH_SPOT = {
 };
 
 /**
- * Requests the browser's live geolocation with high accuracy.
- * If user is physically in Bangladesh, returns their exact GPS coordinates.
- * If user is testing outside Bangladesh (e.g. remote container/browser),
- * gracefully falls back to central Dhaka so Bangladesh ride features work 100%.
+ * Requests the browser's live geolocation with high accuracy and low-accuracy network fallback.
+ * If user is in Bangladesh, returns their exact GPS coordinates.
+ * If user is testing outside Bangladesh, gracefully localizes to Dhaka hub for Bangladesh ride operations.
  */
 export async function requestLiveCoordinates(): Promise<GeolocationResult> {
   if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -35,57 +34,117 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
     };
   }
 
-  return new Promise((resolve) => {
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
+  const queryPosition = (options: PositionOptions): Promise<GeolocationPosition> => {
+    return new Promise((resolve, reject) => {
+      navigator.geolocation.getCurrentPosition(resolve, reject, options);
+    });
+  };
 
-        // Check if user is physically located within Bangladesh
-        const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
+  let position: GeolocationPosition | null = null;
+  let lastError: GeolocationPositionError | null = null;
 
-        if (inBD) {
-          resolve({
-            lat: latitude,
-            lon: longitude,
-            accuracy,
-            isRealGps: true,
-            isSimulatedBangladesh: false,
-          });
-        } else {
-          // Testing outside Bangladesh -> Snap to Dhaka hub
-          resolve({
-            lat: DEFAULT_BANGLADESH_SPOT.lat,
-            lon: DEFAULT_BANGLADESH_SPOT.lon,
-            accuracy: 10,
-            isRealGps: true,
-            isSimulatedBangladesh: true,
-            message: `Detected GPS (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) is outside Bangladesh. Localized to Dhaka hub for Bangladesh ride operations.`,
-          });
-        }
-      },
-      (error) => {
-        let msg = 'Could not access device location.';
-        if (error.code === error.PERMISSION_DENIED) {
-          msg = 'Location permission denied. Defaulting to Dhaka hub.';
-        } else if (error.code === error.POSITION_UNAVAILABLE) {
-          msg = 'Location information unavailable. Defaulting to Dhaka hub.';
-        } else if (error.code === error.TIMEOUT) {
-          msg = 'Location request timed out. Defaulting to Dhaka hub.';
-        }
+  // 1. Try high-accuracy (Hardware GPS / precise Wi-Fi) with 4s timeout
+  try {
+    position = await queryPosition({
+      enableHighAccuracy: true,
+      timeout: 4000,
+      maximumAge: 0,
+    });
+  } catch (err: any) {
+    lastError = err;
+  }
 
-        resolve({
-          lat: DEFAULT_BANGLADESH_SPOT.lat,
-          lon: DEFAULT_BANGLADESH_SPOT.lon,
-          isRealGps: false,
-          isSimulatedBangladesh: true,
-          message: msg,
+  // 2. Fallback to standard network-based location (instant Wi-Fi / IP) if high accuracy timed out or failed
+  if (!position) {
+    try {
+      position = await queryPosition({
+        enableHighAccuracy: false,
+        timeout: 6000,
+        maximumAge: 60000,
+      });
+    } catch (err: any) {
+      lastError = err;
+    }
+  }
+
+  if (position) {
+    const { latitude, longitude, accuracy } = position.coords;
+    const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
+
+    if (inBD) {
+      return {
+        lat: latitude,
+        lon: longitude,
+        accuracy,
+        isRealGps: true,
+        isSimulatedBangladesh: false,
+      };
+    } else {
+      return {
+        lat: DEFAULT_BANGLADESH_SPOT.lat,
+        lon: DEFAULT_BANGLADESH_SPOT.lon,
+        accuracy: 10,
+        isRealGps: true,
+        isSimulatedBangladesh: true,
+        message: `Detected device GPS (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) is outside Bangladesh. Localized to Dhaka hub for Bangladesh ride services.`,
+      };
+    }
+  }
+
+  // Error handling if permission denied or unavailable
+  let msg = 'Could not access device location.';
+  if (lastError?.code === 1) {
+    msg = 'Location permission was denied. Please allow location access in your browser.';
+  } else if (lastError?.code === 2) {
+    msg = 'Location information unavailable. Defaulting to Dhaka.';
+  } else if (lastError?.code === 3) {
+    msg = 'Location request timed out. Defaulting to Dhaka.';
+  }
+
+  return {
+    lat: DEFAULT_BANGLADESH_SPOT.lat,
+    lon: DEFAULT_BANGLADESH_SPOT.lon,
+    isRealGps: false,
+    isSimulatedBangladesh: true,
+    message: msg,
+  };
+}
+
+/**
+ * Subscribes to ongoing live position changes from the device
+ */
+export function watchLiveCoordinates(
+  onUpdate: (res: GeolocationResult) => void
+): () => void {
+  if (typeof window === 'undefined' || !navigator.geolocation) {
+    return () => {};
+  }
+
+  const watchId = navigator.geolocation.watchPosition(
+    (position) => {
+      const { latitude, longitude, accuracy } = position.coords;
+      const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
+      if (inBD) {
+        onUpdate({
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          isRealGps: true,
+          isSimulatedBangladesh: false,
         });
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 9000,
-        maximumAge: 10000,
       }
-    );
-  });
+    },
+    (err) => {
+      console.warn('watchPosition update error:', err);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 10000,
+    }
+  );
+
+  return () => {
+    navigator.geolocation.clearWatch(watchId);
+  };
 }
