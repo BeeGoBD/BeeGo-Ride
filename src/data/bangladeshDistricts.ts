@@ -237,3 +237,20 @@ export function searchBangladeshDistricts(query: string, maxResults = 8): Locati
     placeId: `bd_district_${d.id}`,
   }));
 }
+
+/**
+ * Finds the nearest Bangladesh district for any coordinate in Bangladesh
+ */
+export function getNearestBangladeshDistrict(lat: number, lon: number): BangladeshDistrict {
+  let closest = BANGLADESH_DISTRICTS[0];
+  let minDistance = Infinity;
+  for (const d of BANGLADESH_DISTRICTS) {
+    const dist = (d.lat - lat) ** 2 + (d.lon - lon) ** 2;
+    if (dist < minDistance) {
+      minDistance = dist;
+      closest = d;
+    }
+  }
+  return closest;
+}
+

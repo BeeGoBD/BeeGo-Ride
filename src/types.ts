@@ -59,11 +59,19 @@ export interface RideRequest {
   id: string; // e.g. RIDE-8392
   passengerId: string; // e.g. PAX-4821
   riderId?: string; // e.g. RIDER-9302
+  vehicleType?: 'bike' | 'car';
   pickup: LocationPoint;
   dropoff: LocationPoint;
-  distanceKm: number;
-  durationMinutes: number;
-  fareTaka: number; // 1 km = 70 Taka
+  distanceKm: number; // estimated distance
+  durationMinutes: number; // estimated duration
+  fareTaka: number; // estimated fare: 1 km = 70 Taka
+  actualTraveledKm?: number; // actual distance traveled counted by system
+  finalFareTaka?: number; // fair calculation after finishing ride according to kilometers
+  passengerLiveLocation?: {
+    lat: number;
+    lon: number;
+    updatedAt: number;
+  };
   status: RideStatus;
   createdAt: number;
   routeData?: RouteData;
@@ -71,6 +79,7 @@ export interface RideRequest {
   liveTracking?: LiveTrackingData;
   driverDetails?: {
     name: string;
+    vehicleType?: 'bike' | 'car';
     vehicleModel: string;
     plateNumber: string;
     rating: number;

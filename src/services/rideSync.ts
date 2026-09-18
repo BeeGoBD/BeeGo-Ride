@@ -5,10 +5,11 @@ const STORAGE_KEY = 'geoapify_active_ride';
 const CHANNEL_NAME = 'geoapify_ride_broadcast';
 
 const DEFAULT_DRIVER = {
-  name: 'Md. Rafiqul Islam',
-  vehicleModel: 'Toyota Corolla Axio (Silver)',
-  plateNumber: 'DHAKA METRO-GA 4821',
-  rating: 4.9,
+  name: 'Tanvir Hossain',
+  vehicleType: 'bike' as const,
+  vehicleModel: 'Yamaha FZ-S FI (Midnight Black) - Bike',
+  plateNumber: 'DHAKA METRO-HA 52-8910',
+  rating: 4.95,
   phone: '+880 1712-345678',
 };
 
@@ -119,6 +120,7 @@ export function requestNewRide(
   const newRide: RideRequest = {
     id: generateRideId(),
     passengerId,
+    vehicleType: 'bike',
     pickup,
     dropoff,
     distanceKm,
@@ -131,6 +133,25 @@ export function requestNewRide(
 
   saveAndBroadcastRide(newRide);
   return newRide;
+}
+
+/**
+ * Updates real-time passenger live coordinates so rider sees live movement
+ */
+export function updatePassengerLiveLocation(coords: { lat: number; lon: number }): void {
+  const current = getStoredRide();
+  if (!current) return;
+
+  const updated: RideRequest = {
+    ...current,
+    passengerLiveLocation: {
+      lat: coords.lat,
+      lon: coords.lon,
+      updatedAt: Date.now(),
+    },
+  };
+
+  saveAndBroadcastRide(updated);
 }
 
 /**
@@ -200,15 +221,24 @@ export function startTripToDestination(): RideRequest | null {
 }
 
 /**
- * Trip completes at destination
+ * Trip completes at destination with fair fare calculated by distance
  */
-export function completeTrip(): RideRequest | null {
+export function completeTrip(actualTraveledKm?: number): RideRequest | null {
   const current = getStoredRide();
   if (!current) return null;
+
+  const traveled = actualTraveledKm && actualTraveledKm > 0
+    ? Number(actualTraveledKm.toFixed(2))
+    : current.distanceKm;
+
+  // Fair calculation: ৳70 per kilometer
+  const finalFare = Math.max(RATE_PER_KM_TAKA, Math.round(traveled * RATE_PER_KM_TAKA));
 
   const updated: RideRequest = {
     ...current,
     status: 'completed',
+    actualTraveledKm: traveled,
+    finalFareTaka: finalFare,
   };
 
   saveAndBroadcastRide(updated);

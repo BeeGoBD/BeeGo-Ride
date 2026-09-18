@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
   Car,
+  Bike,
   Navigation,
   MapPin,
   Clock,
@@ -89,8 +90,8 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   // Driver details
   const driver = activeRide.driverDetails || {
     name: 'Md. Rafiqul Islam',
-    vehicleModel: 'Toyota Corolla Axio (Silver)',
-    plateNumber: 'DHAKA METRO-GA 4821',
+    vehicleModel: 'Yamaha FZ-S FI (Bike)',
+    plateNumber: 'DHAKA METRO-HA 3912',
     rating: 4.9,
     phone: '+880 1712-345678',
   };
@@ -207,27 +208,28 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
     dropMarker.bindPopup(`<strong>Destination:</strong><br/>${activeRide.dropoff.formatted}`);
     dropoffMarkerRef.current = dropMarker;
 
-    // Vehicle Marker Icon
-    const carIcon = L.divIcon({
-      className: 'uber-car-marker',
+    // Vehicle Marker Icon (Yamaha Motorcycle Bike)
+    const bikeIcon = L.divIcon({
+      className: 'uber-bike-marker',
       html: `
-        <div id="uber-car-element" style="position: relative; width: 42px; height: 42px; display: flex; align-items: center; justify-content: center; transform: rotate(0deg); transition: transform 0.2s ease-out;">
+        <div id="uber-car-element" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; transform: rotate(0deg); transition: transform 0.2s ease-out;">
           <div style="width: 38px; height: 38px; background: #10b981; border: 2.5px solid #ffffff; border-radius: 9999px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 18px rgba(0,0,0,0.8);">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="white" stroke="black" stroke-width="1.5">
-              <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9C2.1 11.1 2 11.5 2 12v4c0 .6.4 1 1 1h2"/>
-              <circle cx="7" cy="17" r="2"/>
-              <circle cx="17" cy="17" r="2"/>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18.5" cy="17.5" r="3.5"></circle>
+              <circle cx="5.5" cy="17.5" r="3.5"></circle>
+              <circle cx="15" cy="5" r="1"></circle>
+              <path d="M12 17.5V14l-3-3 4-3 2 3h2"></path>
             </svg>
           </div>
         </div>
       `,
-      iconSize: [42, 42],
-      iconAnchor: [21, 21],
+      iconSize: [44, 44],
+      iconAnchor: [22, 22],
     });
 
     const startCoord = initialCenter;
     const vMarker = L.marker(startCoord, {
-      icon: carIcon,
+      icon: bikeIcon,
       zIndexOffset: 1200,
     }).addTo(map);
     vehicleMarkerRef.current = vMarker;
@@ -240,6 +242,13 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       mapInstanceRef.current = null;
     };
   }, [activeKey, activeRide.id]);
+
+  // Dynamically update passenger marker when passenger live coordinates change
+  useEffect(() => {
+    if (!passengerMarkerRef.current) return;
+    const paxLoc = activeRide.passengerLiveLocation || activeRide.pickup;
+    passengerMarkerRef.current.setLatLng([paxLoc.lat, paxLoc.lon]);
+  }, [activeRide.passengerLiveLocation]);
 
   // 3. Draw Polylines when activeRouteCoords changes
   useEffect(() => {
@@ -376,7 +385,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
           if (isEnRouteToPickup) {
             arriveAtPickupSpot();
           } else if (isInTransit) {
-            completeTrip();
+            completeTrip(activeRide.distanceKm);
           }
           return;
         }
@@ -402,7 +411,8 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   };
 
   const handleCompleteTrip = () => {
-    completeTrip();
+    const finalKm = traveledKm > 0 ? traveledKm : activeRide.distanceKm;
+    completeTrip(finalKm);
   };
 
   const handleCancel = () => {
@@ -498,31 +508,36 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       {/* 4. BOTTOM UBER HUD / DASHBOARD PANEL */}
       <div className="absolute bottom-4 left-4 right-4 z-[1000] max-w-xl mx-auto pointer-events-auto">
         <div className="bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800/90 rounded-2xl p-4 shadow-2xl space-y-3.5">
-          {/* Telemetry Stats Bar: Traveled Distance, Speed, Remaining, Fare */}
-          <div className="grid grid-cols-4 gap-2 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-center">
-            <div>
-              <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Traveled</div>
-              <div className="text-sm font-black text-emerald-400">{traveledKm} km</div>
-            </div>
-            <div>
-              <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Speed</div>
-              <div className="text-sm font-black text-white">{currentSpeed} km/h</div>
-            </div>
-            <div>
-              <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Remaining</div>
-              <div className="text-sm font-black text-white">{remainingKm} km</div>
-            </div>
-            <div>
-              <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Fare Rate</div>
-              <div className="text-sm font-black text-emerald-400">৳{RATE_PER_KM_TAKA}/km</div>
-            </div>
-          </div>
+          {/* Telemetry Stats Bar: Traveled Distance, Speed, Remaining, Fare Meter */}
+          {(() => {
+            const liveMeterTaka = Math.max(70, Math.round((traveledKm > 0 ? traveledKm : 0.1) * RATE_PER_KM_TAKA));
+            return (
+              <div className="grid grid-cols-4 gap-2 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-center">
+                <div>
+                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Traveled</div>
+                  <div className="text-sm font-black text-emerald-400">{traveledKm} km</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Speed</div>
+                  <div className="text-sm font-black text-white">{currentSpeed} km/h</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Live Meter</div>
+                  <div className="text-sm font-black text-emerald-400">৳{liveMeterTaka}</div>
+                </div>
+                <div>
+                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Estimated</div>
+                  <div className="text-sm font-black text-zinc-300">~৳{activeRide.fareTaka}</div>
+                </div>
+              </div>
+            );
+          })()}
 
           {/* Passenger & Driver Details Strip */}
           <div className="flex items-center justify-between gap-3 pt-1 border-t border-zinc-800/60">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-white shrink-0">
-                <Car className="w-5 h-5 text-emerald-400" />
+                <Bike className="w-5 h-5 text-emerald-400" />
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
@@ -676,17 +691,26 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
             {/* Fare Breakdown */}
             <div className="bg-zinc-900/90 border border-zinc-800 p-4 rounded-2xl space-y-2.5">
               <div className="flex justify-between items-center text-xs text-zinc-400">
-                <span>Trip Distance</span>
-                <span className="font-bold text-white">{activeRide.distanceKm} km</span>
+                <span>Actual Distance Traveled</span>
+                <span className="font-bold text-white">
+                  {activeRide.actualTraveledKm || traveledKm || activeRide.distanceKm} km
+                </span>
               </div>
               <div className="flex justify-between items-center text-xs text-zinc-400">
                 <span>Rate per Kilometer</span>
                 <span className="font-bold text-white">৳{RATE_PER_KM_TAKA} Taka / km</span>
               </div>
+              <div className="flex justify-between items-center text-xs text-zinc-400">
+                <span>Initial Estimated Price</span>
+                <span className="text-zinc-400 font-mono">~৳{activeRide.fareTaka} Taka</span>
+              </div>
               <div className="pt-2 border-t border-zinc-800 flex justify-between items-center">
-                <span className="text-sm font-bold text-white">Total Fare</span>
+                <div>
+                  <span className="text-sm font-bold text-white">Final Calculated Fare</span>
+                  <div className="text-[10px] text-zinc-500">Counted by system from kilometers traveled</div>
+                </div>
                 <span className="text-2xl font-black text-emerald-400">
-                  ৳{activeRide.fareTaka} Taka
+                  ৳{activeRide.finalFareTaka || activeRide.fareTaka} Taka
                 </span>
               </div>
             </div>

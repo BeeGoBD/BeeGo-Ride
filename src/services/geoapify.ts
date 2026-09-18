@@ -2,6 +2,7 @@ import { LocationPoint, RouteData, RouteStep } from '../types';
 import {
   searchBangladeshDistricts,
   isLocationInBangladesh,
+  getNearestBangladeshDistrict,
   BD_BOUNDS,
 } from '../data/bangladeshDistricts';
 
@@ -133,23 +134,28 @@ export async function searchAddress(
  */
 export async function reverseGeocode(lat: number, lon: number, apiKey: string): Promise<LocationPoint> {
   const keyToUse = apiKey.trim() || DEFAULT_GEOAPIFY_KEY;
-  if (!keyToUse) {
-    throw new Error('Please enter your Geoapify API key for reverse geocoding.');
+
+  // Check coordinates against Bangladesh bounding box
+  const inBDBounds = lat >= BD_BOUNDS.minLat && lat <= BD_BOUNDS.maxLat && lon >= BD_BOUNDS.minLon && lon <= BD_BOUNDS.maxLon;
+  const nearest = getNearestBangladeshDistrict(lat, lon);
+
+  let item: any = null;
+  try {
+    if (keyToUse) {
+      const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${encodeURIComponent(
+        keyToUse
+      )}`;
+      const response = await fetch(url);
+      if (response.ok) {
+        const data = await response.json();
+        item = data.results?.[0] || (data.features?.[0]?.properties ?? null);
+      }
+    }
+  } catch (err) {
+    console.warn('Geoapify reverse geocode failed, using district coordinates fallback:', err);
   }
 
-  const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${encodeURIComponent(
-    keyToUse
-  )}`;
-
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Reverse geocoding failed (${response.status})`);
-  }
-
-  const data = await response.json();
-  const item = data.results?.[0] || (data.features?.[0]?.properties ?? null);
-
-  const isInBD = isLocationInBangladesh({
+  const isInBD = inBDBounds || isLocationInBangladesh({
     lat,
     lon,
     country: item?.country,
@@ -158,23 +164,27 @@ export async function reverseGeocode(lat: number, lon: number, apiKey: string): 
   });
 
   if (!isInBD) {
-    throw new Error('Detected location is outside Bangladesh. Please search for a spot inside Bangladesh.');
+    throw new Error('Detected location is outside Bangladesh. Please search for or pin a spot inside Bangladesh.');
   }
 
-  if (!item) {
+  // If Geoapify has no specific street / POI (unregistered spot, bridge, riverbank, alleyway)
+  if (!item || (!item.formatted && !item.street && !item.name)) {
+    const formatted = `Pinned Spot near ${nearest.name}, ${nearest.division} Division, Bangladesh (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
     return {
       lat,
       lon,
-      formatted: `${lat.toFixed(5)}, ${lon.toFixed(5)}, Bangladesh`,
-      addressLine1: 'Current GPS Location',
-      addressLine2: 'Bangladesh',
+      formatted,
+      addressLine1: `Custom Pinned Spot (${nearest.name})`,
+      addressLine2: `${nearest.division} Division, Bangladesh`,
+      name: `Pinned Spot near ${nearest.name}`,
+      city: nearest.name,
       country: 'Bangladesh',
     };
   }
 
-  const formatted = item.formatted || `${item.street || item.name || 'Location'}, ${item.city || ''}, Bangladesh`;
-  const addressLine1 = item.address_line1 || item.name || item.street || formatted.split(',')[0];
-  const addressLine2 = item.address_line2 || [item.city, item.state, 'Bangladesh'].filter(Boolean).join(', ') || formatted;
+  const formatted = item.formatted || `${item.street || item.name || 'Location'}, ${item.city || nearest.name}, Bangladesh`;
+  const addressLine1 = item.address_line1 || item.name || item.street || `Spot near ${nearest.name}`;
+  const addressLine2 = item.address_line2 || [item.city || nearest.name, item.state || nearest.division, 'Bangladesh'].filter(Boolean).join(', ');
 
   return {
     lat: item.lat ?? lat,
@@ -182,9 +192,9 @@ export async function reverseGeocode(lat: number, lon: number, apiKey: string): 
     formatted,
     addressLine1,
     addressLine2,
-    name: item.name,
+    name: item.name || `Spot near ${nearest.name}`,
     street: item.street,
-    city: item.city,
+    city: item.city || nearest.name,
     country: 'Bangladesh',
     placeId: item.place_id,
   };

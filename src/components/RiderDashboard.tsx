@@ -1,19 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import {
-  Car,
   MapPin,
   Navigation,
   CheckCircle2,
   XCircle,
-  Clock,
   Banknote,
   Compass,
   ArrowLeft,
-  RefreshCw,
-  Milestone,
-  Check,
   Radio,
+  LocateFixed,
+  Loader2,
+  Check,
+  Bike,
+  ShieldCheck,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData } from '../types';
 import {
@@ -25,7 +25,8 @@ import {
   clearCurrentRide,
   RATE_PER_KM_TAKA,
 } from '../services/rideSync';
-import { calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
+import { calculateRoute, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
+import { requestLiveCoordinates } from '../services/geolocation';
 
 interface RiderDashboardProps {
   riderId: string;
@@ -49,41 +50,80 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
 
+  // Rider Live GPS state
+  const [riderLiveGps, setRiderLiveGps] = useState<{
+    lat: number;
+    lon: number;
+    accuracy?: number;
+  } | null>(null);
+  const [riderAddress, setRiderAddress] = useState<string>('Detecting live location in Bangladesh...');
+  const [isLocating, setIsLocating] = useState<boolean>(false);
+  const [locationPrompted, setLocationPrompted] = useState<boolean>(false);
+
   const [isAccepting, setIsAccepting] = useState(false);
-  const [isArriving, setIsArriving] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
 
-  // Initialize and update Map based on ride status
+  // 1. Automatically request live coordinates on mount
   useEffect(() => {
-    // Only show map if ride is accepted, arrived, in_transit, or completed
-    if (
-      !activeRide ||
-      activeRide.status === 'requested' ||
-      activeRide.status === 'declined' ||
-      activeRide.status === 'cancelled'
-    ) {
-      if (mapInstanceRef.current) {
-        mapInstanceRef.current.remove();
-        mapInstanceRef.current = null;
-      }
-      return;
-    }
+    if (locationPrompted) return;
+    setLocationPrompted(true);
 
+    const acquireRiderGps = async () => {
+      setIsLocating(true);
+      try {
+        const coords = await requestLiveCoordinates();
+        setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+
+        const point = await reverseGeocode(coords.lat, coords.lon, activeKey);
+        setRiderAddress(point.formatted);
+      } catch (err: any) {
+        console.warn('Rider GPS detection notice:', err);
+        setRiderAddress('Dhaka Central Hub, Bangladesh');
+      } finally {
+        setIsLocating(false);
+      }
+    };
+
+    acquireRiderGps();
+  }, [locationPrompted, activeKey]);
+
+  // Re-acquire GPS manually
+  const handleRecenterGps = async () => {
+    setIsLocating(true);
+    setActionError(null);
+    try {
+      const coords = await requestLiveCoordinates();
+      setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+
+      const point = await reverseGeocode(coords.lat, coords.lon, activeKey);
+      setRiderAddress(point.formatted);
+
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.flyTo([coords.lat, coords.lon], 16, { duration: 1 });
+      }
+    } catch (err: any) {
+      setActionError(err.message || 'Could not refresh device GPS.');
+    } finally {
+      setIsLocating(false);
+    }
+  };
+
+  // 2. Initialize and maintain Leaflet Map permanently on Rider Dashboard
+  useEffect(() => {
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      const centerLat = activeRide.pickup.lat;
-      const centerLon = activeRide.pickup.lon;
+      const initialLat = riderLiveGps?.lat || activeRide?.pickup.lat || 23.7925;
+      const initialLon = riderLiveGps?.lon || activeRide?.pickup.lon || 90.4078;
 
       const map = L.map(mapContainerRef.current, {
-        center: [centerLat, centerLon],
+        center: [initialLat, initialLon],
         zoom: 14,
         zoomControl: false,
       });
 
       L.control.zoom({ position: 'topright' }).addTo(map);
 
-      // Geoapify Dark tiles
       const tileUrl = activeKey
         ? `https://maps.geoapify.com/v1/tile/dark-matter-purple-roads/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(
             activeKey
@@ -91,8 +131,8 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
       L.tileLayer(tileUrl, {
-        attribution: '&copy; Geoapify | &copy; OpenStreetMap',
         maxZoom: 19,
+        attribution: '&copy; Geoapify | &copy; OpenStreetMap',
       }).addTo(map);
 
       markersLayerRef.current = L.layerGroup().addTo(map);
@@ -109,112 +149,135 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       routeLayerRef.current = null;
     }
 
-    // STAGE 1: Rider Accepted -> Show Where is the Pickup Spot
-    if (activeRide.status === 'accepted') {
+    // A. Always render Rider's Live Motorcycle marker
+    const riderLat = riderLiveGps?.lat || 23.7925;
+    const riderLon = riderLiveGps?.lon || 90.4078;
+
+    const bikeIcon = L.divIcon({
+      className: 'rider-bike-marker',
+      html: `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+          <span style="position: absolute; width: 42px; height: 42px; border-radius: 9999px; background: rgba(16, 185, 129, 0.35); animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+          <div style="width: 32px; height: 32px; border-radius: 9999px; background: #10b981; border: 3px solid #ffffff; box-shadow: 0 0 16px rgba(16, 185, 129, 0.8); display: flex; align-items: center; justify-content: center; z-index: 10;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="18.5" cy="17.5" r="3.5"></circle>
+              <circle cx="5.5" cy="17.5" r="3.5"></circle>
+              <circle cx="15" cy="5" r="1"></circle>
+              <path d="M12 17.5V14l-3-3 4-3 2 3h2"></path>
+            </svg>
+          </div>
+          <div style="margin-top: 2px; padding: 1px 6px; background: #000; color: #10b981; font-size: 10px; font-weight: 800; border-radius: 4px; border: 1px solid #10b981; white-space: nowrap;">
+            You (Bike)
+          </div>
+        </div>
+      `,
+      iconSize: [44, 48],
+      iconAnchor: [22, 24],
+    });
+
+    const riderMarker = L.marker([riderLat, riderLon], {
+      icon: bikeIcon,
+      zIndexOffset: 900,
+    }).addTo(markers);
+
+    riderMarker.bindPopup(`
+      <div style="font-family: sans-serif; font-size: 12px; color: #111;">
+        <strong>Your Live Bike Location</strong><br/>
+        ${riderAddress}<br/>
+        <span style="color: #10b981; font-weight: bold;">🟢 Online & Ready</span>
+      </div>
+    `);
+
+    // B. If a passenger request is pending (requested)
+    if (activeRide && activeRide.status === 'requested') {
+      // Pickup Pin
       const pickupIcon = L.divIcon({
-        className: 'custom-rider-pickup-pin',
+        className: 'pax-pickup-marker',
         html: `
-          <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-            <span style="position: absolute; width: 34px; height: 34px; border-radius: 9999px; background: rgba(16, 185, 129, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
-            <div style="width: 20px; height: 20px; border-radius: 9999px; background: #10b981; border: 3px solid #ffffff; box-shadow: 0 0 14px rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center;">
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div style="padding: 2px 8px; background: #10b981; color: #000; font-size: 11px; font-weight: 800; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); white-space: nowrap; margin-bottom: 2px;">
+              Pickup Spot
             </div>
+            <div style="width: 16px; height: 16px; border-radius: 9999px; background: #10b981; border: 2.5px solid #fff; box-shadow: 0 0 10px rgba(16,185,129,0.9);"></div>
           </div>
         `,
-        iconSize: [34, 34],
-        iconAnchor: [17, 17],
+        iconSize: [70, 40],
+        iconAnchor: [35, 36],
       });
 
-      const pickupMarker = L.marker([activeRide.pickup.lat, activeRide.pickup.lon], {
-        icon: pickupIcon,
-      }).addTo(markers);
-
-      pickupMarker
-        .bindPopup(
-          `<div style="font-family: sans-serif; font-size: 12px; color: #111;">
-            <strong>Pickup Spot</strong><br/>${activeRide.pickup.formatted}
-          </div>`
-        )
-        .openPopup();
-
-      map.setView([activeRide.pickup.lat, activeRide.pickup.lon], 15);
-    }
-
-    // STAGE 2: Arrived at Pickup Spot / In Transit / Completed -> Reveal Drop-off (Where to go) & Full Route
-    if (
-      activeRide.status === 'arrived_at_pickup' ||
-      activeRide.status === 'in_transit' ||
-      activeRide.status === 'completed'
-    ) {
-      // Pickup marker
-      const pickupIcon = L.divIcon({
-        className: 'custom-pax-pickup',
-        html: `
-          <div style="width: 18px; height: 18px; border-radius: 9999px; background: #10b981; border: 3px solid #ffffff; box-shadow: 0 0 10px rgba(0,0,0,0.8);"></div>
-        `,
-        iconSize: [18, 18],
-        iconAnchor: [9, 9],
-      });
-
-      // Dropoff marker (Where to go!)
+      // Drop-off Pin
       const dropoffIcon = L.divIcon({
-        className: 'custom-pax-dropoff',
+        className: 'pax-dropoff-marker',
         html: `
-          <div style="width: 20px; height: 20px; border-radius: 4px; background: #ef4444; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(0,0,0,0.9); transform: rotate(45deg);"></div>
+          <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+            <div style="padding: 2px 8px; background: #ef4444; color: #fff; font-size: 11px; font-weight: 800; border-radius: 9999px; box-shadow: 0 4px 12px rgba(0,0,0,0.6); white-space: nowrap; margin-bottom: 2px;">
+              Drop-off Spot
+            </div>
+            <div style="width: 16px; height: 16px; border-radius: 4px; background: #ef4444; border: 2.5px solid #fff; box-shadow: 0 0 10px rgba(239,68,68,0.9); transform: rotate(45deg);"></div>
+          </div>
         `,
-        iconSize: [20, 20],
-        iconAnchor: [10, 10],
+        iconSize: [80, 40],
+        iconAnchor: [40, 36],
       });
 
       L.marker([activeRide.pickup.lat, activeRide.pickup.lon], { icon: pickupIcon })
-        .bindPopup(`<strong>Pickup:</strong> ${activeRide.pickup.formatted}`)
+        .bindPopup(`<strong>Passenger Pickup:</strong> ${activeRide.pickup.formatted}`)
         .addTo(markers);
 
       L.marker([activeRide.dropoff.lat, activeRide.dropoff.lon], { icon: dropoffIcon })
-        .bindPopup(`<strong>Where to go (Drop-off):</strong> ${activeRide.dropoff.formatted}`)
-        .addTo(markers)
-        .openPopup();
+        .bindPopup(`<strong>Passenger Destination:</strong> ${activeRide.dropoff.formatted}`)
+        .addTo(markers);
 
-      // Draw polyline if route data exists
+      // Route polyline between pickup and dropoff
       if (activeRide.routeData?.coordinates && activeRide.routeData.coordinates.length > 0) {
         const polyline = L.polyline(activeRide.routeData.coordinates, {
-          color: '#3b82f6',
-          weight: 6,
+          color: '#10b981',
+          weight: 5,
           opacity: 0.9,
           lineJoin: 'round',
         }).addTo(map);
-
         routeLayerRef.current = polyline;
-        map.fitBounds(polyline.getBounds(), { padding: [40, 40] });
-      } else {
-        const bounds = L.latLngBounds([
-          [activeRide.pickup.lat, activeRide.pickup.lon],
-          [activeRide.dropoff.lat, activeRide.dropoff.lon],
-        ]);
-        map.fitBounds(bounds, { padding: [50, 50] });
+      }
+
+      // Fit bounds to show Rider, Pickup, and Dropoff
+      const bounds = L.latLngBounds([
+        [riderLat, riderLon],
+        [activeRide.pickup.lat, activeRide.pickup.lon],
+        [activeRide.dropoff.lat, activeRide.dropoff.lon],
+      ]);
+      map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      // Just focus on rider
+      if (!activeRide || activeRide.status === 'declined' || activeRide.status === 'cancelled') {
+        map.setView([riderLat, riderLon], 15);
       }
     }
-  }, [activeRide?.status, activeRide?.id, activeKey]);
+  }, [riderLiveGps, riderAddress, activeRide, activeKey]);
 
-  // Handle Accept
+  // Handle Accept with Rider's LIVE coordinates
   const handleAccept = async () => {
     if (!activeRide) return;
     setIsAccepting(true);
     setActionError(null);
+
     try {
-      // Driver starting location nearby in Bangladesh (~1.2 km from passenger)
-      const offsetLat = 0.011;
-      const offsetLon = -0.009;
-      const driverStart: LocationPoint = {
-        lat: activeRide.pickup.lat + offsetLat,
-        lon: activeRide.pickup.lon + offsetLon,
-        formatted: 'Driver Current Location',
-      };
+      const driverStart: LocationPoint = riderLiveGps
+        ? {
+            lat: riderLiveGps.lat,
+            lon: riderLiveGps.lon,
+            formatted: riderAddress || 'Rider Live Spot',
+          }
+        : {
+            lat: activeRide.pickup.lat + 0.01,
+            lon: activeRide.pickup.lon - 0.008,
+            formatted: 'Rider Live Spot',
+          };
 
       let pickupRoute: RouteData | undefined;
       try {
         pickupRoute = await calculateRoute(driverStart, activeRide.pickup, activeKey);
       } catch (err) {
-        console.warn('Approaching route computed with fallback path');
+        console.warn('Approaching route fallback');
       }
 
       acceptRide(riderId, pickupRoute);
@@ -225,40 +288,12 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     }
   };
 
-  // Handle Arrive at Pickup Spot
-  const handleArriveAtPickup = () => {
-    if (!activeRide) return;
-    setIsArriving(true);
-    try {
-      arriveAtPickupSpot();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to confirm arrival at pickup spot.');
-    } finally {
-      setIsArriving(false);
-    }
-  };
-
-  // Handle Start Trip to destination
-  const handleStartTrip = () => {
-    startTripToDestination();
-  };
-
-  // Handle Complete Trip
-  const handleCompleteTrip = () => {
-    completeTrip();
-  };
-
-  // Handle Dismiss / Reset
-  const handleReset = () => {
-    clearCurrentRide();
+  // Handle Decline
+  const handleDecline = () => {
+    declineRide();
   };
 
   const hasIncomingRequest = activeRide && activeRide.status === 'requested';
-  const isTripActive =
-    activeRide &&
-    (activeRide.status === 'accepted' ||
-      activeRide.status === 'arrived_at_pickup' ||
-      activeRide.status === 'in_transit');
 
   return (
     <div id="rider-dashboard" className="w-full min-h-screen bg-black text-white flex flex-col">
@@ -278,8 +313,9 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             <h1 className="text-sm font-bold text-white tracking-wide">Rider Dashboard</h1>
           </div>
 
-          <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">
-            {riderId}
+          <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded flex items-center gap-1">
+            <Bike className="w-3.5 h-3.5" />
+            <span>{riderId}</span>
           </span>
         </div>
 
@@ -299,13 +335,41 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         {/* Left Side: Controls & Ride Request Details Panel */}
         <div className="w-full md:w-96 lg:w-[420px] bg-zinc-950 border-r border-zinc-800/80 p-5 flex flex-col justify-between overflow-y-auto z-10">
           <div>
-            {/* Status Badge */}
+            {/* Live Dispatch Feed Header */}
             <div className="flex items-center justify-between mb-4">
               <span className="text-xs uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
                 <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
                 Live Dispatch Feed
               </span>
-              <span className="text-[11px] font-mono text-zinc-400">Rate: ৳{RATE_PER_KM_TAKA}/km</span>
+              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900/60">
+                Rate: ৳{RATE_PER_KM_TAKA}/km
+              </span>
+            </div>
+
+            {/* Rider Live Location Status Card */}
+            <div className="mb-4 p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 shadow-lg">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                  Your Live Rider GPS
+                </span>
+                <button
+                  type="button"
+                  onClick={handleRecenterGps}
+                  disabled={isLocating}
+                  className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
+                >
+                  <LocateFixed className="w-3 h-3 text-emerald-400" />
+                  <span>{isLocating ? 'Locating...' : 'Refresh'}</span>
+                </button>
+              </div>
+              <div className="text-xs font-semibold text-white truncate">{riderAddress}</div>
+              {riderLiveGps && (
+                <div className="text-[10px] font-mono text-zinc-500 mt-1">
+                  {riderLiveGps.lat.toFixed(5)}° N, {riderLiveGps.lon.toFixed(5)}° E
+                  {riderLiveGps.accuracy && ` (±${Math.round(riderLiveGps.accuracy)}m)`}
+                </div>
+              )}
             </div>
 
             {actionError && (
@@ -314,14 +378,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
               </div>
             )}
 
-            {/* STATE 1: NO ACTIVE RIDE -> WAITING RADAR */}
+            {/* STATE 1: WAITING FOR RIDE */}
             {!activeRide || activeRide.status === 'declined' || activeRide.status === 'cancelled' ? (
-              <div className="py-12 px-4 text-center">
-                <div className="relative w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+              <div className="py-8 px-2 text-center">
+                <div className="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
                   <div className="absolute inset-2 rounded-full border border-emerald-500/40 animate-pulse" />
                   <div className="w-12 h-12 rounded-full bg-zinc-900 border border-emerald-500/60 flex items-center justify-center text-emerald-400">
-                    <Car className="w-6 h-6" />
+                    <Bike className="w-6 h-6" />
                   </div>
                 </div>
 
@@ -330,24 +394,28 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                     ? 'Ride Declined'
                     : activeRide?.status === 'cancelled'
                     ? 'Ride Cancelled by Passenger'
-                    : 'Online & Ready'}
+                    : 'Online & Ready in Bangladesh'}
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto mb-6">
                   {activeRide?.status === 'declined' || activeRide?.status === 'cancelled'
                     ? 'Listening for new incoming ride requests from passengers...'
-                    : 'Listening for live ride requests from guest passengers...'}
+                    : 'Your live position is showing on the map. Ready to receive ride requests.'}
                 </p>
 
-                <div className="p-3 bg-black/60 border border-zinc-800/80 rounded-xl text-left text-xs text-zinc-400 space-y-2">
+                <div className="p-3.5 bg-black/60 border border-zinc-800/80 rounded-xl text-left text-xs text-zinc-400 space-y-2">
+                  <div className="flex items-center justify-between text-zinc-300">
+                    <span>Vehicle:</span>
+                    <span className="font-bold text-white">Yamaha FZ-S (Bike)</span>
+                  </div>
                   <div className="flex items-center justify-between text-zinc-300">
                     <span>Pricing Standard:</span>
-                    <span className="font-bold text-white">৳70 Taka per km</span>
+                    <span className="font-bold text-emerald-400">৳70 Taka per km</span>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span>Your Rider ID:</span>
+                    <span>Rider ID:</span>
                     <span className="font-mono text-emerald-400">{riderId}</span>
                   </div>
-                  <p className="text-[11px] text-zinc-500 pt-1 border-t border-zinc-800">
+                  <p className="text-[11px] text-zinc-500 pt-1.5 border-t border-zinc-800">
                     When a passenger requests a ride, the price in Taka will appear here instantly for you to accept or decline.
                   </p>
                 </div>
@@ -355,14 +423,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             ) : null}
 
             {/* STATE 2: INCOMING REQUEST (BEFORE ACCEPTING) */}
-            {/* User specification: "Before that, he can only see the price, which is right now 1 kilometer is equal to 70 taka. So you can count that according that." */}
             {hasIncomingRequest && (
               <div
                 id="incoming-ride-request-card"
                 className="p-5 rounded-2xl bg-zinc-900/90 border-2 border-emerald-500/80 shadow-2xl animate-in fade-in"
               >
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-950 px-2 py-0.5 rounded border border-emerald-800">
+                  <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                     New Ride Request!
                   </span>
                   <span className="text-xs text-zinc-400 font-mono">
@@ -370,193 +438,86 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                   </span>
                 </div>
 
-                {/* THE PRICE (HIGHLIGHTED BEFORE ACCEPTING) */}
-                <div className="my-5 p-4 rounded-xl bg-black border border-zinc-800 text-center">
+                {/* THE ESTIMATED PRICE (HIGHLIGHTED BEFORE ACCEPTING) */}
+                <div className="my-4 p-4 rounded-xl bg-black border border-zinc-800 text-center">
                   <div className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-1">
-                    Trip Fare Price
+                    Estimated Trip Fare
                   </div>
                   <div className="text-3xl font-extrabold text-emerald-400 tracking-tight flex items-center justify-center gap-1.5">
                     <Banknote className="w-7 h-7 text-emerald-400" />
-                    <span>৳{activeRide.fareTaka} Taka</span>
+                    <span>~৳{activeRide.fareTaka} Taka</span>
                   </div>
-                  <div className="text-[11px] text-zinc-400 mt-1">
-                    Distance: <strong className="text-zinc-200">{activeRide.distanceKm} km</strong> • (70 Taka/km)
+                  <div className="text-[11px] text-zinc-500 mt-1">
+                    Final fare calculated automatically from actual km traveled on bike (৳70/km)
                   </div>
                 </div>
 
-                <div className="text-xs text-zinc-400 text-center mb-5">
-                  Accept to view where the pickup spot is located.
+                {/* TRIP DETAILS: PICKUP & DROPOFF */}
+                <div className="space-y-3 mb-5">
+                  <div className="p-3 bg-black/60 rounded-xl border border-zinc-800/80">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 mb-1 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Passenger Pickup Spot:</span>
+                    </div>
+                    <div className="text-xs font-semibold text-white">
+                      {activeRide.pickup.addressLine1 || activeRide.pickup.formatted.split(',')[0]}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+                      {activeRide.pickup.addressLine2 || activeRide.pickup.formatted}
+                    </div>
+                  </div>
+
+                  <div className="p-3 bg-black/60 rounded-xl border border-zinc-800/80">
+                    <div className="text-[10px] uppercase font-bold tracking-wider text-red-400 mb-1 flex items-center gap-1.5">
+                      <Navigation className="w-3.5 h-3.5" />
+                      <span>Drop-off Spot:</span>
+                    </div>
+                    <div className="text-xs font-semibold text-white">
+                      {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}
+                    </div>
+                    <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+                      {activeRide.dropoff.addressLine2 || activeRide.dropoff.formatted}
+                    </div>
+                  </div>
+
+                  <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between">
+                    <span>Estimated Distance:</span>
+                    <span className="text-white font-bold">{activeRide.distanceKm} km</span>
+                  </div>
                 </div>
 
-                {/* ACCEPT / DECLINE BUTTONS */}
+                {/* ACTION BUTTONS: ACCEPT OR DECLINE */}
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    id="decline-ride-button"
+                    id="decline-ride-btn"
                     type="button"
-                    onClick={() => declineRide()}
-                    className="py-3 px-4 rounded-xl font-bold text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white border border-zinc-700 transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    onClick={handleDecline}
+                    className="py-3.5 px-4 rounded-xl font-bold text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                   >
                     <XCircle className="w-4 h-4 text-red-400" />
                     <span>Decline</span>
                   </button>
 
                   <button
-                    id="accept-ride-button"
+                    id="accept-ride-btn"
                     type="button"
                     onClick={handleAccept}
                     disabled={isAccepting}
-                    className="py-3 px-4 rounded-xl font-bold text-xs bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/20 transition-all cursor-pointer flex items-center justify-center gap-1.5 disabled:opacity-50"
+                    className="py-3.5 px-4 rounded-xl font-bold text-xs bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
                   >
-                    <CheckCircle2 className="w-4 h-4 text-black" />
-                    <span>{isAccepting ? 'Accepting...' : 'Accept Ride'}</span>
+                    {isAccepting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin text-black" />
+                        <span>Accepting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-4 h-4 text-black" />
+                        <span>Accept Ride</span>
+                      </>
+                    )}
                   </button>
                 </div>
-              </div>
-            )}
-
-            {/* STATE 3: ACCEPTED -> SHOW WHERE IS THE PICKUP SPOT & "I HAVE ARRIVED AT THE PICKUP SPOT" */}
-            {activeRide?.status === 'accepted' && (
-              <div id="accepted-pickup-panel" className="space-y-4 animate-in fade-in">
-                <div className="p-4 rounded-xl bg-zinc-900 border border-emerald-500/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-400">
-                      Step 1: Go to Pickup Spot
-                    </span>
-                    <span className="text-xs font-bold text-white">৳{activeRide.fareTaka} Taka</span>
-                  </div>
-
-                  <div className="mt-3 p-3 bg-black rounded-lg border border-zinc-800">
-                    <div className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Pickup Spot Location:</span>
-                    </div>
-                    <div className="text-sm font-semibold text-white">
-                      {activeRide.pickup.addressLine1 || activeRide.pickup.formatted.split(',')[0]}
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-0.5">
-                      {activeRide.pickup.addressLine2 || activeRide.pickup.formatted}
-                    </div>
-                  </div>
-
-                  <p className="text-xs text-zinc-400 mt-3 leading-relaxed">
-                    Navigate to the pickup spot shown on the map. Once you reach the passenger, click the button below.
-                  </p>
-                </div>
-
-                {/* THE "I HAVE ARRIVED AT THE PICKUP SPOT" BUTTON */}
-                <button
-                  id="arrived-at-pickup-button"
-                  type="button"
-                  onClick={handleArriveAtPickup}
-                  disabled={isArriving}
-                  className="w-full py-4 px-5 rounded-xl font-bold text-sm bg-white hover:bg-zinc-200 text-black shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Check className="w-5 h-5 text-emerald-600" />
-                  <span>I have arrived at the pickup spot</span>
-                </button>
-              </div>
-            )}
-
-            {/* STATE 4: ARRIVED AT PICKUP -> "THEN HE WILL SEE WHERE TO GO" */}
-            {activeRide?.status === 'arrived_at_pickup' && (
-              <div id="arrived-panel" className="space-y-4 animate-in fade-in">
-                <div className="p-4 rounded-xl bg-zinc-900 border border-blue-500/40">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] uppercase tracking-wider font-bold text-sky-400">
-                      Step 2: Where to Go (Destination)
-                    </span>
-                    <span className="text-xs font-bold text-white">৳{activeRide.fareTaka} Taka</span>
-                  </div>
-
-                  <div className="mt-3 p-3 bg-black rounded-lg border border-zinc-800">
-                    <div className="text-[11px] text-zinc-400 uppercase tracking-wider mb-1 flex items-center gap-1">
-                      <Navigation className="w-3.5 h-3.5 text-red-400" />
-                      <span>Drop-off Spot (Where to go):</span>
-                    </div>
-                    <div className="text-sm font-semibold text-white">
-                      {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}
-                    </div>
-                    <div className="text-xs text-zinc-400 mt-0.5">
-                      {activeRide.dropoff.addressLine2 || activeRide.dropoff.formatted}
-                    </div>
-                  </div>
-
-                  <div className="mt-3 flex items-center justify-between text-xs text-zinc-400">
-                    <span>Trip Distance: {activeRide.distanceKm} km</span>
-                    <span>Est. Time: {activeRide.durationMinutes} mins</span>
-                  </div>
-                </div>
-
-                <button
-                  id="start-transit-button"
-                  type="button"
-                  onClick={handleStartTrip}
-                  className="w-full py-4 px-5 rounded-xl font-bold text-sm bg-blue-600 hover:bg-blue-500 text-white shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <Navigation className="w-5 h-5 text-white" />
-                  <span>Start Navigation to Destination</span>
-                </button>
-              </div>
-            )}
-
-            {/* STATE 5: IN TRANSIT */}
-            {activeRide?.status === 'in_transit' && (
-              <div id="transit-panel" className="space-y-4 animate-in fade-in">
-                <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 flex items-center gap-1">
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                      Trip In Progress
-                    </span>
-                    <span className="text-xs font-bold text-emerald-400">৳{activeRide.fareTaka} Taka</span>
-                  </div>
-
-                  <div className="p-3 bg-black rounded-lg border border-zinc-800 text-xs">
-                    <div className="text-zinc-400">Navigating to Drop-off Spot:</div>
-                    <div className="text-white font-semibold mt-1 truncate">
-                      {activeRide.dropoff.formatted}
-                    </div>
-                  </div>
-                </div>
-
-                <button
-                  id="complete-trip-button"
-                  type="button"
-                  onClick={handleCompleteTrip}
-                  className="w-full py-4 px-5 rounded-xl font-bold text-sm bg-emerald-500 hover:bg-emerald-400 text-black shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>Complete Trip (Collect ৳{activeRide.fareTaka} Taka)</span>
-                </button>
-              </div>
-            )}
-
-            {/* STATE 6: COMPLETED */}
-            {activeRide?.status === 'completed' && (
-              <div id="completed-panel" className="p-5 rounded-2xl bg-zinc-900 border border-emerald-500/60 text-center animate-in fade-in">
-                <div className="w-12 h-12 rounded-full bg-emerald-500 text-black flex items-center justify-center mx-auto mb-3">
-                  <Check className="w-7 h-7" />
-                </div>
-                <h3 className="text-lg font-extrabold text-white mb-1">Trip Completed!</h3>
-                <p className="text-xs text-zinc-400 mb-4">Passenger safely dropped off at destination.</p>
-
-                <div className="p-4 rounded-xl bg-black border border-zinc-800 mb-5">
-                  <div className="text-xs text-zinc-400 uppercase tracking-wider">Fare Collected</div>
-                  <div className="text-3xl font-extrabold text-emerald-400 mt-1">
-                    ৳{activeRide.fareTaka} Taka
-                  </div>
-                  <div className="text-xs text-zinc-500 mt-1">
-                    Total distance: {activeRide.distanceKm} km (৳70/km)
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  onClick={handleReset}
-                  className="w-full py-3 px-4 rounded-xl font-bold text-xs bg-white text-black hover:bg-zinc-200 transition-colors cursor-pointer"
-                >
-                  Ready for Next Ride
-                </button>
               </div>
             )}
           </div>
@@ -564,25 +525,45 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           {/* Footer Info */}
           <div className="pt-4 mt-6 border-t border-zinc-900 text-[11px] text-zinc-500 flex items-center justify-between">
             <span>Rider: {riderId}</span>
-            <span>Live Geoapify Routing</span>
+            <span className="flex items-center gap-1 text-emerald-400">
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>Verified Bike</span>
+            </span>
           </div>
         </div>
 
-        {/* Right Side: Map Display */}
-        <div className="flex-1 bg-black relative min-h-[380px] md:min-h-full">
-          {isTripActive || activeRide?.status === 'completed' ? (
-            <div ref={mapContainerRef} className="w-full h-full min-h-[420px]" />
-          ) : (
-            <div className="w-full h-full flex flex-col items-center justify-center p-6 text-center text-zinc-600">
-              <div className="w-16 h-16 rounded-2xl border border-zinc-800 bg-zinc-950 flex items-center justify-center text-zinc-700 mb-3">
-                <Compass className="w-8 h-8" />
+        {/* Right Side: Map Display (Always Live for Rider!) */}
+        <div className="flex-1 bg-black relative min-h-[420px] md:min-h-full">
+          <div ref={mapContainerRef} className="w-full h-full min-h-[420px]" />
+
+          {/* Top Floating Info Banner */}
+          <div className="absolute top-4 left-4 right-16 z-[1000] pointer-events-auto">
+            <div className="bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-xl px-3.5 py-2 shadow-xl flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
+                  <Bike className="w-4 h-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    Rider Live GPS • Bangladesh
+                  </div>
+                  <div className="text-xs font-semibold text-white truncate">
+                    {riderAddress}
+                  </div>
+                </div>
               </div>
-              <div className="text-sm font-semibold text-zinc-500">Navigation Map Standby</div>
-              <div className="text-xs text-zinc-600 max-w-xs mt-1">
-                The map will activate when you accept a ride request to guide you to the pickup spot.
-              </div>
+
+              <button
+                type="button"
+                onClick={handleRecenterGps}
+                title="Re-center map on your live GPS spot"
+                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0"
+              >
+                <Compass className="w-4 h-4 text-emerald-400" />
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
