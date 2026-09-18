@@ -26,44 +26,44 @@ interface SlideItem {
 
 const ONBOARDING_SLIDES: SlideItem[] = [
   {
-    badge: 'Slide 1 of 4 • Bangladesh Rides',
+    badge: 'Nationwide Transit',
     title: 'Fast & Reliable Rides in',
-    highlight: 'All 64 Districts',
+    highlight: '64 Districts',
     description:
-      'Zip through city traffic on agile motorbikes or relax in comfortable AC sedans. Verified local Captains ready across Dhaka, Chittagong, Sylhet, and beyond.',
+      'Quick motorbikes and comfortable AC sedans with verified Captains across Dhaka and all Bangladesh districts.',
     icon: Bike,
     accentColor: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400 border-emerald-500/30',
-    features: ['⚡ Instant Captain Dispatch', '🏍️ Quick Motorbikes & AC Cars', '🇧🇩 64 Districts Coverage'],
+    features: ['Instant Captain Dispatch', 'Agile Motorbikes & AC Sedans', 'Full Bangladesh Coverage'],
   },
   {
-    badge: 'Slide 2 of 4 • Transparent Fare',
+    badge: 'Transparent Fare',
     title: 'Fair & Flat Pricing at',
-    highlight: '৳70 Taka / KM',
+    highlight: '৳70 / km',
     description:
-      'Zero surge pricing surprises and zero hidden fees. Clear distance calculation powered by real-time Geoapify navigation meter directly on your screen.',
+      'Zero surge pricing and zero surprises. Exact kilometer rates calculated with live route navigation.',
     icon: Gauge,
     accentColor: 'from-blue-500/20 to-blue-500/5 text-blue-400 border-blue-500/30',
-    features: ['📊 ৳70 Flat Fare Per Kilometer', '🚫 Zero Surge Extortion', '🧾 Itemized Digital Fare Receipt'],
+    features: ['৳70 Flat Fare / km', 'Zero Hidden Fees', 'Digital Live Receipts'],
   },
   {
-    badge: 'Slide 3 of 4 • Real-Time GPS',
+    badge: 'Live Telemetry',
     title: 'Precision Map Radar &',
-    highlight: 'Captain Telemetry',
+    highlight: 'Live Tracking',
     description:
-      'Track your Captain in real time on dark-mode vector maps. Receive live arrival alerts, exact kilometer odometers, and share trip tracking with your family.',
+      'Follow your Captain in real time on vector maps with minute-by-minute ETA and live progress updates.',
     icon: MapPin,
     accentColor: 'from-amber-500/20 to-amber-500/5 text-amber-400 border-amber-500/30',
-    features: ['📍 Live GPS Radar & Beacon', '⏱️ Minute-by-minute ETA', '🛡️ SMS Live Location Share'],
+    features: ['Live GPS Radar', 'Precise ETA & Meter', 'Share Trip Location'],
   },
   {
-    badge: 'Slide 4 of 4 • Safety & Cashless',
+    badge: 'Safety & Cashless',
     title: 'Verified Safety &',
-    highlight: 'Seamless Payments',
+    highlight: 'Instant Payouts',
     description:
-      'Dual certified helmets for rider and passenger, 24/7 Police 999 emergency hotline, and flexible payment via bKash, Nagad, or direct cash on arrival.',
+      'Dual certified helmets, 24/7 safety response, and easy payments via bKash, Nagad, or cash on arrival.',
     icon: ShieldCheck,
     accentColor: 'from-purple-500/20 to-purple-500/5 text-purple-400 border-purple-500/30',
-    features: ['🪖 Dual Certified Helmets', '💳 bKash, Nagad & Cash Support', '🚨 24/7 Safety SOS Helpline'],
+    features: ['Certified Safety Gear', 'bKash, Nagad & Cash Support', '24/7 Support Hotline'],
   },
 ];
 

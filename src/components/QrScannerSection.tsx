@@ -1,7 +1,18 @@
 import React, { useState } from 'react';
-import { QrCode, Flashlight, Shield, Info, Sparkles, RefreshCw } from 'lucide-react';
+import { QrCode, Flashlight, Info } from 'lucide-react';
 
-export const QrScannerSection: React.FC = () => {
+interface QrScannerSectionProps {
+  title?: string;
+  role?: 'rider' | 'passenger';
+  subtitle?: string;
+  description?: string;
+}
+
+export const QrScannerSection: React.FC<QrScannerSectionProps> = ({
+  title = 'Captain Ride & Fare Scanner',
+  subtitle = 'Scan Passenger QR Pass',
+  description = 'This scanner module is intentionally frozen for the upcoming release. You will be able to scan Passenger booking QR codes at pickup to verify rider identity and confirm cashless bKash/Nagad payments.',
+}) => {
   const [flashlightOn, setFlashlightOn] = useState(false);
 
   return (
@@ -12,7 +23,7 @@ export const QrScannerSection: React.FC = () => {
       {/* Badge */}
       <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-xs font-semibold text-zinc-300 mb-6">
         <QrCode className="w-3.5 h-3.5 text-emerald-400" />
-        <span>Bigo Code Scanner</span>
+        <span>{title}</span>
       </div>
 
       {/* Main Viewfinder Frame */}
@@ -26,14 +37,15 @@ export const QrScannerSection: React.FC = () => {
         <div className="absolute bottom-4 left-4 w-7 h-7 border-b-2 border-l-2 border-emerald-400 rounded-bl-lg" />
         <div className="absolute bottom-4 right-4 w-7 h-7 border-b-2 border-r-2 border-emerald-400 rounded-br-lg" />
 
-        {/* Center Frozen Status Icon */}
+        {/* Center Status */}
         <div className="flex flex-col items-center gap-3 p-4 z-10">
           <div className="w-16 h-16 rounded-2xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-center shadow-inner">
             <QrCode className="w-8 h-8 text-zinc-500" />
           </div>
           <span className="text-[11px] font-mono uppercase tracking-widest text-zinc-400 px-2.5 py-1 rounded-full bg-zinc-900 border border-zinc-800">
-            Module Frozen
+            Scanner Ready • Frozen
           </span>
+          <span className="text-xs text-zinc-400">{subtitle}</span>
         </div>
       </div>
 
@@ -59,9 +71,9 @@ export const QrScannerSection: React.FC = () => {
           <Info className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
           <div className="text-xs text-zinc-400 leading-relaxed">
             <span className="text-white font-semibold block mb-0.5">
-              QR Scanner Integration
+              Rider QR Verification
             </span>
-            This section is intentionally frozen for upcoming release. You will be able to scan Captain QR codes to pair rides instantly or authorize contactless bKash/Nagad payments.
+            {description}
           </div>
         </div>
       </div>

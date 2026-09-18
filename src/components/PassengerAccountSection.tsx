@@ -21,16 +21,17 @@ interface PassengerAccountSectionProps {
   passengerId: string;
   onSwitchToRider: () => void;
   onReplayIntro?: () => void;
-  onOpenApiKeyModal?: () => void;
+  onSignOut: () => void;
 }
 
 export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = ({
   passengerId,
   onSwitchToRider,
   onReplayIntro,
-  onOpenApiKeyModal,
+  onSignOut,
 }) => {
   const [copied, setCopied] = useState(false);
+  const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
 
   const handleCopyId = () => {
     if (navigator.clipboard) {
@@ -146,39 +147,20 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
       </div>
 
       {/* Settings & App Preferences */}
-      <div className="rounded-2xl bg-zinc-950 border border-zinc-800/80 overflow-hidden shadow-lg">
-        {onOpenApiKeyModal && (
-          <button
-            type="button"
-            onClick={onOpenApiKeyModal}
-            className="w-full p-4 flex items-center justify-between hover:bg-zinc-900/80 transition-colors border-b border-zinc-900 text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-400">
-                <Key className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <div className="text-xs sm:text-sm font-bold text-white">Geoapify API Key</div>
-                <div className="text-[11px] text-zinc-500">Update your routing & maps key</div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500" />
-          </button>
-        )}
-
+      <div className="rounded-2xl bg-zinc-950 border border-zinc-800/80 overflow-hidden shadow-lg divide-y divide-zinc-900">
         {onReplayIntro && (
           <button
             type="button"
             onClick={onReplayIntro}
-            className="w-full p-4 flex items-center justify-between hover:bg-zinc-900/80 transition-colors border-b border-zinc-900 text-left cursor-pointer"
+            className="w-full p-4 flex items-center justify-between hover:bg-zinc-900/80 transition-colors text-left cursor-pointer"
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-400">
                 <RotateCcw className="w-4 h-4 text-emerald-400" />
               </div>
               <div>
-                <div className="text-xs sm:text-sm font-bold text-white">Replay Bigo Intro & Slides</div>
-                <div className="text-[11px] text-zinc-500">Watch the shining splash & onboarding</div>
+                <div className="text-xs sm:text-sm font-bold text-white">Replay Introduction</div>
+                <div className="text-[11px] text-zinc-500">View splash screen and feature highlights</div>
               </div>
             </div>
             <ChevronRight className="w-4 h-4 text-zinc-500" />
@@ -186,7 +168,10 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
         )}
 
         {/* 24/7 Safety SOS Hotline */}
-        <div className="p-4 flex items-center justify-between">
+        <a
+          href="tel:999"
+          className="p-4 flex items-center justify-between hover:bg-red-950/20 transition-colors text-left cursor-pointer block"
+        >
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-red-950/40 border border-red-900/60 flex items-center justify-center text-red-400">
               <PhoneCall className="w-4 h-4" />
@@ -199,8 +184,68 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
           <span className="text-xs font-mono font-bold text-red-400 px-2 py-1 rounded bg-red-950/60 border border-red-900/60">
             999
           </span>
-        </div>
+        </a>
+
+        {/* Sign Out Button */}
+        <button
+          type="button"
+          onClick={() => setShowSignOutConfirm(true)}
+          className="w-full p-4 flex items-center justify-between hover:bg-red-950/20 transition-colors text-left cursor-pointer group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-red-950/30 border border-red-900/40 flex items-center justify-center text-red-400 group-hover:scale-105 transition-transform">
+              <LogOut className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-bold text-red-400">Exit Session</div>
+              <div className="text-[11px] text-zinc-500">Return to role selector</div>
+            </div>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-red-400 transition-colors" />
+        </button>
       </div>
+
+      {/* SIGN OUT CONFIRMATION MODAL */}
+      {showSignOutConfirm && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setShowSignOutConfirm(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-zinc-950 border border-zinc-800 p-6 shadow-2xl relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mb-4">
+              <LogOut className="w-6 h-6" />
+            </div>
+
+            <h3 className="text-lg font-bold text-white mb-1.5">Sign out of Bigo?</h3>
+            <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
+              You will be signed out of your current passenger session and returned to the main role selection screen.
+            </p>
+
+            <div className="flex items-center gap-2.5">
+              <button
+                type="button"
+                onClick={() => setShowSignOutConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSignOutConfirm(false);
+                  onSignOut();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer"
+              >
+                Sign Out
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer Info */}
       <div className="text-center text-[11px] text-zinc-600 mt-2">

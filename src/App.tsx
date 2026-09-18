@@ -13,7 +13,7 @@ import { BigoIntroSplash } from './components/BigoIntroSplash';
 import { BigoOnboarding } from './components/BigoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
 import { PassengerAppShell } from './components/PassengerAppShell';
-import { RiderDashboard } from './components/RiderDashboard';
+import { RiderAppShell } from './components/RiderAppShell';
 import { NavigationMap } from './components/NavigationMap';
 import { UberLiveTracking } from './components/UberLiveTracking';
 
@@ -121,6 +121,11 @@ export default function App() {
   const handleBackToRoles = () => {
     setRole(null);
     setErrorMessage(null);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('role');
+      window.history.replaceState({}, '', url.toString());
+    }
   };
 
   const handleSwitchToPassenger = () => {
@@ -229,12 +234,14 @@ export default function App() {
     }
 
     return (
-      <RiderDashboard
+      <RiderAppShell
         riderId={riderId}
         activeRide={activeRide}
         apiKey={apiKey}
+        onApiKeyChange={handleApiKeyChange}
         onBackToRoles={handleBackToRoles}
         onSwitchToPassenger={handleSwitchToPassenger}
+        onReplayIntro={handleReplayIntro}
       />
     );
   }

@@ -2,19 +2,17 @@ import React, { useState, useRef } from 'react';
 import {
   Compass,
   Clock,
-  QrCode,
   User,
   Bike,
   Smartphone,
   Monitor,
   X,
   ArrowLeft,
-  Key,
+  LayoutGrid,
 } from 'lucide-react';
 import { LocationPoint, RouteData, RideRequest } from '../types';
 import { PassengerHomeDashboard } from './PassengerHomeDashboard';
 import { RideHistorySection } from './RideHistorySection';
-import { QrScannerSection } from './QrScannerSection';
 import { PassengerAccountSection } from './PassengerAccountSection';
 import { RideRequestForm } from './RideRequestForm';
 
@@ -39,14 +37,11 @@ interface PassengerAppShellProps {
   onReplayIntro?: () => void;
 }
 
-type TabType = 0 | 1 | 2 | 3;
+type TabType = 0 | 1 | 2;
 
 export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
   const [activeTab, setActiveTab] = useState<TabType>(0);
   const [isBookingOpen, setIsBookingOpen] = useState(false);
-  const [deviceFrameMode, setDeviceFrameMode] = useState<'responsive' | 'phone'>('responsive');
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(props.apiKey);
 
   // Touch swipe gesture tracking
   const touchStartX = useRef<number | null>(null);
@@ -65,10 +60,10 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
     // Only trigger if horizontal swipe is significantly greater than vertical scroll
     if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
       if (diffX < 0) {
-        // Swiped Left -> Move to Next Tab
-        setActiveTab((prev) => (prev < 3 ? ((prev + 1) as TabType) : 3));
+        // Swiped Left -> Move to Next Tab (max index 2)
+        setActiveTab((prev) => (prev < 2 ? ((prev + 1) as TabType) : 2));
       } else {
-        // Swiped Right -> Move to Previous Tab
+        // Swiped Right -> Move to Previous Tab (min index 0)
         setActiveTab((prev) => (prev > 0 ? ((prev - 1) as TabType) : 0));
       }
     }
@@ -95,81 +90,68 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
 
   return (
     <div className="w-full min-h-screen bg-black text-white flex flex-col items-center justify-start overflow-x-hidden selection:bg-zinc-800">
-      {/* LAPTOP / DESKTOP RESPONSIVE CONTAINER */}
-      <div
-        className={`w-full flex flex-col transition-all duration-300 ${
-          deviceFrameMode === 'phone'
-            ? 'max-w-[430px] my-4 sm:my-8 rounded-[40px] border-4 border-zinc-800 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden bg-black min-h-[92dvh]'
-            : 'max-w-5xl'
-        }`}
-      >
+      <div className="w-full max-w-6xl flex flex-col">
         {/* FIXED APP HEADER */}
-        <header className="sticky top-0 z-30 w-full bg-black/95 backdrop-blur-md border-b border-zinc-900/80 px-4 py-3 flex items-center justify-between select-none">
-          {/* Brand */}
-          <div className="flex items-center gap-2">
+        <header className="sticky top-0 z-30 w-full bg-black/90 backdrop-blur-xl border-b border-zinc-900 px-4 sm:px-6 py-3 flex items-center justify-between select-none">
+          {/* Left: Brand & Mode Tag */}
+          <div className="flex items-center gap-2.5">
             {isBookingOpen ? (
               <button
                 type="button"
                 onClick={handleCloseBooking}
-                className="p-1.5 -ml-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors cursor-pointer flex items-center gap-1 text-xs font-bold"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white transition-all cursor-pointer border border-zinc-800 text-xs font-semibold active:scale-95"
               >
                 <ArrowLeft className="w-4 h-4" />
-                <span>Back</span>
+                <span>Home</span>
               </button>
             ) : (
-              <div
+              <button
+                type="button"
                 onClick={() => setActiveTab(0)}
-                className="flex items-center gap-1.5 cursor-pointer"
+                className="flex items-center gap-2.5 cursor-pointer text-left group"
               >
-                <span className="text-2xl font-black tracking-tighter text-white">Bigo</span>
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xl sm:text-2xl font-black tracking-tight text-white group-hover:text-zinc-200 transition-colors">
+                    Bigo
+                  </span>
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shadow-sm shadow-emerald-400/50" />
+                </div>
+                <span className="hidden xs:inline-flex items-center px-2 py-0.5 rounded-md bg-zinc-900 border border-zinc-800 text-[11px] font-medium text-zinc-400">
+                  Passenger
+                </span>
+              </button>
             )}
           </div>
 
-          {/* Center Info on desktop */}
-          <div className="hidden sm:flex items-center gap-2 text-xs text-zinc-400">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            <span>Dhaka Metro • ৳70/km Flat</span>
+          {/* Center: Clean Status Pill */}
+          <div className="hidden md:flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900/60 border border-zinc-800/80 text-xs font-mono text-zinc-400">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+            <span className="text-zinc-300">Dhaka Metro</span>
+            <span className="text-zinc-600">•</span>
+            <span>৳70/km</span>
           </div>
 
-          {/* Right actions: View mode toggle & Switch to Rider */}
+          {/* Right: Actions */}
           <div className="flex items-center gap-2">
-            {/* Desktop / Laptop Phone Frame Toggle */}
-            <button
-              type="button"
-              onClick={() =>
-                setDeviceFrameMode(deviceFrameMode === 'responsive' ? 'phone' : 'responsive')
-              }
-              className="hidden lg:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white text-xs transition-colors cursor-pointer border border-zinc-800"
-              title={
-                deviceFrameMode === 'responsive'
-                  ? 'Switch to Mobile Phone Shell view'
-                  : 'Switch to Full Width Laptop/PC view'
-              }
-            >
-              {deviceFrameMode === 'responsive' ? (
-                <>
-                  <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Phone Frame</span>
-                </>
-              ) : (
-                <>
-                  <Monitor className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Desktop View</span>
-                </>
-              )}
-            </button>
-
-            {/* Switch to Rider Button */}
+            {/* Switch to Rider / Captain Mode */}
             <button
               type="button"
               onClick={props.onSwitchToRider}
-              className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-xs font-bold text-emerald-400 flex items-center gap-1.5 transition-colors cursor-pointer"
-              title="Switch to Captain/Rider Mode"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800 text-xs font-semibold text-emerald-400 hover:text-emerald-300 transition-all cursor-pointer active:scale-95"
+              title="Switch to Captain Mode"
             >
               <Bike className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Rider Mode</span>
+              <span className="hidden sm:inline">Captain Mode</span>
+            </button>
+
+            {/* Return to Portal / Dashboard Selector */}
+            <button
+              type="button"
+              onClick={props.onBackToRoles}
+              className="flex items-center justify-center w-8 h-8 rounded-xl bg-zinc-900/90 hover:bg-zinc-800 border border-zinc-800/80 text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95"
+              title="Select Dashboard / Portal"
+            >
+              <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
         </header>
@@ -189,9 +171,9 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
               />
             </div>
           ) : (
-            /* 4 SWIPEABLE APP TABS */
+            /* 3 SWIPEABLE APP TABS FOR PASSENGER */
             <>
-              {/* TAB 0: HOME / DASHBOARD */}
+              {/* TAB 0: DASHBOARD / BOOKINGS */}
               {activeTab === 0 && (
                 <div className="animate-in fade-in duration-200">
                   <PassengerHomeDashboard
@@ -217,21 +199,14 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
                 </div>
               )}
 
-              {/* TAB 2: QR CODE SCANNER (FROZEN) */}
+              {/* TAB 2: ACCOUNT */}
               {activeTab === 2 && (
-                <div className="animate-in fade-in duration-200">
-                  <QrScannerSection />
-                </div>
-              )}
-
-              {/* TAB 3: ACCOUNT */}
-              {activeTab === 3 && (
                 <div className="animate-in fade-in duration-200">
                   <PassengerAccountSection
                     passengerId={props.passengerId}
                     onSwitchToRider={props.onSwitchToRider}
                     onReplayIntro={props.onReplayIntro}
-                    onOpenApiKeyModal={() => setShowApiKeyModal(true)}
+                    onSignOut={props.onBackToRoles}
                   />
                 </div>
               )}
@@ -239,21 +214,17 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
           )}
         </main>
 
-        {/* FIXED BOTTOM NAVIGATION BAR */}
+        {/* FIXED BOTTOM NAVIGATION BAR - EXACTLY 3 OPTIONS */}
         {!isBookingOpen && (
           <nav
             id="fixed-bottom-navbar"
-            className={`fixed bottom-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 px-3 py-2 flex items-center justify-around select-none shadow-[0_-10px_25px_rgba(0,0,0,0.7)] ${
-              deviceFrameMode === 'phone'
-                ? 'w-full max-w-[422px]'
-                : 'w-full max-w-5xl'
-            }`}
+            className="fixed bottom-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-800/80 px-4 py-2 flex items-center justify-around select-none shadow-[0_-10px_25px_rgba(0,0,0,0.7)] w-full max-w-6xl"
           >
-            {/* Tab 0: Home / Dashboard */}
+            {/* Tab 0: Dashboard (used for bookings) */}
             <button
               type="button"
               onClick={() => setActiveTab(0)}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 0
                   ? 'text-white'
                   : 'text-zinc-500 hover:text-zinc-300'
@@ -266,7 +237,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
               >
                 <Compass className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-bold tracking-tight">Home</span>
+              <span className="text-[11px] font-bold tracking-tight">Dashboard</span>
               {activeTab === 0 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 -mt-0.5" />
               )}
@@ -276,7 +247,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
             <button
               type="button"
               onClick={() => setActiveTab(1)}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 1
                   ? 'text-white'
                   : 'text-zinc-500 hover:text-zinc-300'
@@ -289,17 +260,17 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
               >
                 <Clock className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-bold tracking-tight">History</span>
+              <span className="text-[11px] font-bold tracking-tight">History</span>
               {activeTab === 1 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 -mt-0.5" />
               )}
             </button>
 
-            {/* Tab 2: QR Scanner */}
+            {/* Tab 2: Account */}
             <button
               type="button"
               onClick={() => setActiveTab(2)}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
+              className={`flex-1 flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
                 activeTab === 2
                   ? 'text-white'
                   : 'text-zinc-500 hover:text-zinc-300'
@@ -310,98 +281,16 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
                   activeTab === 2 ? 'text-emerald-400' : ''
                 }`}
               >
-                <QrCode className="w-5 h-5" />
-              </div>
-              <span className="text-[10px] font-bold tracking-tight">Scan QR</span>
-              {activeTab === 2 && (
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 -mt-0.5" />
-              )}
-            </button>
-
-            {/* Tab 3: Account */}
-            <button
-              type="button"
-              onClick={() => setActiveTab(3)}
-              className={`flex flex-col items-center gap-1 py-1 px-3 rounded-xl transition-all cursor-pointer ${
-                activeTab === 3
-                  ? 'text-white'
-                  : 'text-zinc-500 hover:text-zinc-300'
-              }`}
-            >
-              <div
-                className={`p-1 rounded-lg transition-colors ${
-                  activeTab === 3 ? 'text-emerald-400' : ''
-                }`}
-              >
                 <User className="w-5 h-5" />
               </div>
-              <span className="text-[10px] font-bold tracking-tight">Account</span>
-              {activeTab === 3 && (
+              <span className="text-[11px] font-bold tracking-tight">Account</span>
+              {activeTab === 2 && (
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 -mt-0.5" />
               )}
             </button>
           </nav>
         )}
       </div>
-
-      {/* API KEY CONFIGURATION MODAL */}
-      {showApiKeyModal && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowApiKeyModal(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-zinc-950 border border-zinc-800 p-6 shadow-2xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
-              <div className="flex items-center gap-2">
-                <Key className="w-5 h-5 text-amber-400" />
-                <h3 className="text-base font-bold text-white">Geoapify API Key</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowApiKeyModal(false)}
-                className="text-zinc-400 hover:text-white cursor-pointer"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            <p className="text-xs text-zinc-400 mb-4 leading-relaxed">
-              Geoapify provides routing and address search across Bangladesh. You can use your custom key anytime.
-            </p>
-
-            <input
-              type="text"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="Paste your Geoapify API key..."
-              className="w-full px-3.5 py-2.5 bg-black border border-zinc-800 rounded-xl text-xs font-mono text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 mb-4"
-            />
-
-            <div className="flex items-center justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setShowApiKeyModal(false)}
-                className="px-4 py-2 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  props.onApiKeyChange(tempApiKey);
-                  setShowApiKeyModal(false);
-                }}
-                className="px-4 py-2 rounded-xl bg-white hover:bg-zinc-200 text-black text-xs font-bold cursor-pointer"
-              >
-                Save Key
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

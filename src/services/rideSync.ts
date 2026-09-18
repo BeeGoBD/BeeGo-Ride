@@ -1,8 +1,9 @@
-import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData } from '../types';
+import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData, PaymentMethod } from '../types';
 
 export const RATE_PER_KM_TAKA = 70;
 const STORAGE_KEY = 'geoapify_active_ride';
 const CHANNEL_NAME = 'geoapify_ride_broadcast';
+export const REAL_TRIP_HISTORY_KEY = 'bigo_real_trip_history';
 
 const DEFAULT_DRIVER = {
   name: 'Tanvir Hossain',

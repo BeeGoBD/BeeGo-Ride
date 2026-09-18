@@ -55,11 +55,14 @@ export interface LiveTrackingData {
   updatedAt: number;
 }
 
+export type PaymentMethod = 'cash' | 'bkash' | 'nagad' | 'rocket';
+
 export interface RideRequest {
   id: string; // e.g. RIDE-8392
   passengerId: string; // e.g. PAX-4821
   riderId?: string; // e.g. RIDER-9302
   vehicleType?: 'bike' | 'car';
+  paymentMethod?: PaymentMethod;
   pickup: LocationPoint;
   dropoff: LocationPoint;
   distanceKm: number; // estimated distance

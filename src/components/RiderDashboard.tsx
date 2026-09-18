@@ -34,6 +34,7 @@ interface RiderDashboardProps {
   apiKey: string;
   onBackToRoles: () => void;
   onSwitchToPassenger: () => void;
+  hideHeader?: boolean;
 }
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({
@@ -42,6 +43,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   apiKey,
   onBackToRoles,
   onSwitchToPassenger,
+  hideHeader = false,
 }) => {
   const activeKey = apiKey.trim() || DEFAULT_GEOAPIFY_KEY;
 
@@ -310,39 +312,46 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   const hasIncomingRequest = activeRide && activeRide.status === 'requested';
 
   return (
-    <div id="rider-dashboard" className="w-full min-h-screen bg-black text-white flex flex-col">
+    <div
+      id="rider-dashboard"
+      className={`w-full bg-black text-white flex flex-col ${
+        hideHeader ? 'h-full flex-1' : 'min-h-screen'
+      }`}
+    >
       {/* Top Rider Navigation Bar */}
-      <header className="w-full border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur px-4 py-3 flex items-center justify-between z-20">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBackToRoles}
-            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Roles</span>
-          </button>
+      {!hideHeader && (
+        <header className="w-full border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur px-4 py-3 flex items-center justify-between z-20">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={onBackToRoles}
+              className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
+            </button>
 
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-            <h1 className="text-sm font-bold text-white tracking-wide">Rider Dashboard</h1>
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <h1 className="text-sm font-bold text-white tracking-tight">Captain Dashboard</h1>
+            </div>
+
+            <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded flex items-center gap-1">
+              <Bike className="w-3.5 h-3.5" />
+              <span>{riderId}</span>
+            </span>
           </div>
 
-          <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded flex items-center gap-1">
-            <Bike className="w-3.5 h-3.5" />
-            <span>{riderId}</span>
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onSwitchToPassenger}
-            className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer font-medium"
-            title="Switch to passenger in this view"
-          >
-            Switch to Passenger
-          </button>
-        </div>
-      </header>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onSwitchToPassenger}
+              className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer font-medium flex items-center gap-1.5"
+              title="Switch to Passenger view"
+            >
+              <span>Passenger Mode</span>
+            </button>
+          </div>
+        </header>
+      )}
 
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
@@ -398,40 +407,37 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 <div className="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
                   <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
                   <div className="absolute inset-2 rounded-full border border-emerald-500/40 animate-pulse" />
-                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-emerald-500/60 flex items-center justify-center text-emerald-400">
+                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-emerald-500/60 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
                     <Bike className="w-6 h-6" />
                   </div>
                 </div>
 
-                <h3 className="text-base font-bold text-white mb-1.5">
+                <h3 className="text-base font-bold text-white mb-1">
                   {activeRide?.status === 'declined'
                     ? 'Ride Declined'
                     : activeRide?.status === 'cancelled'
-                    ? 'Ride Cancelled by Passenger'
-                    : 'Online & Ready in Bangladesh'}
+                    ? 'Ride Cancelled'
+                    : 'Dispatch Radar Active'}
                 </h3>
                 <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto mb-6">
                   {activeRide?.status === 'declined' || activeRide?.status === 'cancelled'
-                    ? 'Listening for new incoming ride requests from passengers...'
-                    : 'Your live position is showing on the map. Ready to receive ride requests.'}
+                    ? 'Listening for new incoming ride requests...'
+                    : 'Broadcasting live GPS coordinates. Ready for instant dispatch.'}
                 </p>
 
-                <div className="p-3.5 bg-black/60 border border-zinc-800/80 rounded-xl text-left text-xs text-zinc-400 space-y-2">
+                <div className="p-3.5 bg-black/60 border border-zinc-800/80 rounded-2xl text-left text-xs text-zinc-400 space-y-2.5">
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span>Vehicle:</span>
-                    <span className="font-bold text-white">Yamaha FZ-S (Bike)</span>
+                    <span>Assigned Fleet</span>
+                    <span className="font-semibold text-white">Yamaha FZ-S (Bike)</span>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span>Pricing Standard:</span>
-                    <span className="font-bold text-emerald-400">৳70 Taka per km</span>
+                    <span>Base Rate</span>
+                    <span className="font-mono font-bold text-emerald-400">৳70 / km</span>
                   </div>
                   <div className="flex items-center justify-between text-zinc-300">
-                    <span>Rider ID:</span>
-                    <span className="font-mono text-emerald-400">{riderId}</span>
+                    <span>Captain ID</span>
+                    <span className="font-mono text-zinc-400">{riderId}</span>
                   </div>
-                  <p className="text-[11px] text-zinc-500 pt-1.5 border-t border-zinc-800">
-                    When a passenger requests a ride, the price in Taka will appear here instantly for you to accept or decline.
-                  </p>
                 </div>
               </div>
             ) : null}

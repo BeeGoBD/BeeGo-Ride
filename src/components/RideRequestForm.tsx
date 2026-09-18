@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CheckCircle2,
   AlertCircle,
-  Key,
   LocateFixed,
   X,
   Loader2,
@@ -19,6 +18,10 @@ import {
   Radio,
   User,
   ArrowDownUp,
+  Sparkles,
+  Car,
+  Bike,
+  ShieldCheck,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData } from '../types';
 import { searchAddress, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
@@ -81,11 +84,10 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const [isDropoffFocused, setIsDropoffFocused] = useState(false);
 
   const [pinMode, setPinMode] = useState<PinMode>('pickup');
+  const [selectedTier, setSelectedTier] = useState<'select' | 'moto' | 'sedan'>('select');
   const [userLiveGps, setUserLiveGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isPickupLiveGps, setIsPickupLiveGps] = useState(true);
-  const [showKeyModal, setShowKeyModal] = useState(false);
-  const [tempApiKey, setTempApiKey] = useState(activeKey);
   const autoLocatedRef = useRef(false);
 
   // Abort controllers to prevent race conditions on rapid typing
@@ -377,17 +379,6 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
     setErrorMessage(null);
   };
 
-  const handleSaveKey = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!tempApiKey.trim()) {
-      setErrorMessage('Please enter a valid Geoapify API key.');
-      return;
-    }
-    onApiKeyChange(tempApiKey.trim());
-    setShowKeyModal(false);
-    setErrorMessage(null);
-  };
-
   const isReadyToRequest = Boolean(pickup && dropoff);
 
   // Approximate straight-line distance if pickup & dropoff exist (for immediate fare preview)
@@ -446,79 +437,37 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
       id="ride-request-container"
       className={`w-full mx-auto px-4 py-4 ${isRideOngoing ? 'max-w-xl' : 'max-w-7xl'}`}
     >
-      {/* Top Header with Roles, Passenger ID, and Switcher */}
-      <div className="flex items-center justify-between mb-6 pb-4 border-b border-zinc-800/80">
+      {/* Top Header with Navigation, Passenger Badge, and Mode Switcher */}
+      <div className="flex items-center justify-between mb-5 pb-3.5 border-b border-zinc-900">
         <div className="flex items-center gap-2.5">
           <button
+            type="button"
             onClick={onBackToRoles}
-            className="flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white px-2.5 py-1.5 rounded-lg border border-zinc-800 hover:border-zinc-700 transition-colors cursor-pointer"
+            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 transition-all cursor-pointer font-semibold active:scale-95"
+            title="Return to Home Dashboard"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Roles</span>
+            <span>Back</span>
           </button>
 
-          <div className="flex items-center gap-2">
-            <User className="w-4 h-4 text-zinc-300" />
-            <span className="font-mono text-xs text-zinc-300 bg-zinc-900 border border-zinc-800 px-2 py-0.5 rounded">
-              {passengerId}
-            </span>
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs font-mono text-zinc-300">
+            <User className="w-3.5 h-3.5 text-emerald-400" />
+            <span>{passengerId}</span>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
           <button
-            onClick={onSwitchToRider}
-            className="text-xs bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 px-3 py-1.5 rounded-lg transition-colors cursor-pointer font-medium"
-            title="Switch to rider in this view"
-          >
-            Switch to Rider
-          </button>
-
-          <button
-            id="api-settings-button"
             type="button"
-            onClick={() => setShowKeyModal(!showKeyModal)}
-            className="p-1.5 rounded-lg border border-zinc-800 bg-zinc-950 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-            title="Geoapify API key settings"
+            onClick={onSwitchToRider}
+            className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 transition-all cursor-pointer font-semibold active:scale-95"
+            title="Switch to Captain Mode"
           >
-            <Key className="w-3.5 h-3.5 text-emerald-400" />
+            <Bike className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Captain Mode</span>
           </button>
         </div>
       </div>
-
-      {/* Optional Key Config Modal */}
-      {showKeyModal && (
-        <div id="api-key-panel" className="mb-6 p-4 rounded-xl bg-zinc-950 border border-zinc-800 animate-in fade-in">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-zinc-200 flex items-center gap-1.5">
-              <Key className="w-3.5 h-3.5 text-zinc-400" />
-              Geoapify API Key
-            </span>
-            <button
-              onClick={() => setShowKeyModal(false)}
-              className="text-zinc-500 hover:text-white text-xs cursor-pointer"
-            >
-              Close
-            </button>
-          </div>
-          <form onSubmit={handleSaveKey} className="flex gap-2">
-            <input
-              id="geoapify-key-input"
-              type="text"
-              value={tempApiKey}
-              onChange={(e) => setTempApiKey(e.target.value)}
-              placeholder="Geoapify API key"
-              className="flex-1 px-3 py-2 text-xs bg-black border border-zinc-700 rounded-lg text-white font-mono placeholder-zinc-500 focus:outline-none focus:border-white"
-            />
-            <button
-              type="submit"
-              className="px-4 py-2 text-xs font-semibold bg-white text-black rounded-lg hover:bg-zinc-200 cursor-pointer"
-            >
-              Save
-            </button>
-          </form>
-        </div>
-      )}
 
       {/* Error alert banner */}
       {errorMessage && (
@@ -665,324 +614,420 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           {/* Left Column: Form Card */}
           <div className="lg:col-span-5 space-y-4">
-            <div id="ride-request-card" className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-6 shadow-2xl relative">
-              <div className="mb-6">
-                <h2 className="text-xl font-extrabold tracking-tight text-white flex items-center gap-2">
-                  <span className="w-2.5 h-2.5 rounded-full bg-white animate-pulse inline-block" />
-                  Ride Request
-                </h2>
-                <p className="text-xs text-zinc-400 mt-1 font-medium flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  <span>Bangladesh Only • 64 Districts • ৳{RATE_PER_KM_TAKA}/km</span>
-                </p>
+            <div id="ride-request-card" className="bg-zinc-950 border border-zinc-800/80 rounded-2xl p-5 sm:p-6 shadow-2xl relative">
+              <div className="flex items-center justify-between mb-5">
+                <div>
+                  <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2">
+                    <span>Plan Your Ride</span>
+                  </h2>
+                  <p className="text-xs text-zinc-400 mt-0.5 font-mono flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span>Dhaka & 64 Districts • ৳{RATE_PER_KM_TAKA}/km</span>
+                  </p>
+                </div>
+                {approxDistanceKm && (
+                  <div className="text-right font-mono">
+                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">Est. Trip</span>
+                    <span className="text-sm font-bold text-emerald-400">~{approxDistanceKm} km</span>
+                  </div>
+                )}
               </div>
 
-          <div className="space-y-5">
-            {/* OPTION 1: PICKUP SPOT */}
-            <div ref={pickupContainerRef} className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
-                  <label
-                    htmlFor="pickup-input"
-                    className="text-xs font-semibold text-zinc-300 uppercase tracking-wider"
-                  >
-                    1. Pickup Spot
-                  </label>
-                  {isPickupLiveGps && (
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30 flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Live Location (Default)
-                    </span>
-                  )}
-                </div>
+          <div className="space-y-4">
+            {/* UNIFIED ITINERARY INPUTS */}
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 relative">
+              {/* Vertical transit track connector with integrated Swap button */}
+              <div className="absolute left-[26px] sm:left-[30px] top-[48px] bottom-[48px] w-0.5 bg-gradient-to-b from-emerald-500 via-zinc-700 to-red-500 pointer-events-none flex items-center justify-center">
+                <button
+                  type="button"
+                  onClick={handleSwitchLocations}
+                  disabled={!pickup || !dropoff}
+                  className="pointer-events-auto p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-30 border border-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg active:scale-90 disabled:cursor-not-allowed group"
+                  title="Swap pickup and drop-off"
+                >
+                  <ArrowDownUp className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-180 transition-transform duration-300" />
+                </button>
+              </div>
 
-                <div className="flex items-center gap-2">
+              {/* 1. PICKUP SPOT */}
+              <div ref={pickupContainerRef} className="relative pl-8 sm:pl-9 pb-3">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="absolute left-2.5 sm:left-3.5 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
+                    <label
+                      htmlFor="pickup-input"
+                      className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wider"
+                    >
+                      Pickup Location
+                    </label>
+                  </div>
+
                   <button
                     id="current-location-btn"
                     type="button"
                     onClick={handleResetToLiveGpsPickup}
                     disabled={isLocating}
-                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50 font-semibold"
+                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50 font-mono"
                     title="Detect and use your real-time live GPS location"
                   >
-                    <LocateFixed className="w-3.5 h-3.5 text-emerald-400" />
-                    <span>{isLocating ? 'Detecting GPS...' : isPickupLiveGps ? 'At Live Location' : 'Use My Live Spot'}</span>
+                    <LocateFixed className="w-3.5 h-3.5" />
+                    <span>{isLocating ? 'Detecting GPS...' : isPickupLiveGps ? 'Live Location' : 'Use Current GPS'}</span>
                   </button>
                 </div>
-              </div>
 
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <MapPin className="w-4 h-4 text-emerald-400" />
-                </div>
+                <div className="relative">
+                  <input
+                    id="pickup-input"
+                    type="text"
+                    value={pickupInput}
+                    onChange={(e) => handlePickupChange(e.target.value)}
+                    onFocus={() => {
+                      setIsPickupFocused(true);
+                      if (pickupInput && pickupSuggestions.length === 0 && !pickup) {
+                        handlePickupChange(pickupInput);
+                      }
+                    }}
+                    placeholder="Search pickup location in Bangladesh..."
+                    autoComplete="off"
+                    className="w-full pl-3.5 pr-10 py-3 bg-black/90 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/40 transition-all font-medium"
+                  />
 
-                <input
-                  id="pickup-input"
-                  type="text"
-                  value={pickupInput}
-                  onChange={(e) => handlePickupChange(e.target.value)}
-                  onFocus={() => {
-                    setIsPickupFocused(true);
-                    if (pickupInput && pickupSuggestions.length === 0 && !pickup) {
-                      handlePickupChange(pickupInput);
-                    }
-                  }}
-                  placeholder="Click to change or search Bangladesh pickup spot..."
-                  autoComplete="off"
-                  className="w-full pl-10 pr-10 py-3.5 bg-black border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/40 transition-all font-medium"
-                />
-
-                {/* Status Indicator */}
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center gap-1.5">
-                  {isSearchingPickup && (
-                    <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
-                  )}
-                  {pickupInput && !isSearchingPickup && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPickupInput('');
-                        setPickup(null);
-                        setIsPickupLiveGps(false);
-                        setPickupSuggestions([]);
-                      }}
-                      className="text-zinc-500 hover:text-white cursor-pointer"
-                      title="Clear pickup spot"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Selected Confirmation Pill */}
-              {pickup && (
-                <div className="mt-2 flex items-center justify-between gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1.5 rounded-lg">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate font-medium">Pickup: {pickup.formatted}</span>
+                  {/* Status Indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
+                    {isSearchingPickup && (
+                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                    )}
+                    {pickupInput && !isSearchingPickup && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPickupInput('');
+                          setPickup(null);
+                          setIsPickupLiveGps(false);
+                          setPickupSuggestions([]);
+                        }}
+                        className="text-zinc-500 hover:text-white cursor-pointer"
+                        title="Clear pickup spot"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  {isPickupLiveGps ? (
-                    <span className="shrink-0 text-[10px] font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded">
-                      Live GPS
-                    </span>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={handleResetToLiveGpsPickup}
-                      className="shrink-0 text-[10px] text-zinc-400 hover:text-emerald-300 underline cursor-pointer"
-                    >
-                      Reset to Live GPS
-                    </button>
-                  )}
                 </div>
-              )}
 
-              {/* Autocomplete Suggestions Dropdown for Pickup */}
-              {isPickupFocused && pickupSuggestions.length > 0 && !pickup && (
-                <div
-                  id="pickup-suggestions-dropdown"
-                  className="absolute z-50 left-0 right-0 mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto"
-                >
-                  <div className="px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-semibold flex items-center justify-between">
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      Bangladesh Locations & 64 Districts
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">BD Only</span>
+                {/* Selected Confirmation Pill */}
+                {pickup && (
+                  <div className="mt-1.5 flex items-center justify-between gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1 rounded-lg">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate font-medium">{pickup.formatted}</span>
+                    </div>
+                    {isPickupLiveGps ? (
+                      <span className="shrink-0 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded">
+                        GPS Active
+                      </span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResetToLiveGpsPickup}
+                        className="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-emerald-300 underline cursor-pointer"
+                      >
+                        Use GPS
+                      </button>
+                    )}
                   </div>
-                  {pickupSuggestions.map((item, idx) => (
-                    <button
-                      key={`pickup-sug-${item.placeId || idx}`}
-                      type="button"
-                      onClick={() => handleSelectPickup(item)}
-                      className="w-full text-left px-3.5 py-2.5 hover:bg-zinc-800/90 active:bg-zinc-700 border-b border-zinc-800/60 last:border-b-0 transition-colors flex items-start gap-3 cursor-pointer"
-                    >
-                      {renderItemIcon(item, false)}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {item.addressLine1 || item.name || item.formatted.split(',')[0]}
+                )}
+
+                {/* Autocomplete Suggestions Dropdown for Pickup */}
+                {isPickupFocused && pickupSuggestions.length > 0 && !pickup && (
+                  <div
+                    id="pickup-suggestions-dropdown"
+                    className="absolute z-50 left-0 right-0 mt-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto"
+                  >
+                    <div className="px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-mono text-zinc-400 flex items-center justify-between">
+                      <span className="text-emerald-400 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Suggested Pickups
+                      </span>
+                      <span>Bangladesh</span>
+                    </div>
+                    {pickupSuggestions.map((item, idx) => (
+                      <button
+                        key={`pickup-sug-${item.placeId || idx}`}
+                        type="button"
+                        onClick={() => handleSelectPickup(item)}
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-zinc-800 active:bg-zinc-700 border-b border-zinc-800/60 last:border-b-0 transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        {renderItemIcon(item, false)}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-white truncate">
+                            {item.addressLine1 || item.name || item.formatted.split(',')[0]}
+                          </div>
+                          <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+                            {item.addressLine2 || item.formatted}
+                          </div>
                         </div>
-                        <div className="text-[11px] text-zinc-400 truncate mt-0.5">
-                          {item.addressLine2 || item.formatted}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* SWITCH PICKUP & DROP-OFF BUTTON */}
-            <div className="flex items-center justify-center my-1.5">
-              <button
-                type="button"
-                onClick={handleSwitchLocations}
-                disabled={!pickup || !dropoff}
-                className="group flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-40 disabled:hover:bg-zinc-900 border border-zinc-700/80 text-zinc-300 hover:text-white transition-all text-xs font-semibold shadow-md active:scale-95 cursor-pointer disabled:cursor-not-allowed"
-                title="Switch Pickup and Drop-off spots"
-              >
-                <ArrowDownUp className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-180 transition-transform duration-300" />
-                <span>Switch Pickup & Drop-off</span>
-              </button>
-            </div>
-
-            {/* OPTION 2: DROP-OFF SPOT */}
-            <div ref={dropoffContainerRef} className="relative">
-              <div className="flex items-center justify-between mb-2">
-                <label
-                  htmlFor="dropoff-input"
-                  className="text-xs font-semibold text-zinc-300 uppercase tracking-wider flex items-center gap-1.5"
-                >
-                  <span className="w-2 h-2 rounded-full bg-red-500" />
-                  2. Drop-off Spot (Destination in Bangladesh)
-                </label>
-
-                <span className="text-[11px] text-zinc-500 font-medium">
-                  Type & select
-                </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
-                  <Navigation className="w-4 h-4 text-red-400" />
-                </div>
-
-                <input
-                  id="dropoff-input"
-                  type="text"
-                  value={dropoffInput}
-                  onChange={(e) => handleDropoffChange(e.target.value)}
-                  onFocus={() => {
-                    setIsDropoffFocused(true);
-                    if (dropoffInput && dropoffSuggestions.length === 0 && !dropoff) {
-                      handleDropoffChange(dropoffInput);
-                    }
-                  }}
-                  placeholder="Type destination in Bangladesh (e.g. Dhanmondi, Uttara, Agrabad)..."
-                  autoComplete="off"
-                  className="w-full pl-10 pr-10 py-3.5 bg-black border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/80 focus:ring-1 focus:ring-red-500/40 transition-all font-medium"
-                />
-
-                {/* Status Indicator */}
-                <div className="absolute inset-y-0 right-0 pr-3.5 flex items-center gap-1.5">
-                  {isSearchingDropoff && (
-                    <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
-                  )}
-                  {dropoffInput && !isSearchingDropoff && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setDropoffInput('');
-                        setDropoff(null);
-                        setDropoffSuggestions([]);
-                      }}
-                      className="text-zinc-500 hover:text-white cursor-pointer"
+              {/* 2. DROP-OFF SPOT */}
+              <div ref={dropoffContainerRef} className="relative pl-8 sm:pl-9 pt-2">
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="absolute left-2.5 sm:left-3.5 top-4.5 w-2.5 h-2.5 rounded-sm bg-red-400 ring-4 ring-red-400/20" />
+                    <label
+                      htmlFor="dropoff-input"
+                      className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wider"
                     >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Selected Confirmation Pill */}
-              {dropoff && (
-                <div className="mt-2 flex items-center gap-1.5 text-[11px] text-red-400 bg-red-950/40 border border-red-900/50 px-2.5 py-1 rounded-lg">
-                  <CheckCircle2 className="w-3 h-3 shrink-0" />
-                  <span className="truncate font-medium">Drop-off: {dropoff.formatted}</span>
-                </div>
-              )}
-
-              {/* Autocomplete Suggestions Dropdown for Drop-off */}
-              {isDropoffFocused && dropoffSuggestions.length > 0 && !dropoff && (
-                <div
-                  id="dropoff-suggestions-dropdown"
-                  className="absolute z-50 left-0 right-0 mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl shadow-2xl overflow-hidden max-h-64 overflow-y-auto"
-                >
-                  <div className="px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-semibold flex items-center justify-between">
-                    <span className="text-red-400 font-bold flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
-                      Bangladesh Locations & 64 Districts
-                    </span>
-                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 font-mono">BD Only</span>
+                      Drop-off Destination
+                    </label>
                   </div>
-                  {dropoffSuggestions.map((item, idx) => (
-                    <button
-                      key={`dropoff-sug-${item.placeId || idx}`}
-                      type="button"
-                      onClick={() => handleSelectDropoff(item)}
-                      className="w-full text-left px-3.5 py-2.5 hover:bg-zinc-800/90 active:bg-zinc-700 border-b border-zinc-800/60 last:border-b-0 transition-colors flex items-start gap-3 cursor-pointer"
-                    >
-                      {renderItemIcon(item, true)}
-                      <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-white truncate">
-                          {item.addressLine1 || item.name || item.formatted.split(',')[0]}
-                        </div>
-                        <div className="text-[11px] text-zinc-400 truncate mt-0.5">
-                          {item.addressLine2 || item.formatted}
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+
+                  <span className="text-[11px] font-mono text-zinc-500">
+                    64 Districts
+                  </span>
                 </div>
-              )}
+
+                <div className="relative">
+                  <input
+                    id="dropoff-input"
+                    type="text"
+                    value={dropoffInput}
+                    onChange={(e) => handleDropoffChange(e.target.value)}
+                    onFocus={() => {
+                      setIsDropoffFocused(true);
+                      if (dropoffInput && dropoffSuggestions.length === 0 && !dropoff) {
+                        handleDropoffChange(dropoffInput);
+                      }
+                    }}
+                    placeholder="Search destination (e.g. Dhanmondi, Airport, Uttara)..."
+                    autoComplete="off"
+                    className="w-full pl-3.5 pr-10 py-3 bg-black/90 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-red-500/80 focus:ring-1 focus:ring-red-500/40 transition-all font-medium"
+                  />
+
+                  {/* Status Indicator */}
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
+                    {isSearchingDropoff && (
+                      <Loader2 className="w-4 h-4 text-red-400 animate-spin" />
+                    )}
+                    {dropoffInput && !isSearchingDropoff && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDropoffInput('');
+                          setDropoff(null);
+                          setDropoffSuggestions([]);
+                        }}
+                        className="text-zinc-500 hover:text-white cursor-pointer"
+                        title="Clear destination"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Selected Confirmation Pill */}
+                {dropoff && (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-red-400 bg-red-950/40 border border-red-900/50 px-2.5 py-1 rounded-lg">
+                    <CheckCircle2 className="w-3 h-3 shrink-0" />
+                    <span className="truncate font-medium">{dropoff.formatted}</span>
+                  </div>
+                )}
+
+                {/* Autocomplete Suggestions Dropdown for Drop-off */}
+                {isDropoffFocused && dropoffSuggestions.length > 0 && !dropoff && (
+                  <div
+                    id="dropoff-suggestions-dropdown"
+                    className="absolute z-50 left-0 right-0 mt-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto"
+                  >
+                    <div className="px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-mono text-zinc-400 flex items-center justify-between">
+                      <span className="text-red-400 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                        Suggested Destinations
+                      </span>
+                      <span>Bangladesh</span>
+                    </div>
+                    {dropoffSuggestions.map((item, idx) => (
+                      <button
+                        key={`dropoff-sug-${item.placeId || idx}`}
+                        type="button"
+                        onClick={() => handleSelectDropoff(item)}
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-zinc-800 active:bg-zinc-700 border-b border-zinc-800/60 last:border-b-0 transition-colors flex items-start gap-3 cursor-pointer"
+                      >
+                        {renderItemIcon(item, true)}
+                        <div className="min-w-0 flex-1">
+                          <div className="text-xs font-semibold text-white truncate">
+                            {item.addressLine1 || item.name || item.formatted.split(',')[0]}
+                          </div>
+                          <div className="text-[11px] text-zinc-400 truncate mt-0.5">
+                            {item.addressLine2 || item.formatted}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
-          {/* REAL-TIME PRICE PREVIEW (1 KM = 70 TAKA) */}
-          {approxDistanceKm && approxFareTaka && (
-            <div className="mt-6 p-4 rounded-xl bg-zinc-900/90 border border-zinc-800 flex items-center justify-between animate-in fade-in">
-              <div>
-                <div className="text-[11px] uppercase tracking-wider font-semibold text-zinc-400">
-                  Calculated Trip Fare
-                </div>
-                <div className="text-xs text-zinc-500 mt-0.5">
-                  Est. distance ~{approxDistanceKm} km • ৳70 Taka / km
-                </div>
+          {/* MILLION-DOLLAR BIGO RIDE TIER SELECTOR */}
+          {approxDistanceKm && (
+            <div className="mt-6 space-y-3 animate-in fade-in">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
+                  Select Bigo Tier
+                </span>
+                <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 font-mono">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Est. {approxDistanceKm} km</span>
+                </span>
               </div>
-              <div className="text-right">
-                <div className="text-2xl font-black text-emerald-400">
-                  ৳{approxFareTaka} Taka
-                </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {/* Bigo Select - Flagship VIP Tier */}
+                <button
+                  id="tier-bigo-select-btn"
+                  type="button"
+                  onClick={() => setSelectedTier('select')}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
+                    selectedTier === 'select'
+                      ? 'bg-zinc-900 border-amber-400/90 shadow-lg shadow-amber-400/5 ring-1 ring-amber-400/40'
+                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4" />
+                    </div>
+                    <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-black uppercase">
+                      VIP
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-xs font-extrabold text-white">Bigo Select</div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Executive Sedan</div>
+                    <div className="text-sm font-black text-amber-300 mt-1.5 font-mono">
+                      ৳{Math.round(approxDistanceKm * 95)}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Bigo Moto */}
+                <button
+                  id="tier-bigo-moto-btn"
+                  type="button"
+                  onClick={() => setSelectedTier('moto')}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
+                    selectedTier === 'moto'
+                      ? 'bg-zinc-900 border-emerald-400/90 shadow-lg shadow-emerald-400/5 ring-1 ring-emerald-400/40'
+                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
+                      <Bike className="w-4 h-4" />
+                    </div>
+                    <span className="text-[9px] font-mono text-zinc-500">Fastest</span>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Bigo Moto</div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Instant Bike</div>
+                    <div className="text-sm font-black text-emerald-400 mt-1.5 font-mono">
+                      ৳{Math.round(approxDistanceKm * 70)}
+                    </div>
+                  </div>
+                </button>
+
+                {/* Bigo Sedan */}
+                <button
+                  id="tier-bigo-sedan-btn"
+                  type="button"
+                  onClick={() => setSelectedTier('sedan')}
+                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
+                    selectedTier === 'sedan'
+                      ? 'bg-zinc-900 border-blue-400/90 shadow-lg shadow-blue-400/5 ring-1 ring-blue-400/40'
+                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
+                      <Car className="w-4 h-4" />
+                    </div>
+                    <span className="text-[9px] font-mono text-zinc-500">4 Seats</span>
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold text-white">Bigo Sedan</div>
+                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Standard AC</div>
+                    <div className="text-sm font-black text-blue-400 mt-1.5 font-mono">
+                      ৳{Math.round(approxDistanceKm * 85)}
+                    </div>
+                  </div>
+                </button>
+              </div>
+
+              {/* Selected Tier Perks Callout */}
+              <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
+                <span>
+                  {selectedTier === 'select'
+                    ? '✨ Premier AC Sedan • Top 5% Captains • Quiet ride guarantee'
+                    : selectedTier === 'moto'
+                    ? '⚡ Quickest transit through Dhaka traffic • Sanitized helmet provided'
+                    : '❄️ Climate-controlled 4-seater • Luggage space'}
+                </span>
+                <span className="font-mono text-white font-bold shrink-0 ml-2">
+                  ৳{selectedTier === 'select' ? 95 : selectedTier === 'moto' ? 70 : 85}/km
+                </span>
               </div>
             </div>
           )}
 
           {/* OPTION 3: REQUEST FOR RIDE ACTION */}
-          <div className="mt-6 pt-5 border-t border-zinc-900">
+          <div className="mt-5 pt-4 border-t border-zinc-900">
             <button
               id="request-ride-button"
               type="button"
               onClick={onRequestRide}
               disabled={!isReadyToRequest || isLoadingRoute}
-              className={`w-full py-4 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
+              className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
                 isReadyToRequest && !isLoadingRoute
-                  ? 'bg-white text-black hover:bg-zinc-200 active:scale-[0.99] shadow-xl shadow-white/10'
+                  ? 'bg-white text-black hover:bg-zinc-100 active:scale-[0.99] shadow-xl shadow-white/10'
                   : 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800/60'
               }`}
             >
               {isLoadingRoute ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin text-black" />
-                  <span>Calculating Route & Sending to Rider Dashboard...</span>
+                  <span>Dispatching to Nearby Captains...</span>
+                </>
+              ) : isReadyToRequest ? (
+                <>
+                  <span>
+                    Request {selectedTier === 'select' ? 'Bigo Select' : selectedTier === 'sedan' ? 'Bigo Sedan' : 'Bigo Moto'}
+                    {approxDistanceKm ? ` • ৳${Math.round(approxDistanceKm * (selectedTier === 'select' ? 95 : selectedTier === 'sedan' ? 85 : 70))}` : ''}
+                  </span>
+                  <ArrowRight className="w-4 h-4" />
                 </>
               ) : (
                 <>
                   <span>Request for Ride</span>
-                  <ArrowRight className="w-4 h-4" />
+                  <ArrowRight className="w-4 h-4 opacity-40" />
                 </>
               )}
             </button>
 
-            <p className="text-center text-xs text-zinc-500 mt-3">
+            <p className="text-center text-xs text-zinc-500 mt-2.5 font-mono">
               {!pickup && !dropoff
                 ? 'Enter pickup & drop-off spots to start navigation'
                 : !pickup
-                ? 'Select your pickup spot from suggestions'
+                ? 'Select your pickup spot'
                 : !dropoff
-                ? 'Select your drop-off spot from suggestions'
-                : 'Click Request for Ride to notify the Rider Dashboard'}
+                ? 'Select your destination'
+                : 'Ready for instant dispatch'}
             </p>
           </div>
         </div>
