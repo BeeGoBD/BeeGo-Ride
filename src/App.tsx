@@ -9,13 +9,28 @@ import {
   generatePassengerId,
   generateRiderId,
 } from './services/rideSync';
+import { BigoIntroSplash } from './components/BigoIntroSplash';
+import { BigoOnboarding } from './components/BigoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
-import { RideRequestForm } from './components/RideRequestForm';
+import { PassengerAppShell } from './components/PassengerAppShell';
 import { RiderDashboard } from './components/RiderDashboard';
 import { NavigationMap } from './components/NavigationMap';
 import { UberLiveTracking } from './components/UberLiveTracking';
 
+type AppIntroState = 'splash' | 'onboarding' | 'ready';
+
 export default function App() {
+  // Intro splash and slides lifecycle
+  const [introState, setIntroState] = useState<AppIntroState>(() => {
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('skipIntro') === 'true') return 'ready';
+      const seen = sessionStorage.getItem('bigo_intro_completed');
+      if (seen === 'true') return 'ready';
+    }
+    return 'splash';
+  });
+
   // Role selection state: null = dashboard shown first!
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
@@ -118,6 +133,11 @@ export default function App() {
     setErrorMessage(null);
   };
 
+  const handleReplayIntro = () => {
+    sessionStorage.removeItem('bigo_intro_completed');
+    setIntroState('splash');
+  };
+
   // Passenger clicks "Request for Ride"
   const handleRequestRide = async () => {
     if (!pickup || !dropoff) {
@@ -160,18 +180,35 @@ export default function App() {
     setStage('request');
   };
 
-  const handleBackToRequest = () => {
-    setStage('request');
-  };
-
-  // STEP 1: If role is not selected, display the initial Selection Dashboard first!
-  if (role === null) {
-    return <RoleSelectDashboard onSelectRole={handleSelectRole} />;
+  // 1. INTRO SPLASH: "Bigo written in text, full black color screen, shining white like Uber intro" (~2s)
+  if (introState === 'splash') {
+    return <BigoIntroSplash onComplete={() => setIntroState('onboarding')} />;
   }
 
-  // STEP 2: Rider View
+  // 2. ONBOARDING SLIDES: 4 slides with next/back buttons
+  if (introState === 'onboarding') {
+    return (
+      <BigoOnboarding
+        onFinish={() => {
+          sessionStorage.setItem('bigo_intro_completed', 'true');
+          setIntroState('ready');
+        }}
+      />
+    );
+  }
+
+  // 3. ROLE SELECTION: "Continue as guest passenger" or "Continue as guest rider"
+  if (role === null) {
+    return (
+      <RoleSelectDashboard
+        onSelectRole={handleSelectRole}
+        onReplayIntro={handleReplayIntro}
+      />
+    );
+  }
+
+  // 4. RIDER VIEW: The Rider Dashboard
   if (role === 'rider') {
-    // If a ride is active and accepted/in-transit/completed, display the live Uber tracking view
     if (
       activeRide &&
       (activeRide.status === 'accepted' ||
@@ -202,8 +239,7 @@ export default function App() {
     );
   }
 
-  // STEP 3: Passenger View
-  // If ride is active and accepted/in-transit/completed, show live Uber tracking view with vehicle movement and driver telemetry
+  // 5. PASSENGER VIEW: If ride in flight, show live Uber tracking
   if (
     activeRide &&
     (activeRide.status === 'accepted' ||
@@ -223,29 +259,27 @@ export default function App() {
     );
   }
 
+  // 6. PASSENGER VIEW: Full Passenger App Shell with fixed bottom bar, 4 swipeable sections
   return (
-    <main className="w-full min-h-screen bg-black text-white selection:bg-zinc-800 selection:text-white flex flex-col">
-      <div className="flex-1 flex items-center justify-center py-4">
-        <RideRequestForm
-          apiKey={apiKey}
-          onApiKeyChange={handleApiKeyChange}
-          passengerId={passengerId}
-          pickup={pickup}
-          setPickup={setPickup}
-          dropoff={dropoff}
-          setDropoff={setDropoff}
-          routeData={routeData}
-          onRequestRide={handleRequestRide}
-          isLoadingRoute={isLoadingRoute}
-          errorMessage={errorMessage}
-          setErrorMessage={setErrorMessage}
-          activeRide={activeRide}
-          onCancelRide={handleCancelRide}
-          onResetRide={handleResetRide}
-          onBackToRoles={handleBackToRoles}
-          onSwitchToRider={handleSwitchToRider}
-        />
-      </div>
-    </main>
+    <PassengerAppShell
+      apiKey={apiKey}
+      onApiKeyChange={handleApiKeyChange}
+      passengerId={passengerId}
+      pickup={pickup}
+      setPickup={setPickup}
+      dropoff={dropoff}
+      setDropoff={setDropoff}
+      routeData={routeData}
+      onRequestRide={handleRequestRide}
+      isLoadingRoute={isLoadingRoute}
+      errorMessage={errorMessage}
+      setErrorMessage={setErrorMessage}
+      activeRide={activeRide}
+      onCancelRide={handleCancelRide}
+      onResetRide={handleResetRide}
+      onBackToRoles={handleBackToRoles}
+      onSwitchToRider={handleSwitchToRider}
+      onReplayIntro={handleReplayIntro}
+    />
   );
 }
