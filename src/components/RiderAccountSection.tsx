@@ -61,12 +61,12 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
       {/* Profile Header */}
       <div className="flex items-center gap-4 p-5 rounded-3xl bg-zinc-950 border border-zinc-800/90 shadow-xl mb-5">
         <div className="relative">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-0.5 shadow-lg">
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-amber-500 to-yellow-400 p-0.5 shadow-lg shadow-amber-500/20">
             <div className="w-full h-full rounded-[14px] bg-black flex items-center justify-center">
-              <Bike className="w-8 h-8 text-emerald-400" />
+              <Bike className="w-8 h-8 text-amber-400" />
             </div>
           </div>
-          <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-emerald-500 border-2 border-black flex items-center justify-center">
+          <span className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-amber-400 border-2 border-black flex items-center justify-center shadow-sm">
             <Check className="w-3 h-3 text-black stroke-[3]" />
           </span>
         </div>
@@ -74,9 +74,9 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h2 className="text-lg font-black text-white truncate">Captain Tanvir (You)</h2>
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
               <ShieldCheck className="w-3 h-3" />
-              Verified
+              Verified Captain
             </span>
           </div>
 
@@ -85,11 +85,11 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
             <button
               type="button"
               onClick={handleCopyId}
-              className="text-zinc-500 hover:text-white transition-colors cursor-pointer"
+              className="text-zinc-500 hover:text-amber-400 transition-colors cursor-pointer"
               title="Copy Captain ID"
             >
               {copied ? (
-                <Check className="w-3.5 h-3.5 text-emerald-400" />
+                <Check className="w-3.5 h-3.5 text-amber-400" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}
@@ -104,7 +104,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
             <span>•</span>
             <span>342 Rides</span>
             <span>•</span>
-            <span className="text-emerald-400 font-medium">99% Acceptance</span>
+            <span className="text-amber-400 font-medium">99% Acceptance</span>
           </div>
         </div>
       </div>
@@ -113,7 +113,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
       <div className="p-5 rounded-3xl bg-gradient-to-br from-zinc-900 via-zinc-950 to-black border border-zinc-800 shadow-xl mb-5">
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
               <Wallet className="w-4 h-4" />
             </div>
             <div>
@@ -125,7 +125,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           <button
             type="button"
             onClick={() => setShowWithdrawModal(true)}
-            className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs shadow-lg shadow-emerald-500/20 transition-all cursor-pointer flex items-center gap-1.5"
+            className="px-4 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-extrabold text-xs shadow-lg shadow-amber-400/20 transition-all cursor-pointer flex items-center gap-1.5"
           >
             <Send className="w-3.5 h-3.5" />
             <span>Cash Out</span>
@@ -139,7 +139,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           </div>
           <div>
             <span className="text-zinc-500 block text-[11px]">Fare Rate</span>
-            <span className="text-emerald-400 font-bold">৳{RATE_PER_KM_TAKA}/km (85% Captain share)</span>
+            <span className="text-amber-400 font-bold">৳{RATE_PER_KM_TAKA}/km (85% Captain share)</span>
           </div>
         </div>
       </div>
@@ -148,12 +148,12 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
       <div className="p-5 rounded-3xl bg-zinc-950 border border-zinc-800/80 shadow-lg mb-5">
         <div className="flex items-center justify-between pb-3 border-b border-zinc-900 mb-3">
           <div className="flex items-center gap-2">
-            <Bike className="w-4 h-4 text-emerald-400" />
+            <Bike className="w-4 h-4 text-amber-400" />
             <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
               Active Registered Bike
             </span>
           </div>
-          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
             Road Ready
           </span>
         </div>
@@ -165,7 +165,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           </div>
           <div className="flex items-center justify-between py-1 border-b border-zinc-900/60">
             <span className="text-zinc-400">License Plate:</span>
-            <span className="font-mono text-emerald-400 font-bold">Dhaka Metro-HA 52-8910</span>
+            <span className="font-mono text-amber-400 font-bold">Dhaka Metro-HA 52-8910</span>
           </div>
           <div className="flex items-center justify-between py-1 border-b border-zinc-900/60">
             <span className="text-zinc-400">Helmets for Ride:</span>
@@ -187,7 +187,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           className="w-full px-5 py-4 flex items-center justify-between hover:bg-zinc-900/60 transition-colors text-left cursor-pointer group"
         >
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform">
+            <div className="w-9 h-9 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
               <User className="w-4 h-4" />
             </div>
             <div>
@@ -288,7 +288,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           >
             <div className="flex items-center justify-between pb-3 border-b border-zinc-800 mb-4">
               <div className="flex items-center gap-2">
-                <Wallet className="w-5 h-5 text-emerald-400" />
+                <Wallet className="w-5 h-5 text-amber-400" />
                 <h3 className="text-base font-bold text-white">Cash Out Earnings</h3>
               </div>
               <button
@@ -302,7 +302,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
 
             {withdrawSuccess ? (
               <div className="py-8 text-center animate-in fade-in zoom-in duration-200">
-                <div className="w-12 h-12 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto mb-3">
+                <div className="w-12 h-12 rounded-full bg-amber-500/20 text-amber-400 flex items-center justify-center mx-auto mb-3">
                   <Check className="w-6 h-6 stroke-[3]" />
                 </div>
                 <div className="text-base font-bold text-white">Payout Initiated!</div>
@@ -346,7 +346,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
                     type="text"
                     value={withdrawAccount}
                     onChange={(e) => setWithdrawAccount(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-amber-500"
                     required
                   />
                 </div>
@@ -357,7 +357,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
                     type="number"
                     value={withdrawAmount}
                     onChange={(e) => setWithdrawAmount(e.target.value)}
-                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-emerald-500"
+                    className="w-full px-3.5 py-2.5 bg-black border border-zinc-800 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-amber-500"
                     max={1640}
                     min={50}
                     required
@@ -377,7 +377,7 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold cursor-pointer"
+                    className="px-5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold cursor-pointer"
                   >
                     Confirm Payout
                   </button>

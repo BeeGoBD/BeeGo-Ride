@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Clock,
   MapPin,
@@ -32,7 +32,7 @@ import {
   Banknote,
   Navigation,
 } from 'lucide-react';
-import { RATE_PER_KM_TAKA } from '../services/rideSync';
+import { RATE_PER_KM_TAKA, getRealTripHistory, REAL_TRIP_HISTORY_KEY, StoredRealTrip } from '../services/rideSync';
 
 export interface HistoryRideItem {
   id: string;
@@ -56,137 +56,40 @@ export interface HistoryRideItem {
   status: 'completed';
 }
 
-const DEFAULT_COMPLETED_RIDES: HistoryRideItem[] = [
-  {
-    id: 'TRIP-BD-9042',
-    date: 'Today',
-    time: '02:40 PM',
-    pickup: 'Westin Hotel, Gulshan 2 Ave, Dhaka',
-    dropoff: 'Radisson Blu Water Garden, Airport Road, Dhaka',
-    distanceKm: 8.6,
-    fareTaka: 817,
-    ratePerKm: 95,
-    vehicleType: 'car',
-    tier: 'select',
-    tierName: 'Bigo Select',
-    vehicleModel: 'Toyota Camry Hybrid (Executive Obsidian Black)',
-    plateNumber: 'DHAKA METRO-GA 45-8120',
-    driverName: 'Farhan Chowdhury',
-    driverRating: 4.99,
-    paymentMethod: 'Corporate bKash (017••••••99)',
-    transactionRef: 'TXN-BG-9042-881',
-    vatTaka: 41,
+function mapStoredToHistoryItem(item: StoredRealTrip): HistoryRideItem {
+  const vat = Math.round(item.fareTaka * 0.05);
+  return {
+    id: item.id,
+    date: item.date,
+    time: item.time,
+    pickup: item.pickup,
+    dropoff: item.dropoff,
+    distanceKm: item.distanceKm,
+    fareTaka: item.fareTaka,
+    vehicleType: item.vehicleType || 'bike',
+    tier: item.tier || 'moto',
+    tierName: item.tierName || 'Beego Moto',
+    ratePerKm: item.ratePerKm || RATE_PER_KM_TAKA,
+    vehicleModel: item.vehicleModel,
+    plateNumber: item.plateNumber,
+    driverName: item.driverName,
+    driverRating: item.driverRating,
+    paymentMethod:
+      item.paymentMethod === 'bkash'
+        ? 'bKash Wallet'
+        : item.paymentMethod === 'nagad'
+        ? 'Nagad Wallet'
+        : item.paymentMethod === 'rocket'
+        ? 'Rocket DBBL'
+        : 'Cash on Arrival',
+    transactionRef: item.transactionRef,
+    vatTaka: vat,
     status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-8901',
-    date: 'Today',
-    time: '11:20 AM',
-    pickup: 'Gulshan 2 Circle, Road 90, Dhaka',
-    dropoff: 'Dhanmondi 27, Satmasjid Road, Dhaka',
-    distanceKm: 7.2,
-    fareTaka: 504,
-    ratePerKm: 70,
-    vehicleType: 'bike',
-    tier: 'moto',
-    tierName: 'Bigo Moto',
-    vehicleModel: 'Yamaha FZ-S FI V3 (Midnight Black)',
-    plateNumber: 'DHAKA METRO-HA 52-8910',
-    driverName: 'Tanvir Hossain',
-    driverRating: 4.95,
-    paymentMethod: 'bKash (017••••••89)',
-    transactionRef: 'TXN-BG-8901-504',
-    vatTaka: 25,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-8550',
-    date: 'Yesterday',
-    time: '08:15 PM',
-    pickup: 'InterContinental Dhaka, Minto Road',
-    dropoff: 'Gulshan Club, Community Rd 50, Dhaka',
-    distanceKm: 9.4,
-    fareTaka: 893,
-    ratePerKm: 95,
-    vehicleType: 'car',
-    tier: 'select',
-    tierName: 'Bigo Select',
-    vehicleModel: 'Honda Civic RS Turbo (Sonic Titanium)',
-    plateNumber: 'DHAKA METRO-GHA 11-0941',
-    driverName: 'Asif Al-Mamun',
-    driverRating: 4.98,
-    paymentMethod: 'Visa Card (•••• 4012)',
-    transactionRef: 'TXN-BG-8550-893',
-    vatTaka: 45,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-7642',
-    date: 'Yesterday',
-    time: '06:45 PM',
-    pickup: 'Banani Road 11, Block D, Dhaka',
-    dropoff: 'Hazrat Shahjalal Int’l Airport, Terminal 1',
-    distanceKm: 8.5,
-    fareTaka: 722,
-    ratePerKm: 85,
-    vehicleType: 'car',
-    tier: 'sedan',
-    tierName: 'Bigo Sedan',
-    vehicleModel: 'Toyota Axio Hybrid (Pearl White)',
-    plateNumber: 'DHAKA METRO-GA 29-4102',
-    driverName: 'Abdur Rahim',
-    driverRating: 4.88,
-    paymentMethod: 'Cash on Arrival',
-    transactionRef: 'TXN-BG-7642-722',
-    vatTaka: 36,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-6519',
-    date: '16 Sep 2026',
-    time: '09:15 AM',
-    pickup: 'Uttara Sector 3, Jashimuddin Ave, Dhaka',
-    dropoff: 'Mohakhali Wireless Gate, Dhaka',
-    distanceKm: 11.0,
-    fareTaka: 770,
-    ratePerKm: 70,
-    vehicleType: 'bike',
-    tier: 'moto',
-    tierName: 'Bigo Moto',
-    vehicleModel: 'Honda CB Hornet 160R (Crimson Red)',
-    plateNumber: 'DHAKA METRO-LA 18-9321',
-    driverName: 'Kamal Uddin',
-    driverRating: 5.0,
-    paymentMethod: 'Nagad Wallet',
-    transactionRef: 'TXN-BG-6519-770',
-    vatTaka: 38,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-5380',
-    date: '14 Sep 2026',
-    time: '08:30 PM',
-    pickup: 'Bashundhara R/A, Block C, Dhaka',
-    dropoff: 'Jamuna Future Park, Kuril, Dhaka',
-    distanceKm: 3.4,
-    fareTaka: 238,
-    ratePerKm: 70,
-    vehicleType: 'bike',
-    tier: 'moto',
-    tierName: 'Bigo Moto',
-    vehicleModel: 'Suzuki Gixxer Monotone',
-    plateNumber: 'DHAKA METRO-HA 33-7641',
-    driverName: 'Sakibul Islam',
-    driverRating: 4.92,
-    paymentMethod: 'bKash (017••••••89)',
-    transactionRef: 'TXN-BG-5380-238',
-    vatTaka: 12,
-    status: 'completed',
-  },
-];
+  };
+}
 
 // Helper: Download trips as CSV
-export function exportTripsToCsv(trips: HistoryRideItem[], filename = 'bigo-trips-statement.csv') {
+export function exportTripsToCsv(trips: HistoryRideItem[], filename = 'beego-trips-statement.csv') {
   const headers = [
     'Trip ID',
     'Date',
@@ -246,6 +149,25 @@ interface RideHistorySectionProps {
 }
 
 export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAgain }) => {
+  const [trips, setTrips] = useState<HistoryRideItem[]>(() => {
+    return getRealTripHistory().map(mapStoredToHistoryItem);
+  });
+
+  useEffect(() => {
+    const refreshTrips = () => {
+      setTrips(getRealTripHistory().map(mapStoredToHistoryItem));
+    };
+    refreshTrips();
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === REAL_TRIP_HISTORY_KEY) {
+        refreshTrips();
+      }
+    };
+    window.addEventListener('storage', handleStorage);
+    return () => window.removeEventListener('storage', handleStorage);
+  }, []);
+
   const [filterType, setFilterType] = useState<'all' | 'select' | 'moto' | 'sedan'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryRideItem | null>(null);
@@ -256,7 +178,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
   const [copiedNotification, setCopiedNotification] = useState<string | null>(null);
   const [showBatchStatementModal, setShowBatchStatementModal] = useState(false);
 
-  const filteredRides = DEFAULT_COMPLETED_RIDES.filter((ride) => {
+  const filteredRides = trips.filter((ride) => {
     if (filterType !== 'all' && ride.tier !== filterType) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -277,7 +199,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
   const totalVat = filteredRides.reduce((acc, r) => acc + r.vatTaka, 0);
 
   // Selected trips calculation
-  const selectedTrips = DEFAULT_COMPLETED_RIDES.filter((r) => selectedIds.includes(r.id));
+  const selectedTrips = trips.filter((r) => selectedIds.includes(r.id));
   const selectedTotalFare = selectedTrips.reduce((acc, r) => acc + r.fareTaka, 0);
   const selectedTotalKm = selectedTrips.reduce((acc, r) => acc + r.distanceKm, 0);
 
@@ -299,7 +221,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
     const targets = selectedTrips.length > 0 ? selectedTrips : filteredRides;
     exportTripsToCsv(
       targets,
-      `bigo-${selectedTrips.length > 0 ? 'selected' : 'all'}-trips-statement.csv`
+      `beego-${selectedTrips.length > 0 ? 'selected' : 'all'}-trips-statement.csv`
     );
   };
 
@@ -325,8 +247,8 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
               <span className="text-2xl sm:text-3xl font-black tracking-tight text-white">
                 Trip Archive & Invoices
               </span>
-              <span className="px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] uppercase font-mono tracking-widest text-emerald-400 font-semibold flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="px-2.5 py-0.5 rounded-full bg-zinc-900 border border-zinc-800 text-[10px] uppercase font-mono tracking-widest text-amber-400 font-semibold flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                 Verified
               </span>
             </div>
@@ -346,7 +268,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
               }}
               className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer border ${
                 isSelectMode
-                  ? 'bg-emerald-500 text-black border-emerald-400 shadow-lg shadow-emerald-500/10'
+                  ? 'bg-amber-400 text-black border-amber-300 shadow-lg shadow-amber-400/20'
                   : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-200 border-zinc-800 hover:border-zinc-700'
               }`}
             >
@@ -366,8 +288,9 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <button
               id="export-all-csv-btn"
               type="button"
-              onClick={() => exportTripsToCsv(DEFAULT_COMPLETED_RIDES, 'bigo-full-statement.csv')}
-              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-zinc-200 text-black flex items-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
+              onClick={() => exportTripsToCsv(trips, 'beego-full-statement.csv')}
+              disabled={trips.length === 0}
+              className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-white hover:bg-zinc-200 disabled:opacity-40 disabled:cursor-not-allowed text-black flex items-center gap-1.5 transition-all shadow-md active:scale-98 cursor-pointer"
               title="Download full CSV archive of all trips"
             >
               <Download className="w-3.5 h-3.5" />
@@ -393,7 +316,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <div className="text-xl sm:text-2xl font-black text-white tracking-tight">
               ৳{totalSpent.toLocaleString()}
             </div>
-            <div className="text-[10px] text-emerald-400 font-semibold mt-1 flex items-center gap-1">
+            <div className="text-[10px] text-amber-400 font-semibold mt-1 flex items-center gap-1">
               <TrendingUp className="w-3 h-3" />
               <span>Flat ৳70-৳95/km</span>
             </div>
@@ -409,7 +332,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
 
           <div className="p-4 rounded-2xl bg-zinc-950 border border-zinc-900 shadow-sm">
             <div className="text-[11px] font-medium text-zinc-400 mb-1">Govt VAT / SD</div>
-            <div className="text-xl sm:text-2xl font-black text-emerald-400 tracking-tight">
+            <div className="text-xl sm:text-2xl font-black text-amber-400 tracking-tight">
               ৳{totalVat}
             </div>
             <div className="text-[10px] text-zinc-400 mt-1">100% Tax Compliant</div>
@@ -459,10 +382,10 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                 : 'text-zinc-400 hover:text-white'
             }`}
           >
-            All ({DEFAULT_COMPLETED_RIDES.length})
+            All ({trips.length})
           </button>
 
-          {/* Bigo Select Filter */}
+          {/* Beego Select Filter */}
           <button
             type="button"
             onClick={() => setFilterType('select')}
@@ -473,16 +396,16 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             }`}
           >
             <Sparkles className="w-3 h-3" />
-            <span>Bigo Select</span>
+            <span>Beego Select</span>
           </button>
 
-          {/* Bigo Moto Filter */}
+          {/* Beego Moto Filter */}
           <button
             type="button"
             onClick={() => setFilterType('moto')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
               filterType === 'moto'
-                ? 'bg-emerald-500 text-black shadow-sm'
+                ? 'bg-amber-400 text-black font-bold shadow-sm'
                 : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -490,7 +413,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <span>Moto</span>
           </button>
 
-          {/* Bigo Sedan Filter */}
+          {/* Beego Sedan Filter */}
           <button
             type="button"
             onClick={() => setFilterType('sedan')}
@@ -513,10 +436,10 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <button
               type="button"
               onClick={handleSelectAll}
-              className="text-xs font-bold text-white hover:text-emerald-400 flex items-center gap-1.5 cursor-pointer"
+              className="text-xs font-bold text-white hover:text-amber-400 flex items-center gap-1.5 cursor-pointer"
             >
               {selectedIds.length === filteredRides.length ? (
-                <CheckSquare className="w-4 h-4 text-emerald-400" />
+                <CheckSquare className="w-4 h-4 text-amber-400" />
               ) : (
                 <Square className="w-4 h-4 text-zinc-500" />
               )}
@@ -544,11 +467,31 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
 
       {/* 3. TRIPS LIST WITH PREMIUM BREADTH */}
       <div className="flex flex-col gap-3">
-        {filteredRides.length === 0 ? (
+        {trips.length === 0 ? (
+          <div className="text-center py-16 px-6 rounded-3xl bg-zinc-950 border border-zinc-900 text-zinc-400 max-w-md mx-auto">
+            <div className="w-14 h-14 rounded-2xl bg-zinc-900 border border-zinc-800 flex items-center justify-center mx-auto mb-4 text-amber-400">
+              <Bike className="w-7 h-7" />
+            </div>
+            <div className="text-base font-bold text-white mb-1.5">No Ride History Yet</div>
+            <p className="text-xs text-zinc-400 leading-relaxed mb-6">
+              All mock and demo data has been cleared. When you take your first ride with Beego Moto, your real digital receipt, road distance calculation (৳70/km), and payment details will appear here.
+            </p>
+            {onBookAgain && (
+              <button
+                type="button"
+                onClick={() => onBookAgain('', '')}
+                className="py-3 px-5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs transition-colors cursor-pointer inline-flex items-center gap-2 shadow-lg shadow-amber-400/20"
+              >
+                <Bike className="w-4 h-4" />
+                <span>Book Your First Moto Ride</span>
+              </button>
+            )}
+          </div>
+        ) : filteredRides.length === 0 ? (
           <div className="text-center py-16 px-4 rounded-3xl bg-zinc-950 border border-zinc-900 text-zinc-500">
             <FileText className="w-8 h-8 mx-auto mb-2 text-zinc-600" />
-            <div className="text-sm font-semibold text-zinc-300">No trips found</div>
-            <div className="text-xs text-zinc-500 mt-1">Try changing your search query or filter</div>
+            <div className="text-sm font-semibold text-zinc-300">No matching trips found</div>
+            <div className="text-xs text-zinc-500 mt-1">Try clearing your search query or filter</div>
           </div>
         ) : (
           filteredRides.map((ride) => {
@@ -565,7 +508,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                   isSelectMode ? 'cursor-pointer' : ''
                 } ${
                   isSelected
-                    ? 'bg-zinc-950 border-2 border-emerald-500/80 shadow-lg shadow-emerald-500/5'
+                    ? 'bg-zinc-950 border-2 border-amber-500/80 shadow-lg shadow-amber-500/5'
                     : 'bg-zinc-950 border border-zinc-900 hover:border-zinc-700/80 shadow-sm'
                 } p-5`}
               >
@@ -576,7 +519,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                     {isSelectMode && (
                       <div className="shrink-0">
                         {isSelected ? (
-                          <div className="w-5 h-5 rounded-md bg-emerald-500 flex items-center justify-center text-black shadow-sm">
+                          <div className="w-5 h-5 rounded-md bg-amber-400 flex items-center justify-center text-black shadow-sm">
                             <Check className="w-3.5 h-3.5 stroke-[3]" />
                           </div>
                         ) : (
@@ -591,7 +534,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                         ride.tier === 'select'
                           ? 'bg-amber-400/10 text-amber-300 border-amber-500/30'
                           : ride.tier === 'moto'
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                           : 'bg-blue-500/10 text-blue-400 border-blue-500/30'
                       }`}
                     >
@@ -649,7 +592,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
 
                   {/* Origin */}
                   <div className="relative">
-                    <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-black" />
+                    <div className="absolute -left-6 top-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-black" />
                     <div className="text-[10px] uppercase font-mono text-zinc-500">Pickup Location</div>
                     <div className="text-xs sm:text-sm font-medium text-white truncate max-w-lg">
                       {ride.pickup}
@@ -705,7 +648,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                     {/* Quick Single CSV */}
                     <button
                       type="button"
-                      onClick={() => exportTripsToCsv([ride], `bigo-trip-${ride.id}.csv`)}
+                      onClick={() => exportTripsToCsv([ride], `beego-trip-${ride.id}.csv`)}
                       className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white border border-zinc-800 transition-colors cursor-pointer"
                       title="Download single CSV"
                     >
@@ -736,7 +679,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 w-[92%] max-w-xl bg-zinc-950/95 backdrop-blur-xl border border-zinc-700/80 rounded-2xl p-3 sm:p-4 shadow-2xl flex items-center justify-between gap-3 animate-in fade-in slide-in-from-bottom-4">
           <div>
             <div className="text-xs font-bold text-white flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400" />
+              <span className="w-2 h-2 rounded-full bg-amber-400" />
               <span>{selectedIds.length} Trips Selected</span>
             </div>
             <div className="text-[11px] text-zinc-400 mt-0.5">
@@ -749,7 +692,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
               id="export-selected-csv-btn"
               type="button"
               onClick={handleExportSelectedCsv}
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+              className="px-3.5 py-2 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
             >
               <Download className="w-3.5 h-3.5 stroke-[2.5]" />
               <span>Export CSV</span>
@@ -792,7 +735,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <div className="p-6 bg-zinc-900/60 border-b border-zinc-800 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black tracking-tighter text-white">Bigo</span>
+                  <span className="text-2xl font-black tracking-tighter text-amber-400">Beego</span>
                   <span
                     className={`text-[10px] font-extrabold uppercase px-2 py-0.5 rounded font-mono ${
                       selectedReceipt.tier === 'select'
@@ -804,7 +747,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                   </span>
                 </div>
                 <div className="text-[11px] text-zinc-400 mt-1">
-                  Bigo Technologies Bangladesh Ltd. • BIN: 004829104-0102
+                  Beego Technologies Bangladesh Ltd. • BIN: 004829104-0102
                 </div>
               </div>
 
@@ -843,8 +786,8 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
               {/* Transit Itinerary Details */}
               <div className="space-y-3 p-4 rounded-2xl bg-black border border-zinc-900">
                 <div>
-                  <div className="text-[10px] uppercase font-mono text-emerald-400 flex items-center gap-1 mb-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                  <div className="text-[10px] uppercase font-mono text-amber-400 flex items-center gap-1 mb-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                     <span>Origin / Boarding Spot</span>
                   </div>
                   <div className="text-sm font-medium text-white">{selectedReceipt.pickup}</div>
@@ -887,12 +830,12 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
 
                 <div className="flex justify-between py-1.5 text-zinc-300">
                   <span>Surge / Dynamic Pricing Extortion</span>
-                  <span className="font-mono font-bold text-emerald-400">৳0 (Guaranteed)</span>
+                  <span className="font-mono font-bold text-amber-400">৳0 (Guaranteed)</span>
                 </div>
 
                 <div className="flex justify-between pt-3 text-base font-black text-white">
                   <span>Total Amount Paid</span>
-                  <span className="text-emerald-400">৳{selectedReceipt.fareTaka} BDT</span>
+                  <span className="text-amber-400">৳{selectedReceipt.fareTaka} BDT</span>
                 </div>
               </div>
 
@@ -936,7 +879,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                   id="receipt-export-csv-btn"
                   type="button"
                   onClick={() =>
-                    exportTripsToCsv([selectedReceipt], `bigo-receipt-${selectedReceipt.id}.csv`)
+                    exportTripsToCsv([selectedReceipt], `beego-receipt-${selectedReceipt.id}.csv`)
                   }
                   className="py-3 px-4 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold text-xs flex items-center justify-center gap-1.5 border border-zinc-800 transition-colors cursor-pointer"
                 >
@@ -948,7 +891,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                   type="button"
                   onClick={() =>
                     handleCopySummary(
-                      `BIGO RECEIPT ${selectedReceipt.id}\nDate: ${selectedReceipt.date} ${selectedReceipt.time}\nTier: ${selectedReceipt.tierName}\nPickup: ${selectedReceipt.pickup}\nDrop-off: ${selectedReceipt.dropoff}\nDistance: ${selectedReceipt.distanceKm} km\nTotal Paid: ৳${selectedReceipt.fareTaka} BDT\nPayment: ${selectedReceipt.paymentMethod}\nCaptain: ${selectedReceipt.driverName} (${selectedReceipt.vehicleModel})`
+                      `BEEGO RECEIPT ${selectedReceipt.id}\nDate: ${selectedReceipt.date} ${selectedReceipt.time}\nTier: ${selectedReceipt.tierName}\nPickup: ${selectedReceipt.pickup}\nDrop-off: ${selectedReceipt.dropoff}\nDistance: ${selectedReceipt.distanceKm} km\nTotal Paid: ৳${selectedReceipt.fareTaka} BDT\nPayment: ${selectedReceipt.paymentMethod}\nCaptain: ${selectedReceipt.driverName} (${selectedReceipt.vehicleModel})`
                     )
                   }
                   className="p-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 hover:text-white border border-zinc-800 transition-colors cursor-pointer flex items-center justify-center"
@@ -977,7 +920,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
             <div className="p-6 bg-zinc-900/70 border-b border-zinc-800 flex items-start justify-between">
               <div>
                 <div className="flex items-center gap-2">
-                  <span className="text-2xl font-black tracking-tighter text-white">Bigo</span>
+                  <span className="text-2xl font-black tracking-tighter text-amber-400">Beego</span>
                   <span className="text-xs px-2 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono">
                     Corporate Travel Statement
                   </span>
@@ -1012,7 +955,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                 </div>
                 <div>
                   <div className="text-zinc-500 text-[10px] uppercase">Expenditure</div>
-                  <div className="text-lg font-black text-emerald-400 mt-0.5">
+                  <div className="text-lg font-black text-amber-400 mt-0.5">
                     ৳{(selectedTrips.length > 0 ? selectedTotalFare : totalSpent).toLocaleString()}
                   </div>
                 </div>
@@ -1051,7 +994,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({ onBookAg
                 <button
                   type="button"
                   onClick={handleExportSelectedCsv}
-                  className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
+                  className="px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer shadow-lg shadow-amber-400/20"
                 >
                   <Download className="w-3.5 h-3.5 stroke-[2.5]" />
                   <span>Download Statement CSV</span>

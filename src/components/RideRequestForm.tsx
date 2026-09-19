@@ -22,13 +22,15 @@ import {
   Car,
   Bike,
   ShieldCheck,
+  Lock,
 } from 'lucide-react';
-import { LocationPoint, RideRequest, RouteData } from '../types';
+import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { RATE_PER_KM_TAKA, updatePassengerLiveLocation } from '../services/rideSync';
 import { searchBangladeshDistricts } from '../data/bangladeshDistricts';
 import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
 
 interface RideRequestFormProps {
   apiKey: string;
@@ -39,7 +41,7 @@ interface RideRequestFormProps {
   dropoff: LocationPoint | null;
   setDropoff: (point: LocationPoint | null) => void;
   routeData?: RouteData | null;
-  onRequestRide: () => void;
+  onRequestRide: (paymentMethod: PaymentMethod) => void;
   isLoadingRoute: boolean;
   errorMessage: string | null;
   setErrorMessage: (msg: string | null) => void;
@@ -84,7 +86,10 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const [isDropoffFocused, setIsDropoffFocused] = useState(false);
 
   const [pinMode, setPinMode] = useState<PinMode>('pickup');
-  const [selectedTier, setSelectedTier] = useState<'select' | 'moto' | 'sedan'>('select');
+  const [selectedTier, setSelectedTier] = useState<'select' | 'moto' | 'sedan'>('moto');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod | null>(null);
+  const [isPaymentDropdownOpen, setIsPaymentDropdownOpen] = useState(false);
+  const [paymentMethodError, setPaymentMethodError] = useState(false);
   const [userLiveGps, setUserLiveGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
   const [isLocating, setIsLocating] = useState(false);
   const [isPickupLiveGps, setIsPickupLiveGps] = useState(true);
@@ -379,7 +384,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
     setErrorMessage(null);
   };
 
-  const isReadyToRequest = Boolean(pickup && dropoff);
+  const isReadyToRequest = Boolean(pickup && dropoff && selectedPaymentMethod);
 
   // Approximate straight-line distance if pickup & dropoff exist (for immediate fare preview)
   const approxDistanceKm = React.useMemo(() => {
@@ -404,7 +409,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const renderItemIcon = (item: LocationPoint, isDrop: boolean) => {
     if (item.resultType === 'district' || item.category === 'district') {
       return (
-        <span className="w-5 h-5 rounded-md bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-[10px] font-black text-emerald-400 shrink-0 mt-0.5" title="Bangladesh District">
+        <span className="w-5 h-5 rounded-md bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-[10px] font-black text-amber-400 shrink-0 mt-0.5" title="Bangladesh District">
           BD
         </span>
       );
@@ -422,7 +427,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
     return isDrop ? (
       <Navigation className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
     ) : (
-      <MapPin className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
+      <MapPin className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
     );
   };
 
@@ -435,37 +440,31 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   return (
     <div
       id="ride-request-container"
-      className={`w-full mx-auto px-4 py-4 ${isRideOngoing ? 'max-w-xl' : 'max-w-7xl'}`}
+      className="w-full mx-auto px-3 py-2.5 flex-1 flex flex-col"
     >
-      {/* Top Header with Navigation, Passenger Badge, and Mode Switcher */}
-      <div className="flex items-center justify-between mb-5 pb-3.5 border-b border-zinc-900">
-        <div className="flex items-center gap-2.5">
-          <button
-            type="button"
-            onClick={onBackToRoles}
-            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 transition-all cursor-pointer font-semibold active:scale-95"
-            title="Return to Home Dashboard"
-          >
-            <ArrowLeft className="w-3.5 h-3.5" />
-            <span>Back</span>
-          </button>
-
-          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-900/60 border border-zinc-800/80 text-xs font-mono text-zinc-300">
-            <User className="w-3.5 h-3.5 text-emerald-400" />
-            <span>{passengerId}</span>
-          </div>
-        </div>
-
+      {/* Top Compact Navigation & Passenger Badge */}
+      <div className="flex items-center justify-between mb-3 pb-2 border-b border-zinc-900 shrink-0">
         <div className="flex items-center gap-2">
           <button
             type="button"
-            onClick={onSwitchToRider}
-            className="flex items-center gap-1.5 text-xs text-emerald-400 hover:text-emerald-300 px-3 py-1.5 rounded-xl bg-zinc-900/90 hover:bg-zinc-850 border border-zinc-800 transition-all cursor-pointer font-semibold active:scale-95"
-            title="Switch to Captain Mode"
+            onClick={onBackToRoles}
+            className="flex items-center gap-1.5 text-xs text-zinc-300 hover:text-white px-2.5 py-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition-all cursor-pointer font-semibold active:scale-95"
+            title="Return to Dashboard"
           >
-            <Bike className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Captain Mode</span>
+            <ArrowLeft className="w-3.5 h-3.5 text-amber-400" />
+            <span>Dashboard</span>
           </button>
+
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900/80 border border-zinc-800 text-[11px] font-mono text-zinc-400">
+            <User className="w-3 h-3 text-amber-400" />
+            <span className="truncate max-w-[90px]">{passengerId}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-500/30">
+            ৳{RATE_PER_KM_TAKA}/km
+          </span>
         </div>
       </div>
 
@@ -491,9 +490,9 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
         <div id="passenger-active-ride-card" className="bg-zinc-950 border border-zinc-800 rounded-2xl p-6 shadow-2xl space-y-5 animate-in fade-in">
           {activeRide?.status === 'requested' && (
             <div className="text-center py-6">
-              <div className="w-16 h-16 rounded-full bg-zinc-900 border-2 border-emerald-500/60 flex items-center justify-center mx-auto mb-4 relative">
-                <Radio className="w-7 h-7 text-emerald-400 animate-pulse" />
-                <span className="absolute inset-0 rounded-full border border-emerald-500/30 animate-ping" />
+              <div className="w-16 h-16 rounded-full bg-zinc-900 border-2 border-amber-500/60 flex items-center justify-center mx-auto mb-4 relative">
+                <Radio className="w-7 h-7 text-amber-400 animate-pulse" />
+                <span className="absolute inset-0 rounded-full border border-amber-500/30 animate-ping" />
               </div>
 
               <h2 className="text-xl font-extrabold text-white mb-1">
@@ -506,8 +505,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               {/* Price & Trip Info */}
               <div className="p-4 rounded-xl bg-black border border-zinc-800/80 mb-5 max-w-sm mx-auto">
                 <div className="text-xs text-zinc-400 uppercase tracking-wider mb-1">Estimated Fare</div>
-                <div className="text-3xl font-black text-emerald-400 flex items-center justify-center gap-1">
-                  <Banknote className="w-6 h-6 text-emerald-400" />
+                <div className="text-3xl font-black text-amber-400 flex items-center justify-center gap-1">
+                  <Banknote className="w-6 h-6 text-amber-400" />
                   <span>৳{activeRide.fareTaka} Taka</span>
                 </div>
                 <div className="text-xs text-zinc-400 mt-1">
@@ -538,11 +537,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
           {activeRide?.status === 'accepted' && (
             <div className="text-center py-6 animate-in fade-in">
-              <div className="w-16 h-16 rounded-full bg-emerald-950 border-2 border-emerald-500 flex items-center justify-center mx-auto mb-4 text-emerald-400">
+              <div className="w-16 h-16 rounded-full bg-amber-950 border-2 border-amber-500 flex items-center justify-center mx-auto mb-4 text-amber-400">
                 <CheckCircle2 className="w-8 h-8" />
               </div>
 
-              <div className="inline-block px-3 py-1 rounded-full bg-emerald-950/80 border border-emerald-800 text-emerald-400 text-xs font-mono mb-2">
+              <div className="inline-block px-3 py-1 rounded-full bg-amber-950/80 border border-amber-800 text-amber-400 text-xs font-mono mb-2">
                 Rider Assigned: {activeRide.riderId || 'Guest Rider'}
               </div>
 
@@ -553,8 +552,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 Your rider is currently heading to your pickup spot. Please wait at:
               </p>
 
-              <div className="p-4 bg-black border border-emerald-900/50 rounded-xl text-left max-w-sm mx-auto mb-6">
-                <div className="text-[11px] uppercase tracking-wider text-emerald-400 font-bold mb-1 flex items-center gap-1.5">
+              <div className="p-4 bg-black border border-amber-900/50 rounded-xl text-left max-w-sm mx-auto mb-6">
+                <div className="text-[11px] uppercase tracking-wider text-amber-400 font-bold mb-1 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5" />
                   <span>Pickup Spot:</span>
                 </div>
@@ -567,7 +566,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               </div>
 
               <div className="text-xs text-zinc-500 flex items-center justify-center gap-2">
-                <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-400" />
+                <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" />
                 <span>Rider is on the way • Fare: ৳{activeRide.fareTaka} Taka</span>
               </div>
             </div>
@@ -575,11 +574,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
           {activeRide?.status === 'arrived_at_pickup' && (
             <div className="text-center py-6 animate-in fade-in">
-              <div className="w-16 h-16 rounded-full bg-emerald-500 text-black flex items-center justify-center mx-auto mb-4">
+              <div className="w-16 h-16 rounded-full bg-amber-400 text-black flex items-center justify-center mx-auto mb-4">
                 <CheckCircle2 className="w-9 h-9" />
               </div>
 
-              <span className="inline-block px-3 py-1 rounded-full bg-emerald-950 border border-emerald-600 text-emerald-400 text-xs font-bold uppercase tracking-wider mb-2">
+              <span className="inline-block px-3 py-1 rounded-full bg-amber-950 border border-amber-600 text-amber-400 text-xs font-bold uppercase tracking-wider mb-2">
                 Rider Arrived!
               </span>
 
@@ -599,7 +598,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-400">Total Price:</span>
-                  <span className="text-emerald-400 font-bold">৳{activeRide.fareTaka} Taka</span>
+                  <span className="text-amber-400 font-bold">৳{activeRide.fareTaka} Taka</span>
                 </div>
               </div>
 
@@ -621,23 +620,56 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     <span>Plan Your Ride</span>
                   </h2>
                   <p className="text-xs text-zinc-400 mt-0.5 font-mono flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
                     <span>Dhaka & 64 Districts • ৳{RATE_PER_KM_TAKA}/km</span>
                   </p>
                 </div>
-                {approxDistanceKm && (
-                  <div className="text-right font-mono">
-                    <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">Est. Trip</span>
-                    <span className="text-sm font-bold text-emerald-400">~{approxDistanceKm} km</span>
+
+                {/* Bike icon on the opposite side of Plan Your Ride (Right side) */}
+                <div className="flex items-center gap-2.5">
+                  {approxDistanceKm && (
+                    <div className="text-right font-mono hidden sm:block">
+                      <span className="text-[10px] text-zinc-500 uppercase tracking-wider block">Est. Trip</span>
+                      <span className="text-sm font-bold text-amber-400">~{approxDistanceKm} km</span>
+                    </div>
+                  )}
+                  <div
+                    id="plan-your-ride-bike-icon"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-950/50 border border-amber-500/50 text-amber-400 shadow-md shadow-amber-950/40"
+                    title="Beego Moto is available"
+                  >
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/30 flex items-center justify-center">
+                      <Bike className="w-4 h-4 text-amber-400" />
+                    </div>
+                    <div className="text-left">
+                      <span className="text-xs font-black text-white block leading-tight">Moto Bike</span>
+                      <span className="text-[10px] text-amber-400 font-mono block leading-tight font-bold">Available Now</span>
+                    </div>
                   </div>
-                )}
+                </div>
               </div>
 
           <div className="space-y-4">
             {/* UNIFIED ITINERARY INPUTS */}
             <div className="p-3.5 sm:p-4 rounded-2xl bg-zinc-900/40 border border-zinc-800/80 relative">
+              {/* Bike logo at top right of the pickup & dropoff location box */}
+              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-zinc-800/60">
+                <span className="text-[10px] font-mono text-zinc-400 uppercase tracking-wider font-semibold flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                  Route Details
+                </span>
+                <div
+                  id="itinerary-box-bike-logo"
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-zinc-950 border border-amber-500/40 text-amber-400 text-xs font-bold"
+                  title="Moto bike ride available"
+                >
+                  <Bike className="w-3.5 h-3.5 text-amber-400" />
+                  <span className="text-[11px] text-zinc-200">Bike Dispatch</span>
+                </div>
+              </div>
+
               {/* Vertical transit track connector with integrated Swap button */}
-              <div className="absolute left-[26px] sm:left-[30px] top-[48px] bottom-[48px] w-0.5 bg-gradient-to-b from-emerald-500 via-zinc-700 to-red-500 pointer-events-none flex items-center justify-center">
+              <div className="absolute left-[26px] sm:left-[30px] top-[48px] bottom-[48px] w-0.5 bg-gradient-to-b from-amber-400 via-zinc-700 to-red-500 pointer-events-none flex items-center justify-center">
                 <button
                   type="button"
                   onClick={handleSwitchLocations}
@@ -645,7 +677,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                   className="pointer-events-auto p-1.5 rounded-full bg-zinc-900 hover:bg-zinc-800 disabled:opacity-30 border border-zinc-700 text-zinc-400 hover:text-white transition-all cursor-pointer shadow-lg active:scale-90 disabled:cursor-not-allowed group"
                   title="Swap pickup and drop-off"
                 >
-                  <ArrowDownUp className="w-3.5 h-3.5 text-emerald-400 group-hover:rotate-180 transition-transform duration-300" />
+                  <ArrowDownUp className="w-3.5 h-3.5 text-amber-400 group-hover:rotate-180 transition-transform duration-300" />
                 </button>
               </div>
 
@@ -653,7 +685,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               <div ref={pickupContainerRef} className="relative pl-8 sm:pl-9 pb-3">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2">
-                    <span className="absolute left-2.5 sm:left-3.5 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-emerald-400/20" />
+                    <span className="absolute left-2.5 sm:left-3.5 top-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-amber-400/20" />
                     <label
                       htmlFor="pickup-input"
                       className="text-xs font-mono font-bold text-zinc-300 uppercase tracking-wider"
@@ -667,7 +699,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     type="button"
                     onClick={handleResetToLiveGpsPickup}
                     disabled={isLocating}
-                    className="text-[11px] text-emerald-400 hover:text-emerald-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50 font-mono"
+                    className="text-[11px] text-amber-400 hover:text-amber-300 flex items-center gap-1 transition-colors cursor-pointer disabled:opacity-50 font-mono"
                     title="Detect and use your real-time live GPS location"
                   >
                     <LocateFixed className="w-3.5 h-3.5" />
@@ -689,13 +721,13 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     }}
                     placeholder="Search pickup location in Bangladesh..."
                     autoComplete="off"
-                    className="w-full pl-3.5 pr-10 py-3 bg-black/90 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500/80 focus:ring-1 focus:ring-emerald-500/40 transition-all font-medium"
+                    className="w-full pl-3.5 pr-10 py-3 bg-black/90 border border-zinc-800 rounded-xl text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500/80 focus:ring-1 focus:ring-amber-500/40 transition-all font-medium"
                   />
 
                   {/* Status Indicator */}
                   <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-1.5">
                     {isSearchingPickup && (
-                      <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                      <Loader2 className="w-4 h-4 text-amber-400 animate-spin" />
                     )}
                     {pickupInput && !isSearchingPickup && (
                       <button
@@ -717,20 +749,20 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
                 {/* Selected Confirmation Pill */}
                 {pickup && (
-                  <div className="mt-1.5 flex items-center justify-between gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/40 border border-emerald-900/50 px-2.5 py-1 rounded-lg">
+                  <div className="mt-1.5 flex items-center justify-between gap-1.5 text-[11px] text-amber-400 bg-amber-950/40 border border-amber-900/50 px-2.5 py-1 rounded-lg">
                     <div className="flex items-center gap-1.5 min-w-0">
                       <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
                       <span className="truncate font-medium">{pickup.formatted}</span>
                     </div>
                     {isPickupLiveGps ? (
-                      <span className="shrink-0 text-[10px] font-mono font-bold text-emerald-300 bg-emerald-900/60 px-2 py-0.5 rounded">
+                      <span className="shrink-0 text-[10px] font-mono font-bold text-amber-300 bg-amber-900/60 px-2 py-0.5 rounded">
                         GPS Active
                       </span>
                     ) : (
                       <button
                         type="button"
                         onClick={handleResetToLiveGpsPickup}
-                        className="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-emerald-300 underline cursor-pointer"
+                        className="shrink-0 text-[10px] font-mono text-zinc-400 hover:text-amber-300 underline cursor-pointer"
                       >
                         Use GPS
                       </button>
@@ -745,8 +777,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     className="absolute z-50 left-0 right-0 mt-1.5 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-2xl overflow-hidden max-h-60 overflow-y-auto"
                   >
                     <div className="px-3 py-1.5 bg-zinc-950/90 border-b border-zinc-800 text-[10px] uppercase tracking-wider font-mono text-zinc-400 flex items-center justify-between">
-                      <span className="text-emerald-400 font-bold flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="text-amber-400 font-bold flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                         Suggested Pickups
                       </span>
                       <span>Bangladesh</span>
@@ -875,128 +907,155 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
             </div>
           </div>
 
-          {/* MILLION-DOLLAR BIGO RIDE TIER SELECTOR */}
+          {/* BEEGO RIDE TIER SELECTOR */}
           {approxDistanceKm && (
             <div className="mt-6 space-y-3 animate-in fade-in">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-                  Select Bigo Tier
+                  Select Ride Tier
                 </span>
-                <span className="text-[11px] text-emerald-400 font-semibold flex items-center gap-1 font-mono">
+                <span className="text-[11px] text-amber-400 font-semibold flex items-center gap-1 font-mono">
                   <ShieldCheck className="w-3.5 h-3.5" />
                   <span>Est. {approxDistanceKm} km</span>
                 </span>
               </div>
 
+              {/* Notice that only Moto is available */}
+              <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-500/30 flex items-center justify-between text-xs text-amber-300">
+                <div className="flex items-center gap-2">
+                  <Bike className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>Only <strong>Beego Moto</strong> is currently active & ready for dispatch.</span>
+                </div>
+                <span className="px-2 py-0.5 rounded bg-amber-500/20 text-amber-400 font-mono text-[10px] font-bold">
+                  ACTIVE
+                </span>
+              </div>
+
               <div className="grid grid-cols-3 gap-2">
-                {/* Bigo Select - Flagship VIP Tier */}
+                {/* Beego Moto - ACTIVE & AVAILABLE */}
                 <button
-                  id="tier-bigo-select-btn"
+                  id="tier-beego-moto-btn"
                   type="button"
-                  onClick={() => setSelectedTier('select')}
-                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
-                    selectedTier === 'select'
-                      ? 'bg-zinc-900 border-amber-400/90 shadow-lg shadow-amber-400/5 ring-1 ring-amber-400/40'
-                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
-                  }`}
+                  onClick={() => setSelectedTier('moto')}
+                  className="p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between bg-zinc-900 border-amber-400 shadow-lg shadow-amber-500/10 ring-2 ring-amber-500/30"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-amber-400/20 text-amber-300 flex items-center justify-center">
-                      <Sparkles className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Bike className="w-4 h-4" />
                     </div>
                     <span className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-400 text-black uppercase">
-                      VIP
+                      ACTIVE
                     </span>
                   </div>
                   <div>
-                    <div className="text-xs font-extrabold text-white">Bigo Select</div>
-                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Executive Sedan</div>
-                    <div className="text-sm font-black text-amber-300 mt-1.5 font-mono">
-                      ৳{Math.round(approxDistanceKm * 95)}
+                    <div className="text-xs font-black text-white flex items-center gap-1">
+                      <span>Beego Moto</span>
                     </div>
-                  </div>
-                </button>
-
-                {/* Bigo Moto */}
-                <button
-                  id="tier-bigo-moto-btn"
-                  type="button"
-                  onClick={() => setSelectedTier('moto')}
-                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
-                    selectedTier === 'moto'
-                      ? 'bg-zinc-900 border-emerald-400/90 shadow-lg shadow-emerald-400/5 ring-1 ring-emerald-400/40'
-                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
-                  }`}
-                >
-                  <div className="flex items-start justify-between mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center">
-                      <Bike className="w-4 h-4" />
-                    </div>
-                    <span className="text-[9px] font-mono text-zinc-500">Fastest</span>
-                  </div>
-                  <div>
-                    <div className="text-xs font-bold text-white">Bigo Moto</div>
-                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Instant Bike</div>
-                    <div className="text-sm font-black text-emerald-400 mt-1.5 font-mono">
+                    <div className="text-[10px] text-amber-400 mt-0.5 font-semibold leading-tight">Instant Bike</div>
+                    <div className="text-sm font-black text-amber-400 mt-1.5 font-mono">
                       ৳{Math.round(approxDistanceKm * 70)}
                     </div>
                   </div>
                 </button>
 
-                {/* Bigo Sedan */}
-                <button
-                  id="tier-bigo-sedan-btn"
-                  type="button"
-                  onClick={() => setSelectedTier('sedan')}
-                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative flex flex-col justify-between ${
-                    selectedTier === 'sedan'
-                      ? 'bg-zinc-900 border-blue-400/90 shadow-lg shadow-blue-400/5 ring-1 ring-blue-400/40'
-                      : 'bg-zinc-950 border-zinc-800 hover:border-zinc-700'
-                  }`}
+                {/* Beego Select - FROZEN & TEMPORARILY UNAVAILABLE */}
+                <div
+                  id="tier-beego-select-btn"
+                  className="p-3 rounded-2xl text-left border border-zinc-800/60 bg-zinc-950/60 opacity-60 cursor-not-allowed relative flex flex-col justify-between select-none"
+                  title="Beego Select is temporarily frozen & unavailable"
                 >
                   <div className="flex items-start justify-between mb-2">
-                    <div className="w-7 h-7 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center">
-                      <Car className="w-4 h-4" />
+                    <div className="w-7 h-7 rounded-lg bg-zinc-800 text-zinc-500 flex items-center justify-center">
+                      <Lock className="w-3.5 h-3.5" />
                     </div>
-                    <span className="text-[9px] font-mono text-zinc-500">4 Seats</span>
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-tight">
+                      Frozen
+                    </span>
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-white">Bigo Sedan</div>
-                    <div className="text-[10px] text-zinc-400 mt-0.5 leading-tight">Standard AC</div>
-                    <div className="text-sm font-black text-blue-400 mt-1.5 font-mono">
+                    <div className="text-xs font-semibold text-zinc-400">Beego Select</div>
+                    <div className="text-[9px] text-zinc-500 mt-0.5 leading-tight">Temporarily Unavailable</div>
+                    <div className="text-xs font-mono text-zinc-500 mt-1.5 line-through">
+                      ৳{Math.round(approxDistanceKm * 95)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Beego Sedan - FROZEN & TEMPORARILY UNAVAILABLE */}
+                <div
+                  id="tier-beego-sedan-btn"
+                  className="p-3 rounded-2xl text-left border border-zinc-800/60 bg-zinc-950/60 opacity-60 cursor-not-allowed relative flex flex-col justify-between select-none"
+                  title="Beego Sedan is temporarily frozen & unavailable"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="w-7 h-7 rounded-lg bg-zinc-800 text-zinc-500 flex items-center justify-center">
+                      <Lock className="w-3.5 h-3.5" />
+                    </div>
+                    <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-400 uppercase tracking-tight">
+                      Frozen
+                    </span>
+                  </div>
+                  <div>
+                    <div className="text-xs font-semibold text-zinc-400">Beego Sedan</div>
+                    <div className="text-[9px] text-zinc-500 mt-0.5 leading-tight">Temporarily Unavailable</div>
+                    <div className="text-xs font-mono text-zinc-500 mt-1.5 line-through">
                       ৳{Math.round(approxDistanceKm * 85)}
                     </div>
                   </div>
-                </button>
+                </div>
               </div>
 
               {/* Selected Tier Perks Callout */}
               <div className="p-3 rounded-xl bg-zinc-900/60 border border-zinc-800/80 flex items-center justify-between text-[11px] text-zinc-400">
-                <span>
-                  {selectedTier === 'select'
-                    ? '✨ Premier AC Sedan • Top 5% Captains • Quiet ride guarantee'
-                    : selectedTier === 'moto'
-                    ? '⚡ Quickest transit through Dhaka traffic • Sanitized helmet provided'
-                    : '❄️ Climate-controlled 4-seater • Luggage space'}
+                <span className="flex items-center gap-1.5">
+                  <Bike className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Quickest transit across Dhaka traffic • Sanitized helmet provided</span>
                 </span>
-                <span className="font-mono text-white font-bold shrink-0 ml-2">
-                  ৳{selectedTier === 'select' ? 95 : selectedTier === 'moto' ? 70 : 85}/km
+                <span className="font-mono text-amber-400 font-bold shrink-0 ml-2">
+                  ৳70/km
                 </span>
               </div>
             </div>
           )}
 
-          {/* OPTION 3: REQUEST FOR RIDE ACTION */}
+          {/* PAYMENT METHOD SELECTION */}
           <div className="mt-5 pt-4 border-t border-zinc-900">
+            <PaymentMethodSelector
+              selectedMethod={selectedPaymentMethod}
+              onSelectMethod={(method) => {
+                setSelectedPaymentMethod(method);
+                setPaymentMethodError(false);
+                setErrorMessage(null);
+              }}
+              isOpen={isPaymentDropdownOpen}
+              onToggleOpen={() => setIsPaymentDropdownOpen((prev) => !prev)}
+              requiredError={paymentMethodError}
+            />
+          </div>
+
+          {/* OPTION 3: REQUEST FOR RIDE ACTION */}
+          <div className="mt-4 pt-1">
             <button
               id="request-ride-button"
               type="button"
-              onClick={onRequestRide}
-              disabled={!isReadyToRequest || isLoadingRoute}
+              onClick={() => {
+                if (!pickup || !dropoff) {
+                  setErrorMessage('Please select both pickup and drop-off spots.');
+                  return;
+                }
+                if (!selectedPaymentMethod) {
+                  setPaymentMethodError(true);
+                  setIsPaymentDropdownOpen(true);
+                  setErrorMessage('Please select your payment method (Cash, bKash, Nagad, or Rocket) to request the ride.');
+                  return;
+                }
+                onRequestRide(selectedPaymentMethod);
+              }}
+              disabled={isLoadingRoute}
               className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer ${
                 isReadyToRequest && !isLoadingRoute
-                  ? 'bg-white text-black hover:bg-zinc-100 active:scale-[0.99] shadow-xl shadow-white/10'
-                  : 'bg-zinc-900 text-zinc-600 cursor-not-allowed border border-zinc-800/60'
+                  ? 'bg-amber-400 text-black hover:bg-amber-300 active:scale-[0.99] shadow-xl shadow-amber-400/20'
+                  : 'bg-zinc-900 text-zinc-400 hover:text-white border border-zinc-800'
               }`}
             >
               {isLoadingRoute ? (
@@ -1007,15 +1066,20 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               ) : isReadyToRequest ? (
                 <>
                   <span>
-                    Request {selectedTier === 'select' ? 'Bigo Select' : selectedTier === 'sedan' ? 'Bigo Sedan' : 'Bigo Moto'}
-                    {approxDistanceKm ? ` • ৳${Math.round(approxDistanceKm * (selectedTier === 'select' ? 95 : selectedTier === 'sedan' ? 85 : 70))}` : ''}
+                    Request Beego Moto
+                    {approxDistanceKm ? ` • ৳${Math.round(approxDistanceKm * 70)}` : ''}
                   </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
+              ) : !pickup || !dropoff ? (
+                <>
+                  <span>Select Route to Request</span>
+                  <ArrowRight className="w-4 h-4 opacity-40" />
+                </>
               ) : (
                 <>
-                  <span>Request for Ride</span>
-                  <ArrowRight className="w-4 h-4 opacity-40" />
+                  <span className="text-amber-400 font-semibold">Select Payment Method to Request</span>
+                  <ArrowRight className="w-4 h-4 text-amber-400" />
                 </>
               )}
             </button>
@@ -1027,6 +1091,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 ? 'Select your pickup spot'
                 : !dropoff
                 ? 'Select your destination'
+                : !selectedPaymentMethod
+                ? 'Choose Cash, bKash, Nagad, or Rocket'
                 : 'Ready for instant dispatch'}
             </p>
           </div>

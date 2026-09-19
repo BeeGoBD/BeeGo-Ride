@@ -12,6 +12,34 @@ export default defineConfig(() => {
       },
     },
     server: {
+      proxy: {
+        '/api/appwrite': {
+          target: 'https://fra.cloud.appwrite.io/v1',
+          changeOrigin: true,
+          rewrite: (p) => p.replace(/^\/api\/appwrite/, ''),
+          configure: (proxy) => {
+            proxy.on('proxyReq', (proxyReq) => {
+              proxyReq.removeHeader('origin');
+              proxyReq.removeHeader('referer');
+            });
+            proxy.on('proxyRes', (proxyRes) => {
+              const setCookie = proxyRes.headers['set-cookie'];
+              if (setCookie) {
+                if (Array.isArray(setCookie)) {
+                  proxyRes.headers['set-cookie'] = setCookie.map((c) =>
+                    c.replace(/domain=[^;]+;?/gi, '')
+                  );
+                } else if (typeof setCookie === 'string') {
+                  proxyRes.headers['set-cookie'] = [(setCookie as string).replace(
+                    /domain=[^;]+;?/gi,
+                    ''
+                  )];
+                }
+              }
+            });
+          },
+        },
+      },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',

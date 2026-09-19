@@ -1,10 +1,10 @@
 import React, { useEffect, useState } from 'react';
 
-interface BigoIntroSplashProps {
+interface BeegoIntroSplashProps {
   onComplete: () => void;
 }
 
-export const BigoIntroSplash: React.FC<BigoIntroSplashProps> = ({ onComplete }) => {
+export const BeegoIntroSplash: React.FC<BeegoIntroSplashProps> = ({ onComplete }) => {
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
@@ -28,30 +28,30 @@ export const BigoIntroSplash: React.FC<BigoIntroSplashProps> = ({ onComplete }) 
 
   return (
     <div
-      id="bigo-intro-splash"
+      id="beego-intro-splash"
       onClick={handleSkip}
       className={`fixed inset-0 z-50 bg-black flex flex-col items-center justify-center select-none cursor-pointer transition-opacity duration-400 ${
         isFadingOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
       }`}
     >
-      {/* Subtle Radial Glow Behind Bigo */}
-      <div className="absolute w-72 h-72 sm:w-96 sm:h-96 rounded-full bg-white/10 blur-3xl bigo-glow-orb pointer-events-none" />
+      {/* Radiant Golden Honey Glow Behind Beego */}
+      <div className="absolute w-80 h-80 sm:w-[28rem] sm:h-[28rem] rounded-full bg-amber-400/20 blur-3xl beego-glow-orb pointer-events-none" />
 
-      {/* Center Bigo Shining Text (Uber-style) */}
+      {/* Center Beego Shining Text with Bee Theme */}
       <div className="relative flex flex-col items-center">
-        <h1 className="text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter bigo-shining-text">
-          Bigo
+        <h1 className="text-7xl sm:text-8xl md:text-9xl font-black tracking-tighter beego-shining-text">
+          Beego
         </h1>
 
-        {/* Minimalist Sub-brand Indicator */}
-        <div className="flex items-center gap-2 mt-4 text-xs font-semibold tracking-widest uppercase text-zinc-400">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>RIDES • BANGLADESH</span>
+        {/* Minimalist Bee Sub-brand Indicator */}
+        <div className="flex items-center gap-2 mt-4 text-xs font-bold tracking-widest uppercase text-amber-300">
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400/60" />
+          <span className="tracking-[0.25em]">BEE FAST RIDES • BANGLADESH</span>
         </div>
       </div>
 
       {/* Discreet skip hint */}
-      <div className="absolute bottom-8 text-[11px] text-zinc-600 font-mono tracking-wider">
+      <div className="absolute bottom-8 text-[11px] text-amber-500/60 font-mono tracking-wider">
         TAP ANYWHERE TO SKIP
       </div>
     </div>

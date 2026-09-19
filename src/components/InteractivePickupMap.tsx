@@ -243,27 +243,27 @@ export const InteractivePickupMap: React.FC<InteractivePickupMapProps> = ({
         }`}
       >
         {/* Tooltip badge over pin */}
-        <div className="bg-zinc-950/95 text-white border border-emerald-500/60 shadow-2xl px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap mb-1">
+        <div className="bg-zinc-950/95 text-white border border-amber-500/60 shadow-2xl px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 whitespace-nowrap mb-1">
           {isGeocoding ? (
             <>
-              <Loader2 className="w-3.5 h-3.5 text-emerald-400 animate-spin" />
+              <Loader2 className="w-3.5 h-3.5 text-amber-400 animate-spin" />
               <span className="text-zinc-300">Detecting address...</span>
             </>
           ) : (
             <>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span className="text-emerald-400">Pickup Spot</span>
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
+              <span className="text-amber-400">Pickup Spot</span>
             </>
           )}
         </div>
 
         {/* Uber Arrow Pin Icon */}
         <div className="relative flex flex-col items-center">
-          <div className="w-9 h-9 rounded-full bg-emerald-500 border-2 border-white flex items-center justify-center shadow-2xl text-black">
+          <div className="w-9 h-9 rounded-full bg-amber-400 border-2 border-black flex items-center justify-center shadow-2xl text-black">
             <Navigation className="w-5 h-5 text-black fill-black rotate-45" />
           </div>
           {/* Downward Needle Point */}
-          <div className="w-1.5 h-3 bg-emerald-500 rounded-b-full shadow-md" />
+          <div className="w-1.5 h-3 bg-amber-400 rounded-b-full shadow-md" />
         </div>
 
         {/* Dynamic Shadow underneath pin */}
@@ -278,8 +278,8 @@ export const InteractivePickupMap: React.FC<InteractivePickupMapProps> = ({
       <div className="absolute top-4 left-4 right-16 z-[999] pointer-events-auto">
         <div className="bg-zinc-950/90 backdrop-blur-md border border-zinc-800/90 rounded-xl px-3.5 py-2.5 shadow-xl flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-6 h-6 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
-              <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-amber-400" />
             </div>
             <div className="min-w-0 flex-1">
               <div className="text-[10px] uppercase font-bold tracking-wider text-zinc-400">
@@ -290,7 +290,7 @@ export const InteractivePickupMap: React.FC<InteractivePickupMapProps> = ({
               </div>
             </div>
           </div>
-          {isGeocoding && <Loader2 className="w-4 h-4 text-emerald-400 animate-spin shrink-0" />}
+          {isGeocoding && <Loader2 className="w-4 h-4 text-amber-400 animate-spin shrink-0" />}
         </div>
       </div>
 
@@ -305,9 +305,9 @@ export const InteractivePickupMap: React.FC<InteractivePickupMapProps> = ({
           className="w-10 h-10 rounded-xl bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white flex items-center justify-center shadow-xl transition-all active:scale-95 cursor-pointer disabled:opacity-50"
         >
           {isLocating ? (
-            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+            <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
           ) : (
-            <LocateFixed className="w-5 h-5 text-emerald-400" />
+            <LocateFixed className="w-5 h-5 text-amber-400" />
           )}
         </button>
 
@@ -335,7 +335,7 @@ export const InteractivePickupMap: React.FC<InteractivePickupMapProps> = ({
       {/* BOTTOM HINT BANNER */}
       <div className="absolute bottom-3 left-4 z-[999] pointer-events-none">
         <div className="bg-zinc-950/80 backdrop-blur-sm border border-zinc-800/80 rounded-lg px-2.5 py-1 text-[11px] text-zinc-400 font-medium flex items-center gap-1.5">
-          <Compass className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+          <Compass className="w-3.5 h-3.5 text-amber-400 shrink-0" />
           <span>Move map or click to adjust pickup arrow</span>
         </div>
       </div>

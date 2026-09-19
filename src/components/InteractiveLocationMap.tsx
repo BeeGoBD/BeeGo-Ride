@@ -362,13 +362,13 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
           type="button"
           onClick={handleRecenterGps}
           disabled={isLocating}
-          className="w-10 h-10 rounded-xl bg-zinc-900/95 hover:bg-emerald-600 active:bg-emerald-700 text-white border border-zinc-700 hover:border-emerald-400 shadow-xl flex items-center justify-center transition-all cursor-pointer group"
+          className="w-10 h-10 rounded-xl bg-zinc-900/95 hover:bg-amber-500 active:bg-amber-600 text-white hover:text-black border border-zinc-700 hover:border-amber-400 shadow-xl flex items-center justify-center transition-all cursor-pointer group"
           title="Recenter on my live location"
         >
           {isLocating ? (
-            <Loader2 className="w-5 h-5 text-emerald-400 animate-spin" />
+            <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
           ) : (
-            <LocateFixed className="w-5 h-5 text-emerald-400 group-hover:text-white transition-colors" />
+            <LocateFixed className="w-5 h-5 text-amber-400 group-hover:text-black transition-colors" />
           )}
         </button>
 
@@ -396,7 +396,7 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
       {/* BOTTOM INFO CHIP */}
       <div className="absolute bottom-4 left-4 z-[999] pointer-events-none">
         <div className="bg-zinc-950/85 backdrop-blur-md border border-zinc-800/80 px-3 py-1.5 rounded-lg shadow-lg flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-emerald-400" />
+          <div className="w-2 h-2 rounded-full bg-amber-400" />
           <span className="text-[11px] text-zinc-300 font-medium">
             {dropoff ? 'Route calculated • Ready to request' : 'Type destination below to calculate fare'}
           </span>

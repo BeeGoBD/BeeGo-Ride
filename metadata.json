@@ -1,6 +1,6 @@
 {
-  "name": "Ride Request",
-  "description": "Real-time ride request, dispatch, and navigation system with guest passenger and rider dashboards, fare calculation at 70 Taka/km, and routing powered by Geoapify.",
+  "name": "Beego",
+  "description": "Real-time bee-fast ride dispatch and navigation system across Bangladesh, with instant guest passenger and captain dashboards, flat ৳70/km fares, and live telemetry routing.",
   "requestFramePermissions": ["geolocation"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

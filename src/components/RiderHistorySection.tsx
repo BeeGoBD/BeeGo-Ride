@@ -191,7 +191,7 @@ export const RiderHistorySection: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = 'bigo-captain-earnings-statement.csv';
+    link.download = 'beego-captain-earnings-statement.csv';
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -205,7 +205,7 @@ export const RiderHistorySection: React.FC = () => {
         <div>
           <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center gap-2">
             <span>Captain Trip Log</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 font-semibold border border-emerald-500/30">
+            <span className="text-xs px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-400 font-semibold border border-amber-500/30">
               Completed
             </span>
           </h2>
@@ -226,7 +226,7 @@ export const RiderHistorySection: React.FC = () => {
           </button>
           <div className="text-right">
             <div className="text-[11px] text-zinc-400">Total Payouts</div>
-            <div className="text-base sm:text-lg font-black text-emerald-400 font-mono">৳{totalEarned}</div>
+            <div className="text-base sm:text-lg font-black text-amber-400 font-mono">৳{totalEarned}</div>
           </div>
         </div>
       </div>
@@ -235,7 +235,7 @@ export const RiderHistorySection: React.FC = () => {
       <div className="grid grid-cols-3 gap-2.5 sm:gap-3 mb-6">
         <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-lg">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
-            <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+            <TrendingUp className="w-3.5 h-3.5 text-amber-400" />
             <span>Trips</span>
           </div>
           <div className="text-lg sm:text-xl font-black text-white">5 Rides</div>
@@ -244,7 +244,7 @@ export const RiderHistorySection: React.FC = () => {
 
         <div className="p-3.5 rounded-2xl bg-zinc-950 border border-zinc-800 shadow-lg">
           <div className="flex items-center gap-1.5 text-zinc-400 text-xs mb-1">
-            <Bike className="w-3.5 h-3.5 text-blue-400" />
+            <Bike className="w-3.5 h-3.5 text-amber-400" />
             <span>Distance</span>
           </div>
           <div className="text-lg sm:text-xl font-black text-white">{totalKm.toFixed(1)} km</div>
@@ -270,7 +270,7 @@ export const RiderHistorySection: React.FC = () => {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search passenger name or route..."
-            className="w-full pl-9.5 pr-4 py-2 bg-zinc-900/80 border border-zinc-800 rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-emerald-500 transition-colors"
+            className="w-full pl-9.5 pr-4 py-2 bg-zinc-900/80 border border-zinc-800 rounded-xl text-xs sm:text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 transition-colors"
           />
         </div>
 
@@ -291,7 +291,7 @@ export const RiderHistorySection: React.FC = () => {
             onClick={() => setFilterPayment('digital')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               filterPayment === 'digital'
-                ? 'bg-emerald-500 text-black'
+                ? 'bg-amber-400 text-black font-bold'
                 : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -302,7 +302,7 @@ export const RiderHistorySection: React.FC = () => {
             onClick={() => setFilterPayment('cash')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
               filterPayment === 'cash'
-                ? 'bg-emerald-500 text-black'
+                ? 'bg-amber-400 text-black font-bold'
                 : 'text-zinc-400 hover:text-white'
             }`}
           >
@@ -321,7 +321,7 @@ export const RiderHistorySection: React.FC = () => {
             {/* Top row */}
             <div className="flex items-center justify-between pb-3 border-b border-zinc-900 mb-3">
               <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-emerald-400">
+                <div className="w-8 h-8 rounded-lg bg-zinc-900 border border-zinc-800 flex items-center justify-center text-amber-400">
                   <Bike className="w-4 h-4" />
                 </div>
                 <div>
@@ -335,7 +335,7 @@ export const RiderHistorySection: React.FC = () => {
               </div>
 
               <div className="text-right">
-                <div className="text-base sm:text-lg font-black text-emerald-400">
+                <div className="text-base sm:text-lg font-black text-amber-400">
                   +৳{trip.riderEarningsTaka + trip.tipTaka}
                 </div>
                 <div className="text-[11px] text-zinc-400 font-medium">
@@ -349,7 +349,7 @@ export const RiderHistorySection: React.FC = () => {
               <div className="absolute left-1.5 top-2.5 bottom-2.5 w-0.5 bg-zinc-800" />
 
               <div className="relative">
-                <div className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-emerald-400 ring-4 ring-black" />
+                <div className="absolute -left-5 top-1 w-2.5 h-2.5 rounded-full bg-amber-400 ring-4 ring-black" />
                 <div className="text-xs text-zinc-400">Passenger Pickup</div>
                 <div className="text-sm font-medium text-white line-clamp-1">
                   {trip.pickup}
@@ -409,8 +409,8 @@ export const RiderHistorySection: React.FC = () => {
           >
             <div className="flex items-center justify-between pb-4 border-b border-zinc-800 mb-4">
               <div className="flex items-center gap-2">
-                <span className="text-xl font-black text-white">Bigo Rider</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-emerald-950 text-emerald-400 border border-emerald-900 font-mono">
+                <span className="text-xl font-black text-amber-400">Beego Captain</span>
+                <span className="text-xs px-2 py-0.5 rounded bg-amber-950/60 text-amber-400 border border-amber-800 font-mono">
                   Payout Slip
                 </span>
               </div>
@@ -446,12 +446,12 @@ export const RiderHistorySection: React.FC = () => {
                 <span className="font-semibold text-white">৳{selectedTrip.riderEarningsTaka}</span>
               </div>
               {selectedTrip.tipTaka > 0 && (
-                <div className="flex justify-between text-emerald-400 font-semibold">
+                <div className="flex justify-between text-amber-400 font-semibold">
                   <span>Passenger Tip</span>
                   <span>+৳{selectedTrip.tipTaka}</span>
                 </div>
               )}
-              <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm font-bold text-emerald-400">
+              <div className="pt-2 border-t border-zinc-800 flex justify-between text-sm font-bold text-amber-400">
                 <span>Net Credited to Wallet</span>
                 <span>৳{selectedTrip.riderEarningsTaka + selectedTrip.tipTaka} Taka</span>
               </div>

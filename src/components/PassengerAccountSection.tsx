@@ -15,10 +15,15 @@ import {
   Bike,
   Sparkles,
   Wallet,
+  Mail,
+  ShieldCheck,
 } from 'lucide-react';
+import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
+import { APPWRITE_PROJECT_NAME } from '../lib/appwrite';
 
 interface PassengerAccountSectionProps {
   passengerId: string;
+  passengerProfile?: PassengerProfile | null;
   onSwitchToRider: () => void;
   onReplayIntro?: () => void;
   onSignOut: () => void;
@@ -26,18 +31,44 @@ interface PassengerAccountSectionProps {
 
 export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = ({
   passengerId,
+  passengerProfile,
   onSwitchToRider,
   onReplayIntro,
   onSignOut,
 }) => {
   const [copied, setCopied] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [isSigningOut, setIsSigningOut] = useState(false);
+
+  const displayName = passengerProfile?.name || 'Guest Passenger';
+  const displayEmail = passengerProfile?.email || 'guest.session@beego.internal';
+  const isGmailVerified = passengerProfile?.email?.endsWith('@gmail.com');
+
+  const initials = displayName
+    .split(' ')
+    .map((n) => n[0])
+    .slice(0, 2)
+    .join('')
+    .toUpperCase() || 'GP';
 
   const handleCopyId = () => {
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(passengerId);
+      navigator.clipboard.writeText(passengerProfile?.id || passengerId);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleExecuteSignOut = async () => {
+    setIsSigningOut(true);
+    try {
+      await logoutPassenger();
+    } catch (e) {
+      console.warn('Sign out error:', e);
+    } finally {
+      setIsSigningOut(false);
+      setShowSignOutConfirm(false);
+      onSignOut();
     }
   };
 
@@ -49,45 +80,60 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
       {/* Top Header */}
       <div>
         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-          Guest Account
+          {passengerProfile ? 'Passenger Account' : 'Guest Account'}
         </h2>
         <p className="text-xs text-zinc-400 mt-0.5">
-          Temporary guest session active in Dhaka, Bangladesh
+          {passengerProfile
+            ? `Authenticated via Appwrite • ${APPWRITE_PROJECT_NAME}`
+            : 'Temporary guest session active in Dhaka, Bangladesh'}
         </p>
       </div>
 
-      {/* Guest Passenger Profile Card */}
+      {/* Passenger Profile Card */}
       <div className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-5 sm:p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
 
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-white text-black font-black text-xl flex items-center justify-center shadow-md shrink-0">
-            GP
+          <div className="w-16 h-16 rounded-2xl bg-amber-400 text-black font-black text-xl flex items-center justify-center shadow-md shrink-0">
+            {initials}
           </div>
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
               <h3 className="text-lg font-extrabold text-white truncate">
-                Guest Passenger
+                {displayName}
               </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 font-bold uppercase">
-                Active
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase">
+                {passengerProfile ? 'Passenger' : 'Guest'}
               </span>
             </div>
 
-            {/* Guest ID with copy button */}
+            {/* Email Address */}
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-xs text-zinc-400 font-mono truncate max-w-[170px] sm:max-w-[220px]">
-                {passengerId}
+              <Mail className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
+              <span className="text-xs text-zinc-300 font-mono truncate">
+                {displayEmail}
+              </span>
+              {isGmailVerified && (
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
+                  Gmail OTP
+                </span>
+              )}
+            </div>
+
+            {/* Account ID with copy button */}
+            <div className="flex items-center gap-1.5 mt-1">
+              <span className="text-[11px] text-zinc-500 font-mono truncate max-w-[170px] sm:max-w-[220px]">
+                ID: {passengerProfile?.id || passengerId}
               </span>
               <button
                 type="button"
                 onClick={handleCopyId}
-                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                title="Copy Guest ID"
+                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
+                title="Copy ID"
               >
                 {copied ? (
-                  <Check className="w-3.5 h-3.5 text-emerald-400" />
+                  <Check className="w-3.5 h-3.5 text-amber-400" />
                 ) : (
                   <Copy className="w-3.5 h-3.5" />
                 )}
@@ -112,7 +158,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
           <button
             type="button"
             onClick={onSwitchToRider}
-            className="px-3 py-1.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md"
+            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-amber-400/20"
           >
             <Bike className="w-3.5 h-3.5" />
             <span>Switch to Rider</span>
@@ -124,10 +170,10 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
       <div className="rounded-2xl bg-zinc-950 border border-zinc-800/80 p-5 shadow-lg">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-emerald-400" />
-            <h4 className="text-sm font-bold text-white">Bigo Wallet & Payments</h4>
+            <Wallet className="w-4 h-4 text-amber-400" />
+            <h4 className="text-sm font-bold text-white">Beego Wallet & Payments</h4>
           </div>
-          <span className="text-xs font-black text-emerald-400">৳150 Credits</span>
+          <span className="text-xs font-black text-amber-400">৳150 Credits</span>
         </div>
 
         <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -140,7 +186,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
             <span className="text-[10px] text-zinc-500">Ready</span>
           </div>
           <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col items-center gap-1">
-            <span className="text-emerald-400 font-bold">Cash</span>
+            <span className="text-amber-400 font-bold">Cash</span>
             <span className="text-[10px] text-zinc-500">Default</span>
           </div>
         </div>
@@ -156,7 +202,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
           >
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-400">
-                <RotateCcw className="w-4 h-4 text-emerald-400" />
+                <RotateCcw className="w-4 h-4 text-amber-400" />
               </div>
               <div>
                 <div className="text-xs sm:text-sm font-bold text-white">Replay Introduction</div>
@@ -219,7 +265,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
               <LogOut className="w-6 h-6" />
             </div>
 
-            <h3 className="text-lg font-bold text-white mb-1.5">Sign out of Bigo?</h3>
+            <h3 className="text-lg font-bold text-white mb-1.5">Sign out of Beego?</h3>
             <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
               You will be signed out of your current passenger session and returned to the main role selection screen.
             </p>
@@ -234,13 +280,11 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  setShowSignOutConfirm(false);
-                  onSignOut();
-                }}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer"
+                disabled={isSigningOut}
+                onClick={handleExecuteSignOut}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
               >
-                Sign Out
+                {isSigningOut ? 'Signing Out...' : 'Sign Out'}
               </button>
             </div>
           </div>
@@ -249,7 +293,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
 
       {/* Footer Info */}
       <div className="text-center text-[11px] text-zinc-600 mt-2">
-        Bigo Rides v2.4 • Built for Bangladesh • ৳70/km Flat Rate
+        Beego Rides v2.4 • Built for Bangladesh • ৳70/km Flat Rate
       </div>
     </div>
   );

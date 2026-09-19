@@ -10,7 +10,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 
-interface BigoOnboardingProps {
+interface BeegoOnboardingProps {
   onFinish: () => void;
 }
 
@@ -26,33 +26,33 @@ interface SlideItem {
 
 const ONBOARDING_SLIDES: SlideItem[] = [
   {
-    badge: 'Nationwide Transit',
-    title: 'Fast & Reliable Rides in',
+    badge: 'Bee Fast Transit',
+    title: 'Buzzing Across Dhaka &',
     highlight: '64 Districts',
     description:
-      'Quick motorbikes and comfortable AC sedans with verified Captains across Dhaka and all Bangladesh districts.',
+      'Lightning-fast motorbikes and comfortable AC sedans with verified Captains ready to dispatch from the hive.',
     icon: Bike,
-    accentColor: 'from-emerald-500/20 to-emerald-500/5 text-emerald-400 border-emerald-500/30',
-    features: ['Instant Captain Dispatch', 'Agile Motorbikes & AC Sedans', 'Full Bangladesh Coverage'],
+    accentColor: 'from-amber-500/25 to-yellow-500/10 text-amber-400 border-amber-500/40',
+    features: ['Instant Captain Dispatch', 'Agile Bee Moto Fleet', 'Full Bangladesh Coverage'],
   },
   {
-    badge: 'Transparent Fare',
+    badge: 'Honest Honey Fare',
     title: 'Fair & Flat Pricing at',
     highlight: '৳70 / km',
     description:
       'Zero surge pricing and zero surprises. Exact kilometer rates calculated with live route navigation.',
     icon: Gauge,
-    accentColor: 'from-blue-500/20 to-blue-500/5 text-blue-400 border-blue-500/30',
-    features: ['৳70 Flat Fare / km', 'Zero Hidden Fees', 'Digital Live Receipts'],
+    accentColor: 'from-yellow-500/25 to-amber-500/10 text-yellow-400 border-yellow-500/40',
+    features: ['৳70 Flat Fare / km', 'Zero Hidden Fees', 'Digital Itemized Receipts'],
   },
   {
-    badge: 'Live Telemetry',
+    badge: 'Live Radar Hive',
     title: 'Precision Map Radar &',
     highlight: 'Live Tracking',
     description:
       'Follow your Captain in real time on vector maps with minute-by-minute ETA and live progress updates.',
     icon: MapPin,
-    accentColor: 'from-amber-500/20 to-amber-500/5 text-amber-400 border-amber-500/30',
+    accentColor: 'from-amber-400/25 to-yellow-400/10 text-amber-300 border-amber-400/40',
     features: ['Live GPS Radar', 'Precise ETA & Meter', 'Share Trip Location'],
   },
   {
@@ -62,12 +62,12 @@ const ONBOARDING_SLIDES: SlideItem[] = [
     description:
       'Dual certified helmets, 24/7 safety response, and easy payments via bKash, Nagad, or cash on arrival.',
     icon: ShieldCheck,
-    accentColor: 'from-purple-500/20 to-purple-500/5 text-purple-400 border-purple-500/30',
-    features: ['Certified Safety Gear', 'bKash, Nagad & Cash Support', '24/7 Support Hotline'],
+    accentColor: 'from-yellow-400/25 to-amber-600/10 text-yellow-300 border-yellow-400/40',
+    features: ['Certified Safety Helmets', 'bKash, Nagad & Cash Support', '24/7 Captain Hotline'],
   },
 ];
 
-export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
+export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) => {
   const [currentSlide, setCurrentSlide] = useState(0);
 
   const isLast = currentSlide === ONBOARDING_SLIDES.length - 1;
@@ -90,20 +90,20 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
 
   return (
     <div
-      id="bigo-onboarding"
+      id="beego-onboarding"
       className="w-full min-h-screen bg-black text-white flex flex-col justify-between px-4 py-8 sm:py-12 select-none"
     >
       {/* Top Bar: Brand & Skip Button */}
       <div className="w-full max-w-xl mx-auto flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-2xl font-black tracking-tighter text-white">Bigo</span>
-          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-2xl font-black tracking-tighter text-white">Beego</span>
+          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400/50" />
         </div>
 
         <button
           type="button"
           onClick={onFinish}
-          className="text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-white px-3 py-1.5 rounded-lg hover:bg-zinc-900 transition-colors cursor-pointer"
+          className="text-xs font-semibold uppercase tracking-wider text-zinc-400 hover:text-amber-400 px-3 py-1.5 rounded-lg hover:bg-zinc-900 transition-colors cursor-pointer"
         >
           Skip Intro
         </button>
@@ -112,12 +112,12 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
       {/* Main Slide Card */}
       <div className="w-full max-w-xl mx-auto my-auto py-6">
         <div className="relative rounded-3xl bg-zinc-950 border border-zinc-800/80 p-6 sm:p-8 shadow-2xl overflow-hidden transition-all duration-300">
-          {/* Subtle Ambient Background Gradient */}
-          <div className="absolute -top-24 -right-24 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+          {/* Subtle Ambient Golden Bee Background Glow */}
+          <div className="absolute -top-24 -right-24 w-60 h-60 bg-amber-500/15 rounded-full blur-3xl pointer-events-none" />
 
           {/* Slide Category Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-[11px] font-semibold text-zinc-300 mb-6">
-            <Sparkles className="w-3 h-3 text-emerald-400" />
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-amber-950/40 border border-amber-500/30 text-[11px] font-semibold text-amber-300 mb-6">
+            <Sparkles className="w-3 h-3 text-amber-400" />
             <span>{slide.badge}</span>
           </div>
 
@@ -133,7 +133,7 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
           {/* Slide Headline */}
           <h2 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight leading-snug">
             {slide.title}{' '}
-            <span className="text-emerald-400 block sm:inline">{slide.highlight}</span>
+            <span className="text-amber-400 block sm:inline">{slide.highlight}</span>
           </h2>
 
           {/* Slide Description */}
@@ -145,7 +145,7 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
           <div className="mt-6 pt-6 border-t border-zinc-900 flex flex-col gap-2.5">
             {slide.features.map((item, index) => (
               <div key={index} className="flex items-center gap-2.5 text-xs sm:text-sm text-zinc-300">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <CheckCircle2 className="w-4 h-4 text-amber-400 shrink-0" />
                 <span>{item}</span>
               </div>
             ))}
@@ -164,7 +164,7 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
               onClick={() => setCurrentSlide(idx)}
               className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                 idx === currentSlide
-                  ? 'w-8 bg-emerald-400'
+                  ? 'w-8 bg-amber-400 shadow-sm shadow-amber-400/50'
                   : 'w-2 bg-zinc-800 hover:bg-zinc-700'
               }`}
               aria-label={`Go to slide ${idx + 1}`}
@@ -188,11 +188,11 @@ export const BigoOnboarding: React.FC<BigoOnboardingProps> = ({ onFinish }) => {
             <div className="w-0 sm:w-auto" />
           )}
 
-          {/* Next / Finish Button */}
+          {/* Next / Finish Button with Bee Yellow Theme */}
           <button
             type="button"
             onClick={handleNext}
-            className="flex-2 sm:flex-1 px-6 py-3.5 rounded-xl bg-white hover:bg-zinc-100 text-black font-bold text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-xl cursor-pointer active:scale-98"
+            className="flex-2 sm:flex-1 px-6 py-3.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm sm:text-base flex items-center justify-center gap-2 transition-all shadow-xl shadow-amber-400/20 cursor-pointer active:scale-98"
           >
             <span>{isLast ? 'Select Dashboard' : 'Next'}</span>
             <ArrowRight className="w-4 h-4" />

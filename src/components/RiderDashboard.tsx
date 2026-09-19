@@ -14,6 +14,9 @@ import {
   Check,
   Bike,
   ShieldCheck,
+  Lock,
+  Package,
+  Car,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData } from '../types';
 import {
@@ -247,9 +250,9 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       // Route polyline between pickup and dropoff
       if (activeRide.routeData?.coordinates && activeRide.routeData.coordinates.length > 0) {
         const polyline = L.polyline(activeRide.routeData.coordinates, {
-          color: '#10b981',
+          color: '#f59e0b',
           weight: 5,
-          opacity: 0.9,
+          opacity: 0.95,
           lineJoin: 'round',
         }).addTo(map);
         routeLayerRef.current = polyline;
@@ -331,11 +334,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             </button>
 
             <div className="flex items-center gap-2">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
               <h1 className="text-sm font-bold text-white tracking-tight">Captain Dashboard</h1>
             </div>
 
-            <span className="font-mono text-xs text-emerald-400 bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded flex items-center gap-1">
+            <span className="font-mono text-xs text-amber-400 bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded flex items-center gap-1">
               <Bike className="w-3.5 h-3.5" />
               <span>{riderId}</span>
             </span>
@@ -353,222 +356,25 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         </header>
       )}
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:flex-row relative overflow-hidden">
-        {/* Left Side: Controls & Ride Request Details Panel */}
-        <div className="w-full md:w-96 lg:w-[420px] bg-zinc-950 border-r border-zinc-800/80 p-5 flex flex-col justify-between overflow-y-auto z-10">
-          <div>
-            {/* Live Dispatch Feed Header */}
-            <div className="flex items-center justify-between mb-4">
-              <span className="text-xs uppercase font-bold tracking-wider text-zinc-400 flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-emerald-400 animate-pulse" />
-                Live Dispatch Feed
-              </span>
-              <span className="text-[11px] font-mono text-emerald-400 bg-emerald-950/50 px-2 py-0.5 rounded border border-emerald-900/60">
-                Rate: ৳{RATE_PER_KM_TAKA}/km
-              </span>
-            </div>
-
-            {/* Rider Live Location Status Card */}
-            <div className="mb-4 p-3.5 rounded-xl bg-zinc-900/90 border border-zinc-800 shadow-lg">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  Your Live Rider GPS
-                </span>
-                <button
-                  type="button"
-                  onClick={handleRecenterGps}
-                  disabled={isLocating}
-                  className="text-[11px] text-zinc-400 hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
-                >
-                  <LocateFixed className="w-3 h-3 text-emerald-400" />
-                  <span>{isLocating ? 'Locating...' : 'Refresh'}</span>
-                </button>
-              </div>
-              <div className="text-xs font-semibold text-white truncate">{riderAddress}</div>
-              {riderLiveGps && (
-                <div className="text-[10px] font-mono text-zinc-500 mt-1">
-                  {riderLiveGps.lat.toFixed(5)}° N, {riderLiveGps.lon.toFixed(5)}° E
-                  {riderLiveGps.accuracy && ` (±${Math.round(riderLiveGps.accuracy)}m)`}
-                </div>
-              )}
-            </div>
-
-            {actionError && (
-              <div className="mb-4 p-3 bg-red-950/60 border border-red-800 text-red-200 text-xs rounded-xl">
-                {actionError}
-              </div>
-            )}
-
-            {/* STATE 1: WAITING FOR RIDE */}
-            {!activeRide || activeRide.status === 'declined' || activeRide.status === 'cancelled' ? (
-              <div className="py-8 px-2 text-center">
-                <div className="relative w-20 h-20 mx-auto mb-5 flex items-center justify-center">
-                  <div className="absolute inset-0 rounded-full border border-emerald-500/20 animate-ping" />
-                  <div className="absolute inset-2 rounded-full border border-emerald-500/40 animate-pulse" />
-                  <div className="w-12 h-12 rounded-full bg-zinc-900 border border-emerald-500/60 flex items-center justify-center text-emerald-400 shadow-lg shadow-emerald-500/10">
-                    <Bike className="w-6 h-6" />
-                  </div>
-                </div>
-
-                <h3 className="text-base font-bold text-white mb-1">
-                  {activeRide?.status === 'declined'
-                    ? 'Ride Declined'
-                    : activeRide?.status === 'cancelled'
-                    ? 'Ride Cancelled'
-                    : 'Dispatch Radar Active'}
-                </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed max-w-xs mx-auto mb-6">
-                  {activeRide?.status === 'declined' || activeRide?.status === 'cancelled'
-                    ? 'Listening for new incoming ride requests...'
-                    : 'Broadcasting live GPS coordinates. Ready for instant dispatch.'}
-                </p>
-
-                <div className="p-3.5 bg-black/60 border border-zinc-800/80 rounded-2xl text-left text-xs text-zinc-400 space-y-2.5">
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span>Assigned Fleet</span>
-                    <span className="font-semibold text-white">Yamaha FZ-S (Bike)</span>
-                  </div>
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span>Base Rate</span>
-                    <span className="font-mono font-bold text-emerald-400">৳70 / km</span>
-                  </div>
-                  <div className="flex items-center justify-between text-zinc-300">
-                    <span>Captain ID</span>
-                    <span className="font-mono text-zinc-400">{riderId}</span>
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            {/* STATE 2: INCOMING REQUEST (BEFORE ACCEPTING) */}
-            {hasIncomingRequest && (
-              <div
-                id="incoming-ride-request-card"
-                className="p-5 rounded-2xl bg-zinc-900/90 border-2 border-emerald-500/80 shadow-2xl animate-in fade-in"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] uppercase tracking-wider font-bold text-emerald-400 bg-emerald-950 px-2.5 py-1 rounded-full border border-emerald-800 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                    New Ride Request!
-                  </span>
-                  <span className="text-xs text-zinc-400 font-mono">
-                    {activeRide.passengerId}
-                  </span>
-                </div>
-
-                {/* THE ESTIMATED PRICE (HIGHLIGHTED BEFORE ACCEPTING) */}
-                <div className="my-4 p-4 rounded-xl bg-black border border-zinc-800 text-center">
-                  <div className="text-xs text-zinc-400 uppercase tracking-wider font-medium mb-1">
-                    Estimated Trip Fare
-                  </div>
-                  <div className="text-3xl font-extrabold text-emerald-400 tracking-tight flex items-center justify-center gap-1.5">
-                    <Banknote className="w-7 h-7 text-emerald-400" />
-                    <span>~৳{activeRide.fareTaka} Taka</span>
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-1">
-                    Final fare calculated automatically from actual km traveled on bike (৳70/km)
-                  </div>
-                </div>
-
-                {/* TRIP DETAILS: PICKUP & DROPOFF */}
-                <div className="space-y-3 mb-5">
-                  <div className="p-3 bg-black/60 rounded-xl border border-zinc-800/80">
-                    <div className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 mb-1 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <span>Passenger Pickup Spot:</span>
-                    </div>
-                    <div className="text-xs font-semibold text-white">
-                      {activeRide.pickup.addressLine1 || activeRide.pickup.formatted.split(',')[0]}
-                    </div>
-                    <div className="text-[11px] text-zinc-400 truncate mt-0.5">
-                      {activeRide.pickup.addressLine2 || activeRide.pickup.formatted}
-                    </div>
-                  </div>
-
-                  <div className="p-3 bg-black/60 rounded-xl border border-zinc-800/80">
-                    <div className="text-[10px] uppercase font-bold tracking-wider text-red-400 mb-1 flex items-center gap-1.5">
-                      <Navigation className="w-3.5 h-3.5" />
-                      <span>Drop-off Spot:</span>
-                    </div>
-                    <div className="text-xs font-semibold text-white">
-                      {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}
-                    </div>
-                    <div className="text-[11px] text-zinc-400 truncate mt-0.5">
-                      {activeRide.dropoff.addressLine2 || activeRide.dropoff.formatted}
-                    </div>
-                  </div>
-
-                  <div className="p-2.5 bg-zinc-950 rounded-lg border border-zinc-800 text-[11px] text-zinc-400 flex items-center justify-between">
-                    <span>Estimated Distance:</span>
-                    <span className="text-white font-bold">{activeRide.distanceKm} km</span>
-                  </div>
-                </div>
-
-                {/* ACTION BUTTONS: ACCEPT OR DECLINE */}
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    id="decline-ride-btn"
-                    type="button"
-                    onClick={handleDecline}
-                    className="py-3.5 px-4 rounded-xl font-bold text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <XCircle className="w-4 h-4 text-red-400" />
-                    <span>Decline</span>
-                  </button>
-
-                  <button
-                    id="accept-ride-btn"
-                    type="button"
-                    onClick={handleAccept}
-                    disabled={isAccepting}
-                    className="py-3.5 px-4 rounded-xl font-bold text-xs bg-emerald-500 hover:bg-emerald-400 text-black shadow-lg shadow-emerald-500/20 transition-all active:scale-[0.99] flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-                  >
-                    {isAccepting ? (
-                      <>
-                        <Loader2 className="w-4 h-4 animate-spin text-black" />
-                        <span>Accepting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <CheckCircle2 className="w-4 h-4 text-black" />
-                        <span>Accept Ride</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Footer Info */}
-          <div className="pt-4 mt-6 border-t border-zinc-900 text-[11px] text-zinc-500 flex items-center justify-between">
-            <span>Rider: {riderId}</span>
-            <span className="flex items-center gap-1 text-emerald-400">
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span>Verified Bike</span>
-            </span>
-          </div>
-        </div>
-
-        {/* Right Side: Map Display (Always Live for Rider!) */}
-        <div className="flex-1 bg-black relative min-h-[420px] md:min-h-full">
-          <div ref={mapContainerRef} className="w-full h-full min-h-[420px]" />
+      {/* Main Content Area: Split View designed for Android Phone */}
+      <div className="flex-1 flex flex-col relative overflow-hidden h-full">
+        {/* Top Part: Map Display (Always Live for Rider!) */}
+        <div className="h-[46%] w-full bg-black relative shrink-0">
+          <div ref={mapContainerRef} className="w-full h-full" />
 
           {/* Top Floating Info Banner */}
-          <div className="absolute top-4 left-4 right-16 z-[1000] pointer-events-auto">
-            <div className="bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-xl px-3.5 py-2 shadow-xl flex items-center justify-between gap-2">
+          <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] pointer-events-auto">
+            <div className="bg-zinc-950/90 backdrop-blur-md border border-zinc-800 rounded-xl px-2.5 py-1.5 shadow-xl flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 text-emerald-400 flex items-center justify-center shrink-0">
-                  <Bike className="w-4 h-4" />
+                <div className="w-6 h-6 rounded-lg bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center shrink-0">
+                  <Bike className="w-3.5 h-3.5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  <div className="text-[9px] uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
                     Rider Live GPS • Bangladesh
                   </div>
-                  <div className="text-xs font-semibold text-white truncate">
+                  <div className="text-[11px] font-semibold text-white truncate">
                     {riderAddress}
                   </div>
                 </div>
@@ -578,11 +384,164 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 type="button"
                 onClick={handleRecenterGps}
                 title="Re-center map on your live GPS spot"
-                className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0"
+                className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-700 text-zinc-300 hover:text-white cursor-pointer transition-colors shrink-0"
               >
-                <Compass className="w-4 h-4 text-emerald-400" />
+                <Compass className="w-3.5 h-3.5 text-amber-400" />
               </button>
             </div>
+          </div>
+        </div>
+
+        {/* Bottom Part: Controls & Ride Request Details Panel */}
+        <div className="h-[54%] w-full bg-zinc-950 border-t border-zinc-900 p-3 flex flex-col justify-between overflow-y-auto no-scrollbar z-10">
+          <div className="flex-1 flex flex-col justify-between">
+            {actionError && (
+              <div className="mb-2 p-2 bg-red-950/60 border border-red-800 text-red-200 text-xs rounded-xl">
+                {actionError}
+              </div>
+            )}
+
+            {/* STATE 1: WAITING FOR RIDE */}
+            {!activeRide || activeRide.status === 'declined' || activeRide.status === 'cancelled' ? (
+              <div className="flex-1 flex flex-col justify-between py-1">
+                {/* Fleet status row */}
+                <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/90 border border-zinc-800">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center">
+                      <Bike className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold text-white">Beego Moto</div>
+                      <div className="text-[10px] text-amber-400 font-mono font-semibold">
+                        ৳{RATE_PER_KM_TAKA}/km • Ready
+                      </div>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-black bg-amber-400 px-2 py-0.5 rounded-md shadow-sm">
+                    ONLINE
+                  </span>
+                </div>
+
+                {/* Dispatch Radar status */}
+                <div className="py-2.5 px-2 text-center my-auto">
+                  <div className="relative w-12 h-12 mx-auto mb-1.5 flex items-center justify-center">
+                    <div className="absolute inset-0 rounded-full border border-amber-500/20 animate-ping" />
+                    <div className="absolute inset-2 rounded-full border border-amber-500/40 animate-pulse" />
+                    <div className="w-8 h-8 rounded-full bg-zinc-900 border border-amber-500/60 flex items-center justify-center text-amber-400 shadow-md">
+                      <Radio className="w-4 h-4 animate-pulse" />
+                    </div>
+                  </div>
+
+                  <h3 className="text-xs font-bold text-white">
+                    {activeRide?.status === 'declined'
+                      ? 'Ride Declined • Listening for Next'
+                      : activeRide?.status === 'cancelled'
+                      ? 'Ride Cancelled • Ready for Next'
+                      : 'Dispatch Radar Active'}
+                  </h3>
+                  <p className="text-[10px] text-zinc-400 mt-0.5">
+                    Broadcasting live GPS coordinates across Dhaka Metro.
+                  </p>
+                </div>
+
+                {/* Rider info badge */}
+                <div className="p-2 bg-black/60 border border-zinc-900 rounded-xl flex items-center justify-between text-[10px] text-zinc-400">
+                  <div className="flex items-center gap-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Captain: {riderId}</span>
+                  </div>
+                  <span className="text-amber-400 font-mono font-semibold">Flat ৳70/km</span>
+                </div>
+              </div>
+            ) : null}
+
+            {/* STATE 2: INCOMING REQUEST (BEFORE ACCEPTING - 100% visible on screen without scrolling!) */}
+            {hasIncomingRequest && (
+              <div
+                id="incoming-ride-request-card"
+                className="flex-1 flex flex-col justify-between p-2.5 rounded-xl bg-zinc-900 border-2 border-amber-500 shadow-xl animate-in fade-in"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-wider font-bold text-amber-400 bg-amber-950 px-2 py-0.5 rounded-full border border-amber-800 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                    New Ride Request!
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {activeRide.passengerId}
+                  </span>
+                </div>
+
+                {/* THE ESTIMATED PRICE */}
+                <div className="my-1.5 p-2 rounded-xl bg-black border border-zinc-800 text-center flex items-center justify-between px-4">
+                  <span className="text-[11px] text-zinc-400 uppercase font-medium">Estimated Fare:</span>
+                  <span className="text-xl font-black text-amber-400 flex items-center gap-1">
+                    <Banknote className="w-5 h-5 text-amber-400" />
+                    <span>~৳{activeRide.fareTaka}</span>
+                  </span>
+                </div>
+
+                {/* TRIP DETAILS: PICKUP & DROPOFF */}
+                <div className="space-y-1 my-1">
+                  <div className="px-2 py-1 bg-black/60 rounded-lg border border-zinc-800 text-[11px] flex items-center justify-between gap-1">
+                    <span className="text-[10px] text-amber-400 font-bold flex items-center gap-1 shrink-0">
+                      <MapPin className="w-3 h-3" /> Pickup:
+                    </span>
+                    <span className="text-white font-medium truncate">
+                      {activeRide.pickup.addressLine1 || activeRide.pickup.formatted.split(',')[0]}
+                    </span>
+                  </div>
+
+                  <div className="px-2 py-1 bg-black/60 rounded-lg border border-zinc-800 text-[11px] flex items-center justify-between gap-1">
+                    <span className="text-[10px] text-red-400 font-bold flex items-center gap-1 shrink-0">
+                      <Navigation className="w-3 h-3" /> Drop-off:
+                    </span>
+                    <span className="text-white font-medium truncate">
+                      {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}
+                    </span>
+                  </div>
+
+                  <div className="px-2 py-0.5 text-[10px] text-zinc-400 flex items-center justify-between">
+                    <span>Distance: <strong className="text-white">{activeRide.distanceKm} km</strong></span>
+                    <span className="font-mono text-amber-400">
+                      {activeRide.paymentMethod ? activeRide.paymentMethod.toUpperCase() : 'CASH'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ACTION BUTTONS: ACCEPT OR DECLINE (Zero Scroll Needed) */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
+                  <button
+                    id="decline-ride-btn"
+                    type="button"
+                    onClick={handleDecline}
+                    className="py-2.5 px-3 rounded-xl font-bold text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                  >
+                    <XCircle className="w-3.5 h-3.5 text-red-400" />
+                    <span>Decline</span>
+                  </button>
+
+                  <button
+                    id="accept-ride-btn"
+                    type="button"
+                    onClick={handleAccept}
+                    disabled={isAccepting}
+                    className="py-2.5 px-3 rounded-xl font-bold text-xs bg-amber-400 hover:bg-amber-300 text-black shadow-lg shadow-amber-400/25 transition-all active:scale-95 flex items-center justify-center gap-1 cursor-pointer disabled:opacity-50"
+                  >
+                    {isAccepting ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin text-black" />
+                        <span>Accepting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5 text-black" />
+                        <span>Accept Ride</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>

@@ -39,63 +39,77 @@ html, body, #root {
   color: #a1a1aa !important;
 }
 
-/* Uber-style Bigo shine animation */
-@keyframes bigoShimmer {
+/* Selection style with signature Bee Gold */
+::selection {
+  background-color: #f59e0b;
+  color: #000000;
+}
+
+/* Signature Beego Bee Gold & Honey Shimmer Animation */
+@keyframes beegoShimmer {
   0% {
     background-position: -200% 0;
-    opacity: 0.2;
+    opacity: 0.25;
     transform: scale(0.96);
-    filter: drop-shadow(0 0 0 rgba(255, 255, 255, 0));
+    filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0));
   }
   35% {
     opacity: 1;
     transform: scale(1);
-    filter: drop-shadow(0 0 25px rgba(255, 255, 255, 0.8));
+    filter: drop-shadow(0 0 25px rgba(251, 191, 36, 0.85));
   }
   70% {
     background-position: 200% 0;
     opacity: 1;
     transform: scale(1.02);
-    filter: drop-shadow(0 0 35px rgba(255, 255, 255, 0.9));
+    filter: drop-shadow(0 0 35px rgba(245, 158, 11, 0.95));
   }
   100% {
     background-position: 250% 0;
     opacity: 1;
     transform: scale(1);
-    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.5));
+    filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.6));
   }
 }
 
-.bigo-shining-text {
+.beego-shining-text {
   background: linear-gradient(
     105deg,
-    rgba(255, 255, 255, 0.15) 0%,
-    rgba(255, 255, 255, 0.3) 35%,
-    #ffffff 50%,
-    rgba(255, 255, 255, 0.95) 55%,
-    rgba(255, 255, 255, 0.2) 75%,
-    rgba(255, 255, 255, 0.1) 100%
+    rgba(217, 119, 6, 0.4) 0%,
+    rgba(245, 158, 11, 0.8) 25%,
+    #fbbf24 45%,
+    #ffffff 52%,
+    #fef08a 60%,
+    rgba(245, 158, 11, 0.9) 75%,
+    rgba(180, 83, 9, 0.4) 100%
   );
   background-size: 250% 100%;
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: bigoShimmer 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+  animation: beegoShimmer 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
 }
 
-/* Subtle glow behind the logo */
-@keyframes bigoGlowOrb {
+/* Radiant Golden Honeycomb Orb behind the Beego logo */
+@keyframes beegoGlowOrb {
   0%, 100% {
     transform: scale(0.85);
-    opacity: 0.15;
+    opacity: 0.25;
   }
   50% {
     transform: scale(1.15);
-    opacity: 0.45;
+    opacity: 0.6;
   }
 }
 
-.bigo-glow-orb {
-  animation: bigoGlowOrb 2.2s ease-in-out infinite;
+.beego-glow-orb {
+  animation: beegoGlowOrb 2.2s ease-in-out infinite;
+}
+
+/* Bee Honeycomb Hexagonal Subtle Background Pattern */
+.bg-bee-honeycomb {
+  background-color: #000000;
+  background-image: radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 0);
+  background-size: 24px 24px;
 }
 
 /* Laser scanner beam animation */

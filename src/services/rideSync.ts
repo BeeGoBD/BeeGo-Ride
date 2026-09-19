@@ -3,7 +3,8 @@ import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData, Pa
 export const RATE_PER_KM_TAKA = 70;
 const STORAGE_KEY = 'geoapify_active_ride';
 const CHANNEL_NAME = 'geoapify_ride_broadcast';
-export const REAL_TRIP_HISTORY_KEY = 'bigo_real_trip_history';
+export const REAL_TRIP_HISTORY_KEY = 'beego_real_trip_history';
+const LEGACY_TRIP_HISTORY_KEY = 'bigo_real_trip_history';
 
 const DEFAULT_DRIVER = {
   name: 'Tanvir Hossain',
@@ -105,6 +106,50 @@ export function generateRideId(): string {
   return `RIDE-${rand}`;
 }
 
+export interface StoredRealTrip {
+  id: string;
+  date: string;
+  time: string;
+  timestamp: number;
+  pickup: string;
+  dropoff: string;
+  distanceKm: number;
+  fareTaka: number;
+  vehicleType: 'bike' | 'car';
+  tier: 'moto' | 'select' | 'sedan';
+  tierName: string;
+  ratePerKm: number;
+  vehicleModel: string;
+  plateNumber: string;
+  driverName: string;
+  driverRating: number;
+  passengerId: string;
+  paymentMethod: PaymentMethod;
+  transactionRef: string;
+  status: 'completed';
+}
+
+export function getRealTripHistory(): StoredRealTrip[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(REAL_TRIP_HISTORY_KEY) || localStorage.getItem(LEGACY_TRIP_HISTORY_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveRealTrip(trip: StoredRealTrip) {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getRealTripHistory();
+    const updated = [trip, ...current.filter((t) => t.id !== trip.id)];
+    localStorage.setItem(REAL_TRIP_HISTORY_KEY, JSON.stringify(updated));
+  } catch (e) {
+    console.error('Failed to save real trip history', e);
+  }
+}
+
 /**
  * Passenger requests a new ride
  */
@@ -112,7 +157,8 @@ export function requestNewRide(
   passengerId: string,
   pickup: LocationPoint,
   dropoff: LocationPoint,
-  routeData: RouteData
+  routeData: RouteData,
+  paymentMethod: PaymentMethod = 'cash'
 ): RideRequest {
   const distanceKm = Math.max(0.1, Number((routeData.distanceMeters / 1000).toFixed(1)));
   const durationMinutes = Math.max(1, Math.round(routeData.timeSeconds / 60));
@@ -122,6 +168,7 @@ export function requestNewRide(
     id: generateRideId(),
     passengerId,
     vehicleType: 'bike',
+    paymentMethod,
     pickup,
     dropoff,
     distanceKm,
@@ -243,6 +290,35 @@ export function completeTrip(actualTraveledKm?: number): RideRequest | null {
   };
 
   saveAndBroadcastRide(updated);
+
+  // Save to Real Trip History (no mock data)
+  const now = new Date();
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+
+  saveRealTrip({
+    id: current.id,
+    date: dateStr,
+    time: timeStr,
+    timestamp: Date.now(),
+    pickup: current.pickup.formatted,
+    dropoff: current.dropoff.formatted,
+    distanceKm: traveled,
+    fareTaka: finalFare,
+    vehicleType: 'bike',
+    tier: 'moto',
+    tierName: 'Beego Moto',
+    ratePerKm: RATE_PER_KM_TAKA,
+    vehicleModel: current.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
+    plateNumber: current.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
+    driverName: current.driverDetails?.name || DEFAULT_DRIVER.name,
+    driverRating: current.driverDetails?.rating || DEFAULT_DRIVER.rating,
+    passengerId: current.passengerId,
+    paymentMethod: current.paymentMethod || 'cash',
+    transactionRef: `TXN-BD-${current.id.replace('RIDE-', '')}-${finalFare}`,
+    status: 'completed',
+  });
+
   return updated;
 }
 

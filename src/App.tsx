@@ -9,13 +9,19 @@ import {
   generatePassengerId,
   generateRiderId,
 } from './services/rideSync';
-import { BigoIntroSplash } from './components/BigoIntroSplash';
-import { BigoOnboarding } from './components/BigoOnboarding';
+import { BeegoIntroSplash } from './components/BeegoIntroSplash';
+import { BeegoOnboarding } from './components/BeegoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
 import { PassengerAppShell } from './components/PassengerAppShell';
 import { RiderAppShell } from './components/RiderAppShell';
-import { NavigationMap } from './components/NavigationMap';
 import { UberLiveTracking } from './components/UberLiveTracking';
+import { PassengerAuthModal } from './components/PassengerAuthModal';
+import {
+  getCurrentPassenger,
+  logoutPassenger,
+  PassengerProfile,
+} from './services/passengerAuth';
+import './lib/appwrite'; // Ensures client.ping() runs once when the app starts
 
 type AppIntroState = 'splash' | 'onboarding' | 'ready';
 
@@ -25,7 +31,7 @@ export default function App() {
     if (typeof window !== 'undefined') {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('skipIntro') === 'true') return 'ready';
-      const seen = sessionStorage.getItem('bigo_intro_completed');
+      const seen = sessionStorage.getItem('beego_intro_completed') || sessionStorage.getItem('bigo_intro_completed');
       if (seen === 'true') return 'ready';
     }
     return 'splash';
@@ -65,6 +71,20 @@ export default function App() {
     }
     return generateRiderId();
   });
+
+  const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(null);
+  const [passengerAuthModalMode, setPassengerAuthModalMode] = useState<'signup' | 'login' | null>(null);
+
+  // Check for existing active Appwrite passenger session
+  useEffect(() => {
+    getCurrentPassenger()
+      .then((profile) => {
+        if (profile) {
+          setPassengerProfile(profile);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const [stage, setStage] = useState<RideStage>('request');
   const [apiKey, setApiKey] = useState<string>(() => getGeoapifyApiKey());
@@ -114,6 +134,10 @@ export default function App() {
   };
 
   const handleSelectRole = (selectedRole: UserRole) => {
+    if (selectedRole === 'passenger' && !passengerProfile) {
+      setPassengerAuthModalMode('signup');
+      return;
+    }
     setRole(selectedRole);
     setErrorMessage(null);
   };
@@ -129,6 +153,10 @@ export default function App() {
   };
 
   const handleSwitchToPassenger = () => {
+    if (!passengerProfile) {
+      setPassengerAuthModalMode('signup');
+      return;
+    }
     setRole('passenger');
     setErrorMessage(null);
   };
@@ -139,6 +167,7 @@ export default function App() {
   };
 
   const handleReplayIntro = () => {
+    sessionStorage.removeItem('beego_intro_completed');
     sessionStorage.removeItem('bigo_intro_completed');
     setIntroState('splash');
   };
@@ -185,35 +214,37 @@ export default function App() {
     setStage('request');
   };
 
-  // 1. INTRO SPLASH: "Bigo written in text, full black color screen, shining white like Uber intro" (~2s)
+  // 1. INTRO SPLASH: "Beego written in text, full black color screen, shining bee gold/white" (~2s)
   if (introState === 'splash') {
-    return <BigoIntroSplash onComplete={() => setIntroState('onboarding')} />;
+    return <BeegoIntroSplash onComplete={() => setIntroState('onboarding')} />;
   }
 
   // 2. ONBOARDING SLIDES: 4 slides with next/back buttons
   if (introState === 'onboarding') {
     return (
-      <BigoOnboarding
+      <BeegoOnboarding
         onFinish={() => {
-          sessionStorage.setItem('bigo_intro_completed', 'true');
+          sessionStorage.setItem('beego_intro_completed', 'true');
           setIntroState('ready');
         }}
       />
     );
   }
 
+  // Render content based on current route/role
+  let content: React.ReactNode = null;
+
   // 3. ROLE SELECTION: "Continue as guest passenger" or "Continue as guest rider"
   if (role === null) {
-    return (
+    content = (
       <RoleSelectDashboard
         onSelectRole={handleSelectRole}
+        onOpenPassengerAuth={(mode) => setPassengerAuthModalMode(mode)}
         onReplayIntro={handleReplayIntro}
       />
     );
-  }
-
-  // 4. RIDER VIEW: The Rider Dashboard
-  if (role === 'rider') {
+  } else if (role === 'rider') {
+    // 4. RIDER VIEW: The Rider Dashboard or Active Ride Tracking
     if (
       activeRide &&
       (activeRide.status === 'accepted' ||
@@ -221,7 +252,7 @@ export default function App() {
         activeRide.status === 'in_transit' ||
         activeRide.status === 'completed')
     ) {
-      return (
+      content = (
         <UberLiveTracking
           role="rider"
           activeRide={activeRide}
@@ -231,62 +262,81 @@ export default function App() {
           onResetRide={handleResetRide}
         />
       );
+    } else {
+      content = (
+        <RiderAppShell
+          riderId={riderId}
+          activeRide={activeRide}
+          apiKey={apiKey}
+          onApiKeyChange={handleApiKeyChange}
+          onBackToRoles={handleBackToRoles}
+          onSwitchToPassenger={handleSwitchToPassenger}
+          onReplayIntro={handleReplayIntro}
+        />
+      );
     }
-
-    return (
-      <RiderAppShell
-        riderId={riderId}
-        activeRide={activeRide}
-        apiKey={apiKey}
-        onApiKeyChange={handleApiKeyChange}
-        onBackToRoles={handleBackToRoles}
-        onSwitchToPassenger={handleSwitchToPassenger}
-        onReplayIntro={handleReplayIntro}
-      />
-    );
+  } else {
+    // 5. PASSENGER VIEW: Live Uber tracking or Passenger App Shell
+    if (
+      activeRide &&
+      (activeRide.status === 'accepted' ||
+        activeRide.status === 'arrived_at_pickup' ||
+        activeRide.status === 'in_transit' ||
+        activeRide.status === 'completed')
+    ) {
+      content = (
+        <UberLiveTracking
+          role="passenger"
+          activeRide={activeRide}
+          apiKey={apiKey}
+          onBackToRoles={handleBackToRoles}
+          onSwitchRole={handleSwitchToRider}
+          onResetRide={handleResetRide}
+        />
+      );
+    } else {
+      content = (
+        <PassengerAppShell
+          apiKey={apiKey}
+          onApiKeyChange={handleApiKeyChange}
+          passengerId={passengerProfile?.name || passengerId}
+          passengerProfile={passengerProfile}
+          pickup={pickup}
+          setPickup={setPickup}
+          dropoff={dropoff}
+          setDropoff={setDropoff}
+          routeData={routeData}
+          onRequestRide={handleRequestRide}
+          isLoadingRoute={isLoadingRoute}
+          errorMessage={errorMessage}
+          setErrorMessage={setErrorMessage}
+          activeRide={activeRide}
+          onCancelRide={handleCancelRide}
+          onResetRide={handleResetRide}
+          onBackToRoles={handleBackToRoles}
+          onSwitchToRider={handleSwitchToRider}
+          onReplayIntro={handleReplayIntro}
+        />
+      );
+    }
   }
 
-  // 5. PASSENGER VIEW: If ride in flight, show live Uber tracking
-  if (
-    activeRide &&
-    (activeRide.status === 'accepted' ||
-      activeRide.status === 'arrived_at_pickup' ||
-      activeRide.status === 'in_transit' ||
-      activeRide.status === 'completed')
-  ) {
-    return (
-      <UberLiveTracking
-        role="passenger"
-        activeRide={activeRide}
-        apiKey={apiKey}
-        onBackToRoles={handleBackToRoles}
-        onSwitchRole={handleSwitchToRider}
-        onResetRide={handleResetRide}
-      />
-    );
-  }
-
-  // 6. PASSENGER VIEW: Full Passenger App Shell with fixed bottom bar, 4 swipeable sections
   return (
-    <PassengerAppShell
-      apiKey={apiKey}
-      onApiKeyChange={handleApiKeyChange}
-      passengerId={passengerId}
-      pickup={pickup}
-      setPickup={setPickup}
-      dropoff={dropoff}
-      setDropoff={setDropoff}
-      routeData={routeData}
-      onRequestRide={handleRequestRide}
-      isLoadingRoute={isLoadingRoute}
-      errorMessage={errorMessage}
-      setErrorMessage={setErrorMessage}
-      activeRide={activeRide}
-      onCancelRide={handleCancelRide}
-      onResetRide={handleResetRide}
-      onBackToRoles={handleBackToRoles}
-      onSwitchToRider={handleSwitchToRider}
-      onReplayIntro={handleReplayIntro}
-    />
+    <div className="w-full h-full min-h-[100dvh] h-[100dvh] bg-black text-white flex flex-col overflow-hidden relative">
+      {content}
+
+      {/* Appwrite Passenger Authentication Modal */}
+      {passengerAuthModalMode && (
+        <PassengerAuthModal
+          initialMode={passengerAuthModalMode}
+          onAuthenticated={(profile) => {
+            setPassengerProfile(profile);
+            setPassengerAuthModalMode(null);
+            handleSelectRole('passenger');
+          }}
+          onCancel={() => setPassengerAuthModalMode(null)}
+        />
+      )}
+    </div>
   );
 }

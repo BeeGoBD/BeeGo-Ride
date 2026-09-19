@@ -434,36 +434,36 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   };
 
   return (
-    <div id="uber-live-tracking-view" className="w-full h-screen bg-black text-white flex flex-col relative overflow-hidden">
+    <div id="uber-live-tracking-view" className="w-full h-full bg-black text-white flex flex-col relative overflow-hidden">
       {/* 1. TOP UBER TURN-BY-TURN / STATUS BANNER */}
-      <div className="absolute top-4 left-4 right-4 z-[1000] max-w-2xl mx-auto pointer-events-auto">
-        <div className="bg-zinc-950/95 backdrop-blur-xl border border-zinc-800/90 rounded-2xl p-3.5 shadow-2xl flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
+      <div className="absolute top-2.5 left-2.5 right-2.5 z-[1000] max-w-2xl mx-auto pointer-events-auto">
+        <div className="bg-zinc-950/95 backdrop-blur-xl border border-zinc-800/90 rounded-2xl p-2.5 shadow-2xl flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 min-w-0">
             {/* Step Icon */}
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center shrink-0">
               {isEnRouteToPickup ? (
-                <Car className="w-5 h-5 text-emerald-400" />
+                <Car className="w-4 h-4 text-amber-400" />
               ) : isAtPickup ? (
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <CheckCircle className="w-4 h-4 text-amber-400" />
               ) : isInTransit ? (
-                <Navigation className="w-5 h-5 text-emerald-400 rotate-45" />
+                <Navigation className="w-4 h-4 text-amber-400 rotate-45" />
               ) : (
-                <CheckCircle className="w-5 h-5 text-emerald-400" />
+                <CheckCircle className="w-4 h-4 text-amber-400" />
               )}
             </div>
 
             {/* Instruction / Status Text */}
             <div className="min-w-0 flex-1">
-              <div className="text-[10px] uppercase font-bold tracking-wider text-emerald-400 flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                {isEnRouteToPickup && 'Driver En Route to Pickup'}
-                {isAtPickup && 'Driver Arrived at Pickup Spot'}
-                {isInTransit && 'Trip in Progress to Destination'}
-                {isCompleted && 'Trip Completed Successfully'}
+              <div className="text-[9px] uppercase font-bold tracking-wider text-amber-400 flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                {isEnRouteToPickup && 'Captain En Route'}
+                {isAtPickup && 'Captain Arrived'}
+                {isInTransit && 'Trip in Progress'}
+                {isCompleted && 'Trip Completed'}
               </div>
-              <div className="text-sm font-extrabold text-white truncate mt-0.5">
+              <div className="text-xs font-extrabold text-white truncate mt-0.5">
                 {isAtPickup
-                  ? 'Vehicle is parked at pickup spot. Ready to board.'
+                  ? 'Vehicle parked at pickup. Ready to board.'
                   : currentInstruction}
               </div>
             </div>
@@ -471,9 +471,9 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
           {/* Quick Metrics (Remaining Distance & ETA) */}
           {!isCompleted && !isAtPickup && (
-            <div className="text-right shrink-0 bg-zinc-900/80 px-3 py-1.5 rounded-xl border border-zinc-800">
-              <div className="text-sm font-black text-white">{remainingKm} km</div>
-              <div className="text-[10px] text-zinc-400 font-semibold">{etaMinutes} min away</div>
+            <div className="text-right shrink-0 bg-zinc-900/80 px-2 py-1 rounded-lg border border-zinc-800">
+              <div className="text-xs font-black text-white">{remainingKm} km</div>
+              <div className="text-[9px] text-zinc-400 font-semibold">{etaMinutes}m away</div>
             </div>
           )}
         </div>
@@ -483,14 +483,14 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       <div ref={mapContainerRef} className="w-full h-full" />
 
       {/* 3. MAP FLOATING CONTROLS (Right side) */}
-      <div className="absolute right-4 top-24 z-[1000] flex flex-col gap-2 pointer-events-auto">
+      <div className="absolute right-2.5 top-18 z-[1000] flex flex-col gap-1.5 pointer-events-auto">
         {/* Re-center on Vehicle */}
         <button
           onClick={handleRecenter}
           title="Re-center on vehicle"
-          className="w-10 h-10 rounded-xl bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white flex items-center justify-center shadow-2xl transition-all cursor-pointer"
+          className="w-8 h-8 rounded-lg bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white flex items-center justify-center shadow-xl transition-all cursor-pointer"
         >
-          <Compass className="w-5 h-5 text-emerald-400" />
+          <Compass className="w-4 h-4 text-amber-400" />
         </button>
 
         {/* Role Switcher Button for Testing/Live Demo */}
@@ -498,7 +498,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
           <button
             onClick={onSwitchRole}
             title={`Switch view to ${role === 'passenger' ? 'Rider' : 'Passenger'}`}
-            className="w-10 h-10 rounded-xl bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white flex items-center justify-center shadow-2xl transition-all cursor-pointer text-xs font-bold"
+            className="w-8 h-8 rounded-lg bg-zinc-950/90 hover:bg-zinc-900 border border-zinc-800 text-white flex items-center justify-center shadow-xl transition-all cursor-pointer text-[10px] font-bold"
           >
             {role === 'passenger' ? '🚗' : '👤'}
           </button>
@@ -506,38 +506,40 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       </div>
 
       {/* 4. BOTTOM UBER HUD / DASHBOARD PANEL */}
-      <div className="absolute bottom-4 left-4 right-4 z-[1000] max-w-xl mx-auto pointer-events-auto">
-        <div className="bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800/90 rounded-2xl p-4 shadow-2xl space-y-3.5">
-          {/* Telemetry Stats Bar: Traveled Distance, Speed, Remaining, Fare Meter */}
-          {(() => {
-            const liveMeterTaka = Math.max(70, Math.round((traveledKm > 0 ? traveledKm : 0.1) * RATE_PER_KM_TAKA));
-            return (
-              <div className="grid grid-cols-4 gap-2 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-center">
-                <div>
-                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Traveled</div>
-                  <div className="text-sm font-black text-emerald-400">{traveledKm} km</div>
+      <div className="absolute bottom-2.5 left-2.5 right-2.5 z-[1000] max-w-xl mx-auto pointer-events-auto">
+        <div className="bg-zinc-950/95 backdrop-blur-2xl border border-zinc-800/90 rounded-2xl p-3 shadow-2xl space-y-2.5">
+            {/* Telemetry Stats Bar: Traveled Distance, Speed, Remaining, Fare Meter */}
+            {(() => {
+              const liveMeterTaka = Math.max(70, Math.round((traveledKm > 0 ? traveledKm : 0.1) * RATE_PER_KM_TAKA));
+              return (
+                <div className="grid grid-cols-4 gap-2 bg-zinc-900/80 p-2.5 rounded-xl border border-zinc-800/80 text-center">
+                  <div>
+                    <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Traveled</div>
+                    <div className="text-sm font-black text-amber-400">{traveledKm} km</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Speed</div>
+                    <div className="text-sm font-black text-white">{currentSpeed} km/h</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Live Meter</div>
+                    <div className="text-sm font-black text-amber-400">৳{liveMeterTaka}</div>
+                  </div>
+                  <div>
+                    <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Payment</div>
+                    <div className="text-xs font-black text-amber-400 uppercase truncate mt-0.5">
+                      {activeRide.paymentMethod || 'CASH'}
+                    </div>
+                  </div>
                 </div>
-                <div>
-                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Speed</div>
-                  <div className="text-sm font-black text-white">{currentSpeed} km/h</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Live Meter</div>
-                  <div className="text-sm font-black text-emerald-400">৳{liveMeterTaka}</div>
-                </div>
-                <div>
-                  <div className="text-[9px] uppercase font-bold tracking-wider text-zinc-400">Estimated</div>
-                  <div className="text-sm font-black text-zinc-300">~৳{activeRide.fareTaka}</div>
-                </div>
-              </div>
-            );
-          })()}
+              );
+            })()}
 
           {/* Passenger & Driver Details Strip */}
           <div className="flex items-center justify-between gap-3 pt-1 border-t border-zinc-800/60">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-xl bg-zinc-800 border border-zinc-700 flex items-center justify-center font-bold text-white shrink-0">
-                <Bike className="w-5 h-5 text-emerald-400" />
+                <Bike className="w-5 h-5 text-amber-400" />
               </div>
               <div className="min-w-0">
                 <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
@@ -559,7 +561,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   type="button"
                   onClick={() => setContactMessage(`Calling driver ${driver.name} at ${driver.phone}...`)}
                   title="Call Driver"
-                  className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-emerald-400 flex items-center justify-center transition-colors cursor-pointer"
+                  className="w-9 h-9 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-amber-400 flex items-center justify-center transition-colors cursor-pointer"
                 >
                   <Phone className="w-4 h-4" />
                 </button>
@@ -583,7 +585,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   title={isPaused ? 'Resume Driving' : 'Pause Driving'}
                   className="p-1.5 text-zinc-300 hover:text-white cursor-pointer"
                 >
-                  {isPaused ? <Play className="w-3.5 h-3.5 text-emerald-400" /> : <Pause className="w-3.5 h-3.5" />}
+                  {isPaused ? <Play className="w-3.5 h-3.5 text-amber-400" /> : <Pause className="w-3.5 h-3.5" />}
                 </button>
                 <button
                   type="button"
@@ -598,7 +600,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
           {/* Contact Alert Message if clicked */}
           {contactMessage && (
-            <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/60 text-xs text-emerald-300 flex items-center justify-between">
+            <div className="p-2.5 rounded-xl bg-amber-950/40 border border-amber-800/60 text-xs text-amber-300 flex items-center justify-between">
               <span>{contactMessage}</span>
               <button
                 onClick={() => setContactMessage(null)}
@@ -616,7 +618,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               <button
                 type="button"
                 onClick={handleArriveAtPickup}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle className="w-4 h-4" />
                 <span>I Have Arrived at Pickup Spot</span>
@@ -628,7 +630,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               <button
                 type="button"
                 onClick={handleStartTrip}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Navigation className="w-4 h-4 fill-black" />
                 <span>Passenger Boarded • Start Trip to Destination</span>
@@ -637,8 +639,8 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
             {/* STAGE 2 (At Pickup): Passenger Alert */}
             {role === 'passenger' && isAtPickup && (
-              <div className="p-3 bg-emerald-950/40 border border-emerald-500/50 rounded-xl text-center">
-                <div className="text-xs font-bold text-emerald-400 flex items-center justify-center gap-1.5">
+              <div className="p-3 bg-amber-950/40 border border-amber-500/50 rounded-xl text-center">
+                <div className="text-xs font-bold text-amber-400 flex items-center justify-center gap-1.5">
                   <CheckCircle className="w-4 h-4" />
                   <span>Your driver has arrived at your pickup spot!</span>
                 </div>
@@ -653,7 +655,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               <button
                 type="button"
                 onClick={handleCompleteTrip}
-                className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-amber-400 hover:bg-amber-300 active:scale-[0.99] text-black font-extrabold rounded-xl transition-all shadow-lg shadow-amber-400/20 flex items-center justify-center gap-2 cursor-pointer"
               >
                 <CheckCircle className="w-4 h-4" />
                 <span>Complete Ride at Drop-off</span>
@@ -679,7 +681,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
         <div className="absolute inset-0 z-[2000] bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
           <div className="w-full max-w-md bg-zinc-950 border border-zinc-800 rounded-3xl p-6 shadow-2xl space-y-5 animate-in zoom-in-95">
             <div className="text-center space-y-1">
-              <div className="w-14 h-14 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center mx-auto text-emerald-400">
+              <div className="w-14 h-14 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center mx-auto text-amber-400">
                 <CheckCircle className="w-7 h-7" />
               </div>
               <h3 className="text-xl font-black text-white pt-2">Trip Completed!</h3>
@@ -704,12 +706,27 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                 <span>Initial Estimated Price</span>
                 <span className="text-zinc-400 font-mono">~৳{activeRide.fareTaka} Taka</span>
               </div>
+              <div className="flex justify-between items-center text-xs text-zinc-400">
+                <span>Payment Method</span>
+                <span className="font-bold text-white uppercase flex items-center gap-1.5 font-mono">
+                  <Banknote className="w-3.5 h-3.5 text-amber-400" />
+                  <span>
+                    {activeRide.paymentMethod === 'bkash'
+                      ? 'bKash Wallet'
+                      : activeRide.paymentMethod === 'nagad'
+                      ? 'Nagad Wallet'
+                      : activeRide.paymentMethod === 'rocket'
+                      ? 'Rocket DBBL'
+                      : 'Cash on Arrival'}
+                  </span>
+                </span>
+              </div>
               <div className="pt-2 border-t border-zinc-800 flex justify-between items-center">
                 <div>
                   <span className="text-sm font-bold text-white">Final Calculated Fare</span>
                   <div className="text-[10px] text-zinc-500">Counted by system from kilometers traveled</div>
                 </div>
-                <span className="text-2xl font-black text-emerald-400">
+                <span className="text-2xl font-black text-amber-400">
                   ৳{activeRide.finalFareTaka || activeRide.fareTaka} Taka
                 </span>
               </div>
@@ -741,7 +758,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   ))}
                 </div>
                 {feedbackSubmitted && (
-                  <div className="text-[11px] text-emerald-400 font-semibold">
+                  <div className="text-[11px] text-amber-400 font-semibold">
                     Thank you for your {rating}-star rating!
                   </div>
                 )}
@@ -752,7 +769,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
             <button
               type="button"
               onClick={handleFinishAndReset}
-              className="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold rounded-xl transition-all cursor-pointer shadow-xl text-sm"
+              className="w-full py-3.5 bg-amber-400 hover:bg-amber-300 text-black font-extrabold rounded-xl transition-all cursor-pointer shadow-xl shadow-amber-400/20 text-sm"
             >
               Done • Book Another Ride
             </button>

@@ -90,8 +90,8 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
       className: 'custom-pickup-marker',
       html: `
         <div style="position: relative; display: flex; align-items: center; justify-content: center;">
-          <span style="position: absolute; width: 28px; height: 28px; border-radius: 9999px; background: rgba(16, 185, 129, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
-          <div style="width: 16px; height: 16px; border-radius: 9999px; background: #10b981; border: 3px solid #ffffff; box-shadow: 0 0 10px rgba(0,0,0,0.8);"></div>
+          <span style="position: absolute; width: 28px; height: 28px; border-radius: 9999px; background: rgba(245, 158, 11, 0.4); animation: ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;"></span>
+          <div style="width: 16px; height: 16px; border-radius: 9999px; background: #fbbf24; border: 3px solid #ffffff; box-shadow: 0 0 10px rgba(0,0,0,0.8);"></div>
         </div>
       `,
       iconSize: [28, 28],
@@ -114,7 +114,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
     const vehicleIcon = L.divIcon({
       className: 'custom-vehicle-marker',
       html: `
-        <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: #ffffff; color: #000000; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.7); border: 2px solid #10b981;">
+        <div style="display: flex; align-items: center; justify-content: center; width: 34px; height: 34px; background: #ffffff; color: #000000; border-radius: 9999px; box-shadow: 0 4px 14px rgba(0,0,0,0.7); border: 2px solid #f59e0b;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polygon points="3 11 22 2 13 21 11 13 3 11"/>
           </svg>
@@ -146,9 +146,9 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
         opacity: 0.9,
       }).addTo(map);
 
-      // Main Navigation Line (Uber-style cyan/emerald)
+      // Main Navigation Line (Beego Amber Gold)
       const routePolyline = L.polyline(routeData.coordinates, {
-        color: '#10b981',
+        color: '#f59e0b',
         weight: 5,
         opacity: 0.95,
         lineJoin: 'round',
@@ -250,7 +250,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
           </button>
 
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-2.5 bg-zinc-950/90 border border-zinc-800 rounded-xl text-xs text-zinc-300 backdrop-blur-md">
-            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+            <Zap className="w-3.5 h-3.5 text-amber-400" />
             <span>Geoapify Route Optimized</span>
           </div>
         </div>
@@ -258,7 +258,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
         {/* Turn-by-Turn Instruction Banner */}
         {currentStep && (
           <div className="pointer-events-auto bg-zinc-950/95 border border-zinc-800 rounded-xl px-4 py-2.5 text-white shadow-2xl backdrop-blur-md flex items-center gap-3 max-w-md">
-            <div className="w-8 h-8 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
               <Navigation className="w-4 h-4" />
             </div>
             <div className="min-w-0">
@@ -289,7 +289,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
           {/* Progress Bar */}
           <div className="w-full bg-zinc-800 h-1.5 rounded-full overflow-hidden mb-4">
             <div
-              className="bg-emerald-500 h-full transition-all duration-300 ease-out"
+              className="bg-amber-400 h-full transition-all duration-300 ease-out shadow-sm shadow-amber-400/50"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
@@ -298,7 +298,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
             {/* Pickup & Destination Summary */}
             <div className="sm:col-span-2 space-y-1.5 min-w-0">
               <div className="flex items-center gap-2 text-xs text-zinc-300 truncate">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
+                <span className="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
                 <span className="font-semibold text-zinc-400 shrink-0">From:</span>
                 <span className="truncate">{pickup.formatted}</span>
               </div>
@@ -315,7 +315,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
                 <div className="text-[10px] text-zinc-400 uppercase tracking-wider font-semibold">
                   Trip Fare
                 </div>
-                <div className="text-sm font-black text-emerald-400">
+                <div className="text-sm font-black text-amber-400">
                   ৳{finalFare} Taka
                 </div>
               </div>
@@ -332,10 +332,10 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
 
               <div className="text-right">
                 <div className="text-[11px] text-zinc-400 flex items-center justify-end gap-1">
-                  <Clock className="w-3 h-3 text-emerald-400" />
+                  <Clock className="w-3 h-3 text-amber-400" />
                   <span>ETA</span>
                 </div>
-                <div className="text-sm font-bold text-emerald-400">
+                <div className="text-sm font-bold text-amber-400">
                   {durationMinutes} min
                 </div>
               </div>
@@ -345,7 +345,7 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
           {/* Real-time Tracking Controls */}
           <div className="flex items-center justify-between pt-3 border-t border-zinc-900 text-xs">
             <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-emerald-500 animate-pulse' : tripCompleted ? 'bg-blue-500' : 'bg-amber-500'}`} />
+              <span className={`w-2 h-2 rounded-full ${isNavigating ? 'bg-amber-400 animate-pulse' : tripCompleted ? 'bg-blue-500' : 'bg-amber-500'}`} />
               <span className="text-zinc-300 font-medium">
                 {tripCompleted ? 'Trip Finished' : isNavigating ? 'Real-time Tracking Active' : 'Navigation Paused'}
               </span>

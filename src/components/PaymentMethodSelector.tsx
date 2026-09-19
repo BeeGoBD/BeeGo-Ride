@@ -47,7 +47,7 @@ export const PaymentIcon: React.FC<{ method: PaymentMethod; className?: string }
 }) => {
   if (method === 'cash') {
     return (
-      <div className="w-7 h-7 rounded-lg bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
+      <div className="w-7 h-7 rounded-lg bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400 shrink-0">
         <Banknote className="w-4 h-4" />
       </div>
     );
@@ -148,7 +148,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
           requiredError && !selectedMethod
             ? 'border-red-500 ring-2 ring-red-500/20 shadow-lg shadow-red-500/10'
             : selectedMethod
-            ? 'border-zinc-700 hover:border-emerald-500/80 bg-zinc-950'
+            ? 'border-zinc-700 hover:border-amber-500/80 bg-zinc-950'
             : 'border-zinc-800 hover:border-zinc-700'
         }`}
       >
@@ -216,7 +216,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
         >
           <div className="px-3 py-1.5 text-[10px] uppercase tracking-wider font-mono text-zinc-500 border-b border-zinc-900 flex items-center justify-between">
             <span>Payment Options</span>
-            <span className="text-emerald-400 font-bold">Bangladesh Currency (৳)</span>
+            <span className="text-amber-400 font-bold">Bangladesh Currency (৳)</span>
           </div>
 
           {PAYMENT_OPTIONS.map((opt) => {
@@ -262,7 +262,7 @@ export const PaymentMethodSelector: React.FC<PaymentMethodSelectorProps> = ({
 
                 <div className="pl-3 shrink-0">
                   {isSelected ? (
-                    <div className="w-5 h-5 rounded-full bg-emerald-500 text-black flex items-center justify-center font-bold">
+                    <div className="w-5 h-5 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold">
                       <Check className="w-3.5 h-3.5 stroke-[3]" />
                     </div>
                   ) : (
