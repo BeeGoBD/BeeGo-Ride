@@ -1,4 +1,4 @@
-import { account, ID, AppwriteException } from '../lib/appwrite';
+import { account, client, ID, AppwriteException } from '../lib/appwrite';
 
 export interface PassengerProfile {
   id: string;
@@ -6,6 +6,29 @@ export interface PassengerProfile {
   email: string;
   role: 'passenger';
   isEmailVerified: boolean;
+}
+
+/**
+ * Safely parses response as JSON, handling non-JSON error pages (like 404/500 HTML) gracefully
+ * to avoid "Unexpected token 'T', 'The page c'... is not valid JSON" crashes.
+ */
+async function safeParseJson(res: Response): Promise<any> {
+  const contentType = res.headers.get('content-type') || '';
+  if (!contentType.includes('application/json')) {
+    const text = await res.text().catch(() => '');
+    console.warn(`[Passenger Auth] Server returned non-JSON response (${res.status}):`, text.slice(0, 120));
+    if (res.status === 404) {
+      throw new Error('Authentication service endpoint was not found. Please try again.');
+    }
+    if (res.status === 429) {
+      throw new Error('Too many requests. Please wait a moment before trying again.');
+    }
+    if (res.status >= 500) {
+      throw new Error('Authentication service is temporarily unavailable. Please try again in a moment.');
+    }
+    throw new Error(`Server returned unexpected response (${res.status}). Please try again.`);
+  }
+  return res.json();
 }
 
 // Gmail address validation mandate: must end with @gmail.com
@@ -146,7 +169,7 @@ export async function sendPassengerRegistrationOtp(
       }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || 'Failed to send verification code.');
     }
@@ -158,6 +181,53 @@ export async function sendPassengerRegistrationOtp(
       name: cleanName,
       email: cleanEmail,
       password,
+      createdAt: Date.now(),
+    });
+
+    return {
+      success: true,
+      userId: assignedUserId,
+      message: data.message || `Verification code sent to ${cleanEmail}`,
+    };
+  } catch (error: any) {
+    throw new Error(error?.message || 'Failed to send verification code.');
+  }
+}
+
+/**
+ * Send OTP for Passwordless Passenger Login (Instant 6-digit code to Gmail)
+ */
+export async function sendPassengerLoginOtp(
+  email: string
+): Promise<{ success: boolean; userId: string; message: string }> {
+  const check = validateGmailAddress(email);
+  if (!check.isValid) {
+    throw new Error(check.error);
+  }
+
+  const cleanEmail = email.trim().toLowerCase();
+
+  try {
+    const res = await fetch('/api/auth/otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        email: cleanEmail,
+        name: cleanEmail.split('@')[0],
+      }),
+    });
+
+    const data = await safeParseJson(res);
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to send verification code to your email.');
+    }
+
+    const assignedUserId = data.userId || 'pax-' + Date.now();
+
+    setPendingRegistration({
+      userId: assignedUserId,
+      name: cleanEmail.split('@')[0],
+      email: cleanEmail,
       createdAt: Date.now(),
     });
 
@@ -203,9 +273,18 @@ export async function verifyPassengerOtp(
       }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || 'Invalid verification code. Please check your email and try again.');
+    }
+
+    // If active session token was established, set it on client
+    if (data.sessionSecret) {
+      try {
+        client.setSession(data.sessionSecret);
+      } catch (e) {
+        // Continue
+      }
     }
 
     clearPendingRegistration();
@@ -226,7 +305,8 @@ export async function verifyPassengerOtp(
 }
 
 /**
- * Passenger Password Login
+ * Passenger Password Login:
+ * Authenticates against /api/auth/login with graceful Appwrite SDK fallback
  */
 export async function loginPassengerWithPassword(
   email: string,
@@ -244,62 +324,89 @@ export async function loginPassengerWithPassword(
   const cleanEmail = email.trim().toLowerCase();
 
   try {
-    // Delete any stale session first
-    await account.deleteSession({ sessionId: 'current' }).catch(() => {});
-
-    // Create email/password session in Appwrite
-    await account.createEmailPasswordSession({
-      email: cleanEmail,
-      password,
+    // Primary: Call server login endpoint
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password }),
     });
 
-    const user = await account.get();
-    const prefs = (user.prefs || {}) as Record<string, any>;
+    const data = await safeParseJson(res);
 
-    // Enforce role segregation
-    if (prefs.role === 'captain') {
-      await account.deleteSession({ sessionId: 'current' }).catch(() => {});
-      throw new Error(
-        'Access Denied: This account is registered as a Captain. Captains cannot log in as Passengers.'
-      );
+    if (!res.ok) {
+      throw new Error(data.error || 'Incorrect email or password.');
     }
 
-    // Ensure role is passenger
-    if (prefs.role !== 'passenger') {
-      await account.updatePrefs({
-        prefs: {
-          ...prefs,
-          role: 'passenger',
-        },
-      }).catch(() => {});
+    if (data.sessionSecret) {
+      try {
+        client.setSession(data.sessionSecret);
+      } catch (e) {
+        // Continue
+      }
     }
 
-    const profile: PassengerProfile = {
-      id: user.$id,
-      name: user.name || cleanEmail.split('@')[0],
-      email: user.email,
-      role: 'passenger',
-      isEmailVerified: true,
-    };
+    if (data.profile) {
+      try {
+        sessionStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
+      } catch (e) {
+        // Ignore
+      }
+      return data.profile as PassengerProfile;
+    }
 
+    throw new Error('Sign in failed. Please check your credentials.');
+  } catch (serverErr: any) {
+    // If server login threw a business error (like invalid credentials), rethrow it
+    const msg = (serverErr?.message || '').toLowerCase();
+    if (msg.includes('incorrect email') || msg.includes('access denied') || msg.includes('wait a moment')) {
+      throw serverErr;
+    }
+
+    // Fallback: direct Appwrite SDK session creation
     try {
-      sessionStorage.setItem('beego_active_passenger', JSON.stringify(profile));
-    } catch (e) {
-      // Ignore
-    }
+      await account.deleteSession({ sessionId: 'current' }).catch(() => {});
+      await account.createEmailPasswordSession({
+        email: cleanEmail,
+        password,
+      });
 
-    return profile;
-  } catch (error: any) {
-    const msg = (error?.message || '').toLowerCase();
-    const code = error?.code;
+      const user = await account.get();
+      const prefs = (user.prefs || {}) as Record<string, any>;
 
-    if (code === 401 || msg.includes('invalid credentials')) {
-      throw new Error('Incorrect password for this Gmail account. Please try again or sign in with OTP.');
+      if (prefs.role === 'captain') {
+        await account.deleteSession({ sessionId: 'current' }).catch(() => {});
+        throw new Error(
+          'Access Denied: This account is registered as a Captain. Captains cannot log in as Passengers.'
+        );
+      }
+
+      const profile: PassengerProfile = {
+        id: user.$id,
+        name: user.name || cleanEmail.split('@')[0],
+        email: user.email,
+        role: 'passenger',
+        isEmailVerified: true,
+      };
+
+      try {
+        sessionStorage.setItem('beego_active_passenger', JSON.stringify(profile));
+      } catch (e) {
+        // Ignore
+      }
+
+      return profile;
+    } catch (sdkError: any) {
+      const sdkMsg = (sdkError?.message || '').toLowerCase();
+      const code = sdkError?.code;
+
+      if (code === 401 || sdkMsg.includes('invalid credentials')) {
+        throw new Error('Incorrect password for this Gmail account. Please try again or sign in with OTP.');
+      }
+      if (code === 429 || sdkMsg.includes('rate limit')) {
+        throw new Error('Rate limit exceeded. Please wait a moment and try again.');
+      }
+      throw new Error(serverErr?.message || sdkError?.message || 'Login failed. Please check your credentials.');
     }
-    if (code === 429 || msg.includes('rate limit')) {
-      throw new Error('Rate limit exceeded. Please wait a moment and try again.');
-    }
-    throw new Error(error?.message || 'Login failed. Please check your credentials.');
   }
 }
 
@@ -323,7 +430,7 @@ export async function sendPasswordResetOtp(
       body: JSON.stringify({ email: cleanEmail, name: cleanEmail.split('@')[0] }),
     });
 
-    const data = await res.json();
+    const data = await safeParseJson(res);
     if (!res.ok) {
       throw new Error(data.error || 'Failed to send reset code.');
     }

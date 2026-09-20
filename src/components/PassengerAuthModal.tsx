@@ -15,6 +15,7 @@ import {
 import {
   validateGmailAddress,
   sendPassengerRegistrationOtp,
+  sendPassengerLoginOtp,
   verifyPassengerOtp,
   loginPassengerWithPassword,
   sendPasswordResetOtp,
@@ -235,6 +236,30 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
       }, 500);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Incorrect password or email.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // 3b. SIGN IN WITH OTP: Send 6-digit code to Gmail instead of password
+  const handleLoginWithOtpClick = async () => {
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    const check = validateGmailAddress(email);
+    if (!check.isValid) {
+      setErrorMessage(check.error || 'Please enter your @gmail.com address above first.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await sendPassengerLoginOtp(email);
+      setStatusMessage(res.message);
+      setResendCooldown(45);
+      switchMode('otp_verify');
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to send verification code.');
     } finally {
       setIsLoading(false);
     }
@@ -647,6 +672,25 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}
+            </button>
+
+            {/* Passwordless OTP Login Alternative */}
+            <div className="relative flex items-center justify-center my-0.5">
+              <div className="border-t border-zinc-800/80 w-full" />
+              <span className="bg-zinc-950 px-2.5 text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
+                Or
+              </span>
+            </div>
+
+            <button
+              id="login-with-otp-button"
+              type="button"
+              onClick={handleLoginWithOtpClick}
+              disabled={isLoading || isSuccess}
+              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-zinc-800 text-zinc-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Mail className="w-3.5 h-3.5 text-amber-400" />
+              <span>Sign in with 6-digit email code</span>
             </button>
           </form>
         )}

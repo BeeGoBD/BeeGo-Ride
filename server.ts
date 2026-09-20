@@ -147,12 +147,54 @@ async function startServer() {
 
       const passengerName = record.name || name || cleanEmail.split('@')[0] || 'Passenger';
       const passengerId = record.userId;
+      const sessionSecret = sessionJson.secret || '';
+
+      // If user signed up with a password, persist it directly to their Appwrite account using the verified session
+      const targetPassword = record.password || password;
+      if (targetPassword && sessionSecret) {
+        try {
+          await fetch(`${APPWRITE_UPSTREAM}/account/password`, {
+            method: 'PATCH',
+            headers: {
+              'x-appwrite-project': APPWRITE_PROJECT_ID,
+              'x-appwrite-session': sessionSecret,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              password: targetPassword,
+            }),
+          });
+          console.log(`[Beego Auth] Password set successfully in Appwrite for ${cleanEmail}`);
+        } catch (pwErr) {
+          console.warn('[Beego Auth] Could not set password in Appwrite:', pwErr);
+        }
+      }
+
+      // Update user name and role in Appwrite
+      if (sessionSecret) {
+        try {
+          await fetch(`${APPWRITE_UPSTREAM}/account/name`, {
+            method: 'PATCH',
+            headers: {
+              'x-appwrite-project': APPWRITE_PROJECT_ID,
+              'x-appwrite-session': sessionSecret,
+              'content-type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: passengerName,
+            }),
+          });
+        } catch (nameErr) {
+          console.warn('[Beego Auth] Could not set name in Appwrite:', nameErr);
+        }
+      }
 
       console.log(`[Beego Auth] Passenger verified via Appwrite: ${passengerName} (${cleanEmail})`);
 
       return res.json({
         success: true,
         message: 'Email verified successfully.',
+        sessionSecret: sessionSecret || undefined,
         profile: {
           id: passengerId,
           name: passengerName,
@@ -167,14 +209,111 @@ async function startServer() {
     }
   });
 
+  // POST /api/auth/login - Direct email & password authentication via Appwrite
+  app.post('/api/auth/login', async (req, res) => {
+    try {
+      const { email, password } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+
+      if (!cleanEmail || !cleanEmail.endsWith('@gmail.com')) {
+        return res.status(400).json({ error: 'A valid @gmail.com email address is required.' });
+      }
+
+      if (!password) {
+        return res.status(400).json({ error: 'Please enter your password.' });
+      }
+
+      // Authenticate directly with Appwrite sessions
+      const appwriteRes = await fetch(`${APPWRITE_UPSTREAM}/account/sessions/email`, {
+        method: 'POST',
+        headers: {
+          'x-appwrite-project': APPWRITE_PROJECT_ID,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: cleanEmail,
+          password,
+        }),
+      });
+
+      const appwriteJson = await appwriteRes.json().catch(() => ({}));
+
+      if (!appwriteRes.ok) {
+        if (appwriteRes.status === 401) {
+          return res.status(401).json({
+            error: 'Incorrect email or password. If you signed up with a Gmail code, use "Sign in with OTP" or reset your password.',
+          });
+        }
+        if (appwriteRes.status === 429) {
+          return res.status(429).json({
+            error: 'Too many sign in attempts. Please wait a moment and try again.',
+          });
+        }
+        return res.status(appwriteRes.status >= 400 && appwriteRes.status < 500 ? appwriteRes.status : 500).json({
+          error: appwriteJson.message || 'Login failed. Please check your credentials.',
+        });
+      }
+
+      let passengerName = cleanEmail.split('@')[0] || 'Passenger';
+      let passengerId = appwriteJson.userId || 'pax-' + Date.now();
+      const sessionSecret = appwriteJson.secret || '';
+
+      // Retrieve full user profile using active session
+      if (sessionSecret) {
+        try {
+          const userRes = await fetch(`${APPWRITE_UPSTREAM}/account`, {
+            method: 'GET',
+            headers: {
+              'x-appwrite-project': APPWRITE_PROJECT_ID,
+              'x-appwrite-session': sessionSecret,
+            },
+          });
+          if (userRes.ok) {
+            const userData = await userRes.json().catch(() => ({}));
+            if (userData.name) passengerName = userData.name;
+            if (userData.$id) passengerId = userData.$id;
+            const prefs = (userData.prefs || {}) as Record<string, any>;
+            if (prefs.role === 'captain') {
+              return res.status(403).json({
+                error: 'Access Denied: This account is registered as a Captain. Captains cannot log in as Passengers.',
+              });
+            }
+          }
+        } catch (uErr) {
+          console.warn('[Beego Auth] Could not fetch user profile details:', uErr);
+        }
+      }
+
+      console.log(`[Beego Auth] Passenger logged in with password: ${passengerName} (${cleanEmail})`);
+
+      return res.json({
+        success: true,
+        sessionSecret: sessionSecret || undefined,
+        profile: {
+          id: passengerId,
+          name: passengerName,
+          email: cleanEmail,
+          role: 'passenger',
+          isEmailVerified: true,
+        },
+      });
+    } catch (err: any) {
+      console.error('[Password Login Error]', err);
+      return res.status(500).json({ error: 'Login service encountered an error. Please try again.' });
+    }
+  });
+
   // Appwrite Reverse Proxy Route:
   // Forwards Appwrite client requests securely without triggering browser CORS or unknown origin errors
   app.all('/api/appwrite*', async (req, res) => {
     try {
       const rawPath = req.originalUrl || req.url;
+      // Strip /api/appwrite
       const subPath = rawPath.replace(/^\/api\/appwrite/, '') || '/';
-      const base = APPWRITE_UPSTREAM.replace(/\/$/, '');
-      const targetUrl = `${base}/${subPath.replace(/^\//, '')}`;
+      // Strip any duplicate v1 prefix to prevent /v1/v1/... 404 errors
+      const cleanSubPath = subPath.replace(/^\//, '').replace(/^v1\/?/, '');
+      const base = APPWRITE_UPSTREAM.replace(/\/$/, '').replace(/\/v1$/, '');
+      const targetUrl = cleanSubPath ? `${base}/v1/${cleanSubPath}` : `${base}/v1`;
 
       const headers: Record<string, string> = {};
       for (const [key, val] of Object.entries(req.headers)) {
@@ -239,6 +378,23 @@ async function startServer() {
             redirect: 'manual',
           });
         }
+      }
+
+      const upstreamContentType = upstreamRes.headers.get('content-type') || '';
+
+      // CRITICAL: If Appwrite upstream returns an HTML error page (e.g., 404 "The page you're looking for doesn't exist"),
+      // never send raw HTML back to JSON-expecting clients. Convert to a valid JSON response.
+      if (!upstreamContentType.includes('application/json')) {
+        const text = await upstreamRes.text().catch(() => '');
+        console.warn(`[Appwrite Proxy] Upstream returned non-JSON (${upstreamRes.status}):`, text.slice(0, 100));
+        return res.status(upstreamRes.status >= 400 ? upstreamRes.status : 502).json({
+          message: upstreamRes.status === 404
+            ? 'The requested Appwrite route was not found.'
+            : 'Service returned an unexpected response format.',
+          code: upstreamRes.status,
+          type: 'upstream_non_json_response',
+          version: '2.2.0',
+        });
       }
 
       res.status(upstreamRes.status);
