@@ -17,6 +17,9 @@ export const APPWRITE_PROJECT_NAME = 'My first project';
  * CORS / Invalid Origin restrictions across development, preview, and production domains.
  */
 export function getAppwriteEndpoint(): string {
+  if (import.meta.env.VITE_APPWRITE_DIRECT === 'true') {
+    return APPWRITE_ENDPOINT_REMOTE;
+  }
   if (typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}/api/appwrite`;
   }

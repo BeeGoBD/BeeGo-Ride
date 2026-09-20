@@ -14,11 +14,14 @@ export interface PassengerProfile {
  */
 async function safeParseJson(res: Response): Promise<any> {
   const contentType = res.headers.get('content-type') || '';
+  const text = await res.text().catch(() => '');
+
   if (!contentType.includes('application/json')) {
-    const text = await res.text().catch(() => '');
     console.warn(`[Passenger Auth] Server returned non-JSON response (${res.status}):`, text.slice(0, 120));
     if (res.status === 404) {
-      throw new Error('Authentication service endpoint was not found. Please try again.');
+      throw new Error(
+        'Authentication service endpoint was not found (404). If deploying to Vercel, please ensure /api serverless functions and vercel.json are included.'
+      );
     }
     if (res.status === 429) {
       throw new Error('Too many requests. Please wait a moment before trying again.');
@@ -28,7 +31,13 @@ async function safeParseJson(res: Response): Promise<any> {
     }
     throw new Error(`Server returned unexpected response (${res.status}). Please try again.`);
   }
-  return res.json();
+
+  try {
+    return JSON.parse(text);
+  } catch (parseErr) {
+    console.warn('[Passenger Auth] Failed to parse JSON response:', text.slice(0, 120));
+    throw new Error('Received an unreadable response from the server. Please try again.');
+  }
 }
 
 // Gmail address validation mandate: must end with @gmail.com
@@ -267,6 +276,7 @@ export async function verifyPassengerOtp(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: targetEmail,
+        userId: pending?.userId || (userIdOrEmail && !userIdOrEmail.includes('@') ? userIdOrEmail : undefined),
         otp: cleanOtp,
         name: targetName,
         password: targetPassword,
