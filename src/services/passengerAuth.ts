@@ -118,7 +118,7 @@ export async function sendPassengerRegistrationOtp(
   name: string,
   email: string,
   password?: string
-): Promise<{ success: boolean; userId: string; message: string; devCode?: string }> {
+): Promise<{ success: boolean; userId: string; message: string }> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
     throw new Error(check.error);
@@ -151,8 +151,10 @@ export async function sendPassengerRegistrationOtp(
       throw new Error(data.error || 'Failed to send verification code.');
     }
 
+    const assignedUserId = data.userId || 'pax-' + Date.now();
+
     setPendingRegistration({
-      userId: 'pax-' + Date.now(),
+      userId: assignedUserId,
       name: cleanName,
       email: cleanEmail,
       password,
@@ -161,9 +163,8 @@ export async function sendPassengerRegistrationOtp(
 
     return {
       success: true,
-      userId: 'pax-' + Date.now(),
+      userId: assignedUserId,
       message: data.message || `Verification code sent to ${cleanEmail}`,
-      devCode: data.devCode,
     };
   } catch (error: any) {
     throw new Error(error?.message || 'Failed to send verification code.');
@@ -307,7 +308,7 @@ export async function loginPassengerWithPassword(
  */
 export async function sendPasswordResetOtp(
   email: string
-): Promise<{ success: boolean; userId: string; message: string; devCode?: string }> {
+): Promise<{ success: boolean; userId: string; message: string }> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
     throw new Error(check.error);
@@ -327,11 +328,12 @@ export async function sendPasswordResetOtp(
       throw new Error(data.error || 'Failed to send reset code.');
     }
 
+    const assignedUserId = data.userId || 'pax-' + Date.now();
+
     return {
       success: true,
-      userId: 'pax-' + Date.now(),
+      userId: assignedUserId,
       message: data.message || `Reset code sent to ${cleanEmail}`,
-      devCode: data.devCode,
     };
   } catch (error: any) {
     throw new Error(error?.message || 'Failed to send reset code.');

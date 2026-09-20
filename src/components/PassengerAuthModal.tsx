@@ -49,7 +49,6 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
   const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   // State
-  const [devCode, setDevCode] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -151,9 +150,6 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPassengerRegistrationOtp(name, email, password);
       setStatusMessage(res.message);
-      if (res.devCode) {
-        setDevCode(res.devCode);
-      }
       setResendCooldown(45);
       switchMode('otp_verify');
     } catch (err: any) {
@@ -204,9 +200,6 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPassengerRegistrationOtp(name, email, password);
       setStatusMessage(res.message);
-      if (res.devCode) {
-        setDevCode(res.devCode);
-      }
       setResendCooldown(45);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to resend code.');
@@ -262,9 +255,6 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPasswordResetOtp(email);
       setStatusMessage(res.message);
-      if (res.devCode) {
-        setDevCode(res.devCode);
-      }
       setResendCooldown(45);
       switchMode('reset_otp');
     } catch (err: any) {
@@ -382,16 +372,6 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
           </div>
         )}
 
-        {/* Dev Sandbox Preview Code Banner (shown if email service is simulated or rate-limited) */}
-        {devCode && (mode === 'otp_verify' || mode === 'reset_otp') && (
-          <div className="py-2 px-3 rounded-xl bg-amber-950/30 border border-amber-500/20 text-[11px] text-amber-300 flex items-center justify-between">
-            <span className="text-zinc-400">Verification Code:</span>
-            <span className="font-mono font-bold tracking-widest text-amber-400 text-sm">
-              {devCode}
-            </span>
-          </div>
-        )}
-
         {/* ================= MODE: SIGN UP ================= */}
         {mode === 'signup' && (
           <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
@@ -487,24 +467,34 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
         {/* ================= MODE: OTP VERIFICATION (6 DIGITS) ================= */}
         {mode === 'otp_verify' && (
           <form onSubmit={handleVerifyOtpSubmit} className="flex flex-col gap-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-zinc-800"
+                title="Back to Sign Up"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
-              <div>
-                <h2 className="text-lg font-black tracking-tight text-white">Enter 6-digit code</h2>
-                <p className="text-xs text-zinc-400 truncate max-w-[240px]">
-                  Sent to <span className="text-amber-400 font-semibold">{email}</span>
+              <div className="min-w-0">
+                <h2 className="text-lg font-black tracking-tight text-white">Verify your email</h2>
+                <p className="text-xs text-zinc-400 truncate">
+                  Code sent to <span className="text-amber-400 font-semibold">{email}</span>
                 </p>
               </div>
             </div>
 
+            <div className="p-3 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 text-xs text-zinc-400 flex items-start gap-2.5">
+              <div className="w-5 h-5 rounded-full bg-amber-400/10 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                <Mail className="w-3.5 h-3.5" />
+              </div>
+              <p className="leading-relaxed text-[11px]">
+                Please open your Gmail inbox to find the 6-digit verification code sent by Appwrite. Enter the code below to complete sign up.
+              </p>
+            </div>
+
             {/* 6 Square Digit Inputs */}
-            <div className="flex items-center justify-between gap-1.5 pt-2">
+            <div className="flex items-center justify-between gap-1.5 pt-1">
               {otpDigits.map((digit, index) => (
                 <input
                   key={index}
@@ -524,16 +514,20 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               ))}
             </div>
 
+            <p className="text-[11px] text-zinc-500 text-center">
+              Didn't see the email? Please check your Spam or Updates folder.
+            </p>
+
             <button
               id="otp-verify-submit-button"
               type="submit"
               disabled={isLoading || isSuccess}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50 mt-1"
+              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Verifying Code...</span>
+                  <span>Verifying with Appwrite...</span>
                 </>
               ) : isSuccess ? (
                 <>
@@ -550,7 +544,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
 
             {/* Resend Action */}
             <div className="flex items-center justify-between text-xs pt-1">
-              <span className="text-zinc-500">Didn't receive code?</span>
+              <span className="text-zinc-500">Didn't receive email?</span>
               {resendCooldown > 0 ? (
                 <span className="text-zinc-400 font-mono text-[11px]">
                   Resend in {resendCooldown}s

@@ -9,9 +9,9 @@ async function startServer() {
   const APPWRITE_UPSTREAM = process.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
   const APPWRITE_PROJECT_ID = process.env.VITE_APPWRITE_PROJECT_ID || '6aaec93d001b38fee383';
 
-  // In-memory store for OTP verification
+  // In-memory store for OTP verification tracking
   interface OtpRecord {
-    otp: string;
+    userId: string;
     email: string;
     name: string;
     password?: string;
@@ -23,7 +23,7 @@ async function startServer() {
   // Parse JSON exclusively for /api/auth routes to prevent stream conflicts with proxy
   app.use('/api/auth', express.json());
 
-  // POST /api/auth/otp/send - Dispatches 6-digit OTP code to passenger's Gmail
+  // POST /api/auth/otp/send - Dispatches 6-digit OTP code to passenger's Gmail via Appwrite
   app.post('/api/auth/otp/send', async (req, res) => {
     try {
       const { email, name, password } = req.body || {};
@@ -34,12 +34,44 @@ async function startServer() {
         return res.status(400).json({ error: 'A valid @gmail.com email address is required.' });
       }
 
-      // Generate a secure 6-digit numerical OTP
-      const otp = Math.floor(100000 + Math.random() * 900000).toString();
-      const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
+      // Generate unique user ID candidate for Appwrite
+      const generatedUserId = 'usr-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+
+      // Call Appwrite to send the email verification token to the user's Gmail
+      const appwriteRes = await fetch(`${APPWRITE_UPSTREAM}/account/tokens/email`, {
+        method: 'POST',
+        headers: {
+          'x-appwrite-project': APPWRITE_PROJECT_ID,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: generatedUserId,
+          email: cleanEmail,
+          phrase: false,
+        }),
+      });
+
+      const appwriteJson = await appwriteRes.json().catch(() => ({}));
+
+      if (appwriteRes.status === 429) {
+        return res.status(429).json({
+          error: 'Rate limit reached on email verification. Please wait a few moments before requesting another code.',
+        });
+      }
+
+      if (!appwriteRes.ok && appwriteRes.status !== 201) {
+        console.error('[Appwrite Email Token Error]', appwriteRes.status, appwriteJson);
+        return res.status(appwriteRes.status >= 400 && appwriteRes.status < 500 ? appwriteRes.status : 500).json({
+          error: appwriteJson.message || 'Failed to send verification code to your email. Please check your address.',
+        });
+      }
+
+      // Appwrite returns either the existing user's userId or the newly created one
+      const actualUserId = appwriteJson.userId || generatedUserId;
+      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
 
       otpStore.set(cleanEmail, {
-        otp,
+        userId: actualUserId,
         email: cleanEmail,
         name: cleanName,
         password,
@@ -47,36 +79,12 @@ async function startServer() {
         attempts: 0,
       });
 
-      console.log(`[Beego OTP] Dispatched verification code for ${cleanEmail}: ${otp}`);
-
-      // Attempt sending via Appwrite's native token endpoint
-      let appwriteSent = false;
-      try {
-        const appwriteRes = await fetch(`${APPWRITE_UPSTREAM}/account/tokens/email`, {
-          method: 'POST',
-          headers: {
-            'x-appwrite-project': APPWRITE_PROJECT_ID,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: 'usr-' + Date.now().toString(36),
-            email: cleanEmail,
-            phrase: false,
-          }),
-        });
-        if (appwriteRes.status === 201) {
-          appwriteSent = true;
-        }
-      } catch (e) {
-        // Appwrite network or rate limit
-      }
+      console.log(`[Beego Auth] Verification email dispatched by Appwrite to ${cleanEmail} (userId: ${actualUserId})`);
 
       return res.json({
         success: true,
-        message: appwriteSent
-          ? `We sent a 6-digit verification code to ${cleanEmail}.`
-          : `Verification code sent to ${cleanEmail}.`,
-        devCode: otp,
+        userId: actualUserId,
+        message: `We have sent a 6-digit verification code to ${cleanEmail}. Please check your Gmail inbox.`,
       });
     } catch (err: any) {
       console.error('[OTP Send Error]', err);
@@ -84,17 +92,23 @@ async function startServer() {
     }
   });
 
-  // POST /api/auth/otp/verify - Validates 6-digit OTP code strictly
+  // POST /api/auth/otp/verify - Validates 6-digit OTP code against Appwrite
   app.post('/api/auth/otp/verify', async (req, res) => {
     try {
       const { email, otp, name, password } = req.body || {};
       const cleanEmail = (email || '').trim().toLowerCase();
       const cleanOtp = (otp || '').trim();
 
+      if (!cleanOtp || cleanOtp.length < 6) {
+        return res.status(400).json({
+          error: 'Please enter the complete 6-digit verification code from your email.',
+        });
+      }
+
       const record = otpStore.get(cleanEmail);
       if (!record || Date.now() > record.expiresAt) {
         return res.status(400).json({
-          error: 'Verification code has expired or was not found. Please request a new code.',
+          error: 'Verification code has expired or was not requested. Please request a new code.',
         });
       }
 
@@ -105,38 +119,36 @@ async function startServer() {
         });
       }
 
-      // Check OTP strictly: if wrong, reject without approving
-      if (record.otp !== cleanOtp) {
+      // Verify the OTP code strictly with Appwrite
+      const sessionRes = await fetch(`${APPWRITE_UPSTREAM}/account/sessions/token`, {
+        method: 'POST',
+        headers: {
+          'x-appwrite-project': APPWRITE_PROJECT_ID,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: record.userId,
+          secret: cleanOtp,
+        }),
+      });
+
+      const sessionJson = await sessionRes.json().catch(() => ({}));
+
+      if (!sessionRes.ok) {
         record.attempts += 1;
+        console.warn(`[Beego Auth] Verification failed for ${cleanEmail}: ${sessionJson.message || 'Invalid token'}`);
         return res.status(400).json({
-          error: 'Invalid verification code. Please check your email and try again.',
+          error: 'Invalid verification code. Please check your email inbox and enter the exact code you received.',
         });
       }
 
-      // OTP confirmed! Delete used token
+      // Appwrite session verified successfully!
       otpStore.delete(cleanEmail);
 
       const passengerName = record.name || name || cleanEmail.split('@')[0] || 'Passenger';
-      const passengerId = 'pax-' + Buffer.from(cleanEmail).toString('hex').slice(0, 16);
+      const passengerId = record.userId;
 
-      // Attempt Appwrite user account creation in background
-      try {
-        await fetch(`${APPWRITE_UPSTREAM}/account`, {
-          method: 'POST',
-          headers: {
-            'x-appwrite-project': APPWRITE_PROJECT_ID,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: passengerId,
-            email: cleanEmail,
-            password: record.password || password || 'Passenger123!',
-            name: passengerName,
-          }),
-        });
-      } catch (e) {
-        // Appwrite error ignored
-      }
+      console.log(`[Beego Auth] Passenger verified via Appwrite: ${passengerName} (${cleanEmail})`);
 
       return res.json({
         success: true,
