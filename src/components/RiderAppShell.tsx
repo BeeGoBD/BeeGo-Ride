@@ -1,17 +1,21 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import {
-  Radio,
+  Compass,
   Clock,
   QrCode,
   User,
   Bike,
-  LayoutGrid,
+  ArrowLeft,
+  ShieldCheck,
+  Zap,
 } from 'lucide-react';
 import { RideRequest } from '../types';
+import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
 import { RiderDashboard } from './RiderDashboard';
 import { RiderHistorySection } from './RiderHistorySection';
 import { QrScannerSection } from './QrScannerSection';
 import { RiderAccountSection } from './RiderAccountSection';
+import { BatterySwapModal } from './BatterySwapModal';
 
 interface RiderAppShellProps {
   riderId: string;
@@ -23,215 +27,210 @@ interface RiderAppShellProps {
   onReplayIntro?: () => void;
 }
 
-type RiderTabType = 0 | 1 | 2 | 3;
+type RiderNavTab = 'dashboard' | 'trips' | 'scan_qr' | 'profile';
 
 export const RiderAppShell: React.FC<RiderAppShellProps> = ({
   riderId,
   activeRide,
   apiKey,
+  onApiKeyChange,
   onBackToRoles,
   onSwitchToPassenger,
   onReplayIntro,
 }) => {
-  const [activeTab, setActiveTab] = useState<RiderTabType>(0);
-
-  // Swipe gesture tracking (when not dragging map)
-  const touchStartX = useRef<number | null>(null);
-  const touchStartY = useRef<number | null>(null);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    if ((e.target as HTMLElement).closest('.leaflet-container')) return;
-    touchStartX.current = e.touches[0].clientX;
-    touchStartY.current = e.touches[0].clientY;
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (touchStartX.current === null || touchStartY.current === null) return;
-    const diffX = e.changedTouches[0].clientX - touchStartX.current;
-    const diffY = e.changedTouches[0].clientY - touchStartY.current;
-
-    if (Math.abs(diffX) > 60 && Math.abs(diffX) > Math.abs(diffY) * 1.5) {
-      if (diffX < 0) {
-        // Swiped Left -> Next tab
-        setActiveTab((prev) => (prev < 3 ? ((prev + 1) as RiderTabType) : 3));
-      } else {
-        // Swiped Right -> Prev tab
-        setActiveTab((prev) => (prev > 0 ? ((prev - 1) as RiderTabType) : 0));
-      }
-    }
-
-    touchStartX.current = null;
-    touchStartY.current = null;
-  };
-
-  const hasIncomingRequest = activeRide && activeRide.status === 'requested';
+  const [activeTab, setActiveTab] = useState<RiderNavTab>('dashboard');
+  const [isPowerStationsOpen, setIsPowerStationsOpen] = useState(false);
 
   return (
-    <div className="w-full h-full flex flex-col justify-between bg-black text-white overflow-hidden relative select-none">
-      {/* 1. ANDROID APP COMPACT TOP APPBAR */}
-      <header className="w-full h-12 bg-black/95 border-b border-zinc-900/90 px-3.5 flex items-center justify-between shrink-0 z-30">
-        {/* Left: Brand & Captain Badge */}
+    <div className="w-full h-full min-h-screen bg-white text-[#1A1A1A] flex flex-col justify-between overflow-hidden relative select-none max-w-[430px] mx-auto shadow-2xl">
+      {/* 1. STICKY TOP APPBAR */}
+      <header className="sticky top-0 z-40 w-full h-14 bg-white/95 backdrop-blur-md border-b border-zinc-100 px-4 flex items-center justify-between shrink-0 shadow-xs">
+        {/* Left: Brand Logo & Driver Tag */}
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveTab(0)}
-            className="flex items-center gap-1.5 cursor-pointer text-left"
-          >
-            <span className="text-xl font-black tracking-tight text-white">Beego</span>
-            <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400/50" />
-            <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-950/80 border border-amber-600/50 text-[10px] font-bold text-amber-300">
-              <Bike className="w-2.5 h-2.5" />
-              <span>CAPTAIN</span>
-            </span>
-          </button>
+          {activeTab !== 'dashboard' ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 cursor-pointer text-xs font-bold active:scale-95"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setActiveTab('dashboard')}
+              className="cursor-pointer text-left flex items-center gap-2"
+            >
+              <BeeGoVoltxLogo size="md" />
+              <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-900 text-[#F5C518]">
+                Driver
+              </span>
+            </button>
+          )}
         </div>
 
-        {/* Right: Quick actions */}
-        <div className="flex items-center gap-1.5">
+        {/* Right: Quick Switch to Passenger & Profile Avatar */}
+        <div className="flex items-center gap-2">
           {/* Switch to Passenger Mode */}
           <button
             type="button"
             onClick={onSwitchToPassenger}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-[11px] font-semibold text-zinc-300 hover:text-amber-400 transition-all cursor-pointer active:scale-95"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 hover:bg-[#F5C518] text-[11px] font-bold text-[#E6A800] hover:text-black transition-all cursor-pointer active:scale-95"
             title="Switch to Passenger Mode"
           >
-            <User className="w-3 h-3 text-zinc-400" />
+            <User className="w-3.5 h-3.5" />
             <span>Passenger</span>
           </button>
 
-          {/* Return to Portal / Dashboard Selector */}
+          {/* Circular Driver Profile Avatar */}
           <button
             type="button"
-            onClick={onBackToRoles}
-            className="flex items-center justify-center w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white transition-all cursor-pointer active:scale-95"
-            title="Select Dashboard / Portal"
+            id="driver-profile-avatar-button"
+            onClick={() => setActiveTab(activeTab === 'profile' ? 'dashboard' : 'profile')}
+            className={`w-9 h-9 rounded-full flex items-center justify-center font-black text-xs transition-all cursor-pointer border-2 ${
+              activeTab === 'profile'
+                ? 'bg-[#F5C518] text-black border-[#E6A800] shadow-sm'
+                : 'bg-zinc-900 text-[#F5C518] border-zinc-900 hover:bg-zinc-800'
+            }`}
+            title="Driver Profile & Documents"
           >
-            <LayoutGrid className="w-3.5 h-3.5" />
+            DR
           </button>
         </div>
       </header>
 
-      {/* 2. ANDROID MAIN CONTENT AREA */}
-      <main
-        className="flex-1 w-full overflow-hidden relative flex flex-col"
-        onTouchStart={handleTouchStart}
-        onTouchEnd={handleTouchEnd}
-      >
-        {/* TAB 0: BOOKINGS / DISPATCH (All buttons and accept prompt visible without scroll!) */}
-        {activeTab === 0 && (
-          <div className="w-full h-full flex flex-col flex-1 overflow-hidden">
-            <RiderDashboard
-              riderId={riderId}
-              activeRide={activeRide}
-              apiKey={apiKey}
-              onBackToRoles={onBackToRoles}
-              onSwitchToPassenger={onSwitchToPassenger}
-              hideHeader={true}
-            />
-          </div>
+      {/* 2. MAIN SCROLLABLE CONTENT */}
+      <main className="flex-1 w-full overflow-y-auto no-scrollbar relative flex flex-col bg-[#F8F9FA]">
+        {/* TAB 1: DASHBOARD */}
+        {activeTab === 'dashboard' && (
+          <RiderDashboard
+            riderId={riderId}
+            activeRide={activeRide}
+            apiKey={apiKey}
+            onBackToRoles={onBackToRoles}
+            onSwitchToPassenger={onSwitchToPassenger}
+            onOpenMyTrips={() => setActiveTab('trips')}
+            onOpenPowerStations={() => setIsPowerStationsOpen(true)}
+            hideHeader={true}
+          />
         )}
 
-        {/* TAB 1: HISTORY */}
-        {activeTab === 1 && (
-          <div className="w-full flex-1 overflow-y-auto no-scrollbar">
-            <RiderHistorySection />
-          </div>
+        {/* TAB 2: MY TRIPS (Activity for Driver) */}
+        {activeTab === 'trips' && (
+          <RiderHistorySection />
         )}
 
-        {/* TAB 2: QR SCANNER */}
-        {activeTab === 2 && (
-          <div className="w-full flex-1 overflow-y-auto no-scrollbar">
-            <QrScannerSection
-              title="Captain Ride & Fare Scanner"
-              subtitle="Scan Passenger QR Code"
-              description="Scan passenger booking QR code to verify passenger identity at pickup or confirm cashless bKash/Nagad payments."
-            />
-          </div>
+        {/* TAB 3: SCAN QR (Scan Battery QR page) */}
+        {activeTab === 'scan_qr' && (
+          <QrScannerSection onBack={() => setActiveTab('dashboard')} />
         )}
 
-        {/* TAB 3: ACCOUNT */}
-        {activeTab === 3 && (
-          <div className="w-full flex-1 overflow-y-auto no-scrollbar">
-            <RiderAccountSection
-              riderId={riderId}
-              onSwitchToPassenger={onSwitchToPassenger}
-              onReplayIntro={onReplayIntro}
-              onSignOut={onBackToRoles}
-            />
-          </div>
+        {/* TAB 4: PROFILE / ACCOUNT (Driver details) */}
+        {activeTab === 'profile' && (
+          <RiderAccountSection
+            riderId={riderId}
+            onSwitchToPassenger={onSwitchToPassenger}
+            onReplayIntro={onReplayIntro}
+            onSignOut={onBackToRoles}
+          />
         )}
       </main>
 
-      {/* 3. ANDROID NATIVE BOTTOM NAVIGATION BAR (Fixed at bottom of screen) */}
+      {/* 3. FIXED BOTTOM NAVIGATION BAR (3 Items Adapted for Rider) */}
       <nav
-        id="rider-bottom-navbar"
-        className="w-full h-14 bg-zinc-950 border-t border-zinc-900/90 px-2 flex items-center justify-around shrink-0 z-30 select-none shadow-[0_-4px_16px_rgba(0,0,0,0.8)]"
+        id="rider-voltx-fixed-bottom-nav"
+        className="fixed bottom-0 left-0 right-0 z-40 max-w-[430px] mx-auto bg-white/98 backdrop-blur-md border-t border-zinc-200/90 h-16 px-4 flex items-center justify-around shadow-lg select-none"
       >
-        {/* Tab 0: Bookings */}
+        {/* Item 1: Dispatch / Dashboard */}
         <button
           type="button"
-          onClick={() => setActiveTab(0)}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 0 ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
+          id="rider-bottom-nav-dashboard-button"
+          onClick={() => setActiveTab('dashboard')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'dashboard' ? 'text-[#1A1A1A]' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
-          <div className="relative mb-0.5">
-            <Radio className="w-5 h-5" />
-            {hasIncomingRequest && (
-              <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-400 animate-ping" />
-            )}
+          <div
+            className={`w-10 h-7 rounded-full flex items-center justify-center transition-colors ${
+              activeTab === 'dashboard' ? 'bg-[#FFF9E6] text-[#E6A800]' : ''
+            }`}
+          >
+            <Compass className={`w-5 h-5 ${activeTab === 'dashboard' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
           </div>
-          <span className="text-[10px] font-bold tracking-tight">Bookings</span>
-          {activeTab === 0 && (
-            <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 shadow-sm shadow-amber-400" />
+          <span
+            className={`text-[10px] tracking-tight ${
+              activeTab === 'dashboard' ? 'font-black text-[#1A1A1A]' : 'font-medium'
+            }`}
+          >
+            Radar
+          </span>
+        </button>
+
+        {/* Item 2: My Trips */}
+        <button
+          type="button"
+          id="rider-bottom-nav-trips-button"
+          onClick={() => setActiveTab('trips')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer relative ${
+            activeTab === 'trips' ? 'text-[#1A1A1A]' : 'text-zinc-400 hover:text-zinc-600'
+          }`}
+        >
+          <div
+            className={`w-10 h-7 rounded-full flex items-center justify-center transition-colors ${
+              activeTab === 'trips' ? 'bg-[#FFF9E6] text-[#E6A800]' : ''
+            }`}
+          >
+            <Clock className={`w-5 h-5 ${activeTab === 'trips' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          </div>
+          <span
+            className={`text-[10px] tracking-tight ${
+              activeTab === 'trips' ? 'font-black text-[#1A1A1A]' : 'font-medium'
+            }`}
+          >
+            My Trips
+          </span>
+
+          {activeRide && (activeRide.status === 'accepted' || activeRide.status === 'in_transit') && (
+            <span className="absolute top-1.5 right-6 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
           )}
         </button>
 
-        {/* Tab 1: History */}
+        {/* Item 3: Scan QR */}
         <button
           type="button"
-          onClick={() => setActiveTab(1)}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 1 ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
+          id="rider-bottom-nav-scan-qr-button"
+          onClick={() => setActiveTab('scan_qr')}
+          className={`flex flex-col items-center justify-center flex-1 py-1 transition-all cursor-pointer ${
+            activeTab === 'scan_qr' ? 'text-[#1A1A1A]' : 'text-zinc-400 hover:text-zinc-600'
           }`}
         >
-          <Clock className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-bold tracking-tight">History</span>
-          {activeTab === 1 && (
-            <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 shadow-sm shadow-amber-400" />
-          )}
-        </button>
-
-        {/* Tab 2: QR Code */}
-        <button
-          type="button"
-          onClick={() => setActiveTab(2)}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 2 ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <QrCode className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-bold tracking-tight">QR Code</span>
-          {activeTab === 2 && (
-            <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 shadow-sm shadow-amber-400" />
-          )}
-        </button>
-
-        {/* Tab 3: Account */}
-        <button
-          type="button"
-          onClick={() => setActiveTab(3)}
-          className={`flex-1 flex flex-col items-center justify-center py-1 rounded-xl transition-all cursor-pointer ${
-            activeTab === 3 ? 'text-amber-400' : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          <User className="w-5 h-5 mb-0.5" />
-          <span className="text-[10px] font-bold tracking-tight">Account</span>
-          {activeTab === 3 && (
-            <span className="w-1 h-1 rounded-full bg-amber-400 mt-0.5 shadow-sm shadow-amber-400" />
-          )}
+          <div
+            className={`w-10 h-7 rounded-full flex items-center justify-center transition-colors ${
+              activeTab === 'scan_qr' ? 'bg-[#FFF9E6] text-[#E6A800]' : ''
+            }`}
+          >
+            <QrCode className={`w-5 h-5 ${activeTab === 'scan_qr' ? 'stroke-[2.5]' : 'stroke-[1.8]'}`} />
+          </div>
+          <span
+            className={`text-[10px] tracking-tight ${
+              activeTab === 'scan_qr' ? 'font-black text-[#1A1A1A]' : 'font-medium'
+            }`}
+          >
+            Scan QR
+          </span>
         </button>
       </nav>
+
+      {/* 4. BATTERY SWAP POWER STATIONS MODAL */}
+      {isPowerStationsOpen && (
+        <BatterySwapModal
+          onClose={() => setIsPowerStationsOpen(false)}
+          onSelectStation={() => {
+            setIsPowerStationsOpen(false);
+          }}
+        />
+      )}
     </div>
   );
 };

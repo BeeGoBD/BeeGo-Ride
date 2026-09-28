@@ -16,12 +16,14 @@ import { PassengerAppShell } from './components/PassengerAppShell';
 import { RiderAppShell } from './components/RiderAppShell';
 import { UberLiveTracking } from './components/UberLiveTracking';
 import { PassengerAuthModal } from './components/PassengerAuthModal';
+import { DriverAuthModal } from './components/DriverAuthModal';
 import {
   getCurrentPassenger,
   logoutPassenger,
   PassengerProfile,
 } from './services/passengerAuth';
-import './lib/appwrite'; // Ensures client.ping() runs once when the app starts
+import { getCurrentDriver, DriverProfile } from './services/driverAuth';
+import './lib/appwrite';
 
 type AppIntroState = 'splash' | 'onboarding' | 'ready';
 
@@ -37,7 +39,7 @@ export default function App() {
     return 'splash';
   });
 
-  // Role selection state: null = dashboard shown first!
+  // Role selection state: null = role selection screen shown first
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -45,9 +47,15 @@ export default function App() {
       if (paramRole === 'passenger' || paramRole === 'rider') {
         return paramRole as UserRole;
       }
+      const storedRole = localStorage.getItem('beego_user_role');
+      if (storedRole === 'passenger' || storedRole === 'rider') {
+        return storedRole as UserRole;
+      }
     }
     return null;
   });
+
+  const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
 
   // Generated Guest IDs
   const [passengerId] = useState<string>(() => {
@@ -75,7 +83,11 @@ export default function App() {
   const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(null);
   const [passengerAuthModalMode, setPassengerAuthModalMode] = useState<'signup' | 'login' | null>(null);
 
-  // Check for existing active Appwrite passenger session
+  // Driver profile & auth modal state
+  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => getCurrentDriver());
+  const [driverAuthModalMode, setDriverAuthModalMode] = useState<'register' | 'login' | null>(null);
+
+  // Check for existing active passenger session
   useEffect(() => {
     getCurrentPassenger()
       .then((profile) => {
@@ -97,12 +109,11 @@ export default function App() {
   // Synchronized active ride state across all components and tabs
   const [activeRide, setActiveRide] = useState<RideRequest | null>(null);
 
-  // Subscribe to real-time ride updates (BroadcastChannel & storage sync)
+  // Subscribe to real-time ride updates
   useEffect(() => {
     const unsubscribe = subscribeToRideUpdates((ride) => {
       setActiveRide(ride);
 
-      // Only synchronize pickup, dropoff and route if there is an active in-flight ride
       const isInFlight =
         ride &&
         (ride.status === 'requested' ||
@@ -133,12 +144,32 @@ export default function App() {
     saveGeoapifyApiKey(newKey);
   };
 
+  // User chooses role after onboarding
   const handleSelectRole = (selectedRole: UserRole) => {
-    if (selectedRole === 'passenger' && !passengerProfile) {
+    setPendingRoleForAuth(selectedRole);
+    if (selectedRole === 'rider') {
+      const activeDriver = getCurrentDriver();
+      if (!activeDriver) {
+        setDriverAuthModalMode('register');
+        return;
+      }
+      setDriverProfile(activeDriver);
+      setRole('rider');
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('beego_user_role', 'rider');
+      }
+      setErrorMessage(null);
+      return;
+    }
+
+    if (!passengerProfile) {
       setPassengerAuthModalMode('signup');
       return;
     }
     setRole(selectedRole);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('beego_user_role', selectedRole);
+    }
     setErrorMessage(null);
   };
 
@@ -146,6 +177,7 @@ export default function App() {
     setRole(null);
     setErrorMessage(null);
     if (typeof window !== 'undefined') {
+      localStorage.removeItem('beego_user_role');
       const url = new URL(window.location.href);
       url.searchParams.delete('role');
       window.history.replaceState({}, '', url.toString());
@@ -153,16 +185,30 @@ export default function App() {
   };
 
   const handleSwitchToPassenger = () => {
+    setPendingRoleForAuth('passenger');
     if (!passengerProfile) {
       setPassengerAuthModalMode('signup');
       return;
     }
     setRole('passenger');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('beego_user_role', 'passenger');
+    }
     setErrorMessage(null);
   };
 
   const handleSwitchToRider = () => {
+    setPendingRoleForAuth('rider');
+    const activeDriver = getCurrentDriver();
+    if (!activeDriver) {
+      setDriverAuthModalMode('register');
+      return;
+    }
+    setDriverProfile(activeDriver);
     setRole('rider');
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('beego_user_role', 'rider');
+    }
     setErrorMessage(null);
   };
 
@@ -189,11 +235,8 @@ export default function App() {
     setErrorMessage(null);
 
     try {
-      // Direct call to Geoapify Routing API - strictly no mock data
       const route = await calculateRoute(pickup, dropoff, keyToUse);
       setRouteData(route);
-
-      // Dispatch real-time ride request to Rider Dashboard
       requestNewRide(passengerId, pickup, dropoff, route);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to calculate navigation route using Geoapify.');
@@ -214,7 +257,7 @@ export default function App() {
     setStage('request');
   };
 
-  // 1. INTRO SPLASH: "Beego written in text, full black color screen, shining bee gold/white" (~2s)
+  // 1. INTRO SPLASH: BeeGo Voltx shining intro (~2s)
   if (introState === 'splash') {
     return <BeegoIntroSplash onComplete={() => setIntroState('onboarding')} />;
   }
@@ -234,17 +277,23 @@ export default function App() {
   // Render content based on current route/role
   let content: React.ReactNode = null;
 
-  // 3. ROLE SELECTION: "Continue as guest passenger" or "Continue as guest rider"
+  // 3. ROLE SELECTION: "Continue as Passenger" or "Continue as Rider"
   if (role === null) {
     content = (
       <RoleSelectDashboard
         onSelectRole={handleSelectRole}
-        onOpenPassengerAuth={(mode) => setPassengerAuthModalMode(mode)}
+        onOpenPassengerAuth={(mode) => {
+          setPendingRoleForAuth('passenger');
+          setPassengerAuthModalMode(mode);
+        }}
+        onOpenDriverAuth={(driverMode) => {
+          setDriverAuthModalMode(driverMode);
+        }}
         onReplayIntro={handleReplayIntro}
       />
     );
   } else if (role === 'rider') {
-    // 4. RIDER VIEW: The Rider Dashboard or Active Ride Tracking
+    // 4. RIDER VIEW
     if (
       activeRide &&
       (activeRide.status === 'accepted' ||
@@ -276,7 +325,7 @@ export default function App() {
       );
     }
   } else {
-    // 5. PASSENGER VIEW: Live Uber tracking or Passenger App Shell
+    // 5. PASSENGER VIEW
     if (
       activeRide &&
       (activeRide.status === 'accepted' ||
@@ -316,27 +365,54 @@ export default function App() {
           onBackToRoles={handleBackToRoles}
           onSwitchToRider={handleSwitchToRider}
           onReplayIntro={handleReplayIntro}
+          onOpenAuthModal={() => {
+            setPendingRoleForAuth('passenger');
+            setPassengerAuthModalMode('login');
+          }}
         />
       );
     }
   }
 
   return (
-    <div className="w-full h-full min-h-[100dvh] h-[100dvh] bg-black text-white flex flex-col overflow-hidden relative">
-      {content}
+    <div className="w-full min-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:py-6 overflow-x-hidden font-sans text-[#1A1A1A]">
+      <div className="w-full max-w-[430px] min-h-[100dvh] sm:min-h-[880px] sm:max-h-[920px] sm:rounded-[36px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
+        {content}
 
-      {/* Appwrite Passenger Authentication Modal */}
-      {passengerAuthModalMode && (
-        <PassengerAuthModal
-          initialMode={passengerAuthModalMode}
-          onAuthenticated={(profile) => {
-            setPassengerProfile(profile);
-            setPassengerAuthModalMode(null);
-            handleSelectRole('passenger');
-          }}
-          onCancel={() => setPassengerAuthModalMode(null)}
-        />
-      )}
+        {/* Passenger Login / Signup Modal */}
+        {passengerAuthModalMode && (
+          <PassengerAuthModal
+            initialMode={passengerAuthModalMode}
+            intendedRole={pendingRoleForAuth}
+            onAuthenticated={(profile, authedRole) => {
+              setPassengerProfile(profile);
+              setPassengerAuthModalMode(null);
+              const targetRole = authedRole || pendingRoleForAuth || 'passenger';
+              setRole(targetRole);
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('beego_user_role', targetRole);
+              }
+            }}
+            onCancel={() => setPassengerAuthModalMode(null)}
+          />
+        )}
+
+        {/* Driver Login / Register Modal */}
+        {driverAuthModalMode && (
+          <DriverAuthModal
+            initialMode={driverAuthModalMode}
+            onAuthenticated={(driver) => {
+              setDriverProfile(driver);
+              setDriverAuthModalMode(null);
+              setRole('rider');
+              if (typeof window !== 'undefined') {
+                localStorage.setItem('beego_user_role', 'rider');
+              }
+            }}
+            onCancel={() => setDriverAuthModalMode(null)}
+          />
+        )}
+      </div>
     </div>
   );
 }

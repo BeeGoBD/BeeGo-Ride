@@ -8,36 +8,45 @@ export interface PassengerProfile {
   isEmailVerified: boolean;
 }
 
+export interface OtpSendResult {
+  success: boolean;
+  userId: string;
+  message: string;
+  devOtp?: string;
+}
+
 /**
  * Safely parses response as JSON, handling non-JSON error pages (like 404/500 HTML) gracefully
  * to avoid "Unexpected token 'T', 'The page c'... is not valid JSON" crashes.
  */
 async function safeParseJson(res: Response): Promise<any> {
-  const contentType = res.headers.get('content-type') || '';
   const text = await res.text().catch(() => '');
-
-  if (!contentType.includes('application/json')) {
-    console.warn(`[Passenger Auth] Server returned non-JSON response (${res.status}):`, text.slice(0, 120));
-    if (res.status === 404) {
-      throw new Error(
-        'Authentication service endpoint was not found (404). If deploying to Vercel, please ensure /api serverless functions and vercel.json are included.'
-      );
-    }
-    if (res.status === 429) {
-      throw new Error('Too many requests. Please wait a moment before trying again.');
-    }
-    if (res.status >= 500) {
-      throw new Error('Authentication service is temporarily unavailable. Please try again in a moment.');
-    }
-    throw new Error(`Server returned unexpected response (${res.status}). Please try again.`);
-  }
-
   try {
-    return JSON.parse(text);
+    if (text) {
+      return JSON.parse(text);
+    }
   } catch (parseErr) {
-    console.warn('[Passenger Auth] Failed to parse JSON response:', text.slice(0, 120));
-    throw new Error('Received an unreadable response from the server. Please try again.');
+    console.warn(`[Passenger Auth] Server returned non-JSON response (${res.status}):`, text.slice(0, 120));
   }
+
+  // Handle specific HTTP status codes if body was not JSON
+  if (res.status === 404) {
+    throw new Error('Authentication service endpoint was not found. Please try again.');
+  }
+  if (res.status === 403) {
+    throw new Error('Access permission issue or upstream authentication is paused. Please try again.');
+  }
+  if (res.status === 429) {
+    throw new Error('Too many requests. Please wait a moment before trying again.');
+  }
+  if (res.status >= 500) {
+    throw new Error('Authentication service is temporarily unavailable. Please try again in a moment.');
+  }
+  if (!res.ok) {
+    throw new Error(`Authentication request could not be processed (${res.status}). Please try again.`);
+  }
+
+  return {};
 }
 
 // Gmail address validation mandate: must end with @gmail.com
@@ -108,10 +117,46 @@ export function clearPendingRegistration() {
 }
 
 /**
- * Check currently logged in Appwrite user and verify they have 'passenger' role
+ * Check currently logged in passenger session with multiple fallback layers:
+ * 1. Active session storage cache
+ * 2. Dedicated server session verification (/api/auth/me)
+ * 3. Appwrite SDK account session
  */
 export async function getCurrentPassenger(): Promise<PassengerProfile | null> {
-  // First check Appwrite session
+  // Check active cached session profile first
+  try {
+    const stored = sessionStorage.getItem('beego_active_passenger');
+    if (stored) {
+      const parsed = JSON.parse(stored) as PassengerProfile;
+      if (parsed && parsed.email) {
+        return parsed;
+      }
+    }
+  } catch (e) {
+    // Continue
+  }
+
+  // Check server session via /api/auth/me
+  try {
+    const token = sessionStorage.getItem('beego_session_token');
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+      headers['x-appwrite-session'] = token;
+    }
+    const meRes = await fetch('/api/auth/me', { headers });
+    if (meRes.ok) {
+      const meData = await safeParseJson(meRes);
+      if (meData?.profile) {
+        sessionStorage.setItem('beego_active_passenger', JSON.stringify(meData.profile));
+        return meData.profile;
+      }
+    }
+  } catch (e) {
+    // Continue
+  }
+
+  // Attempt Appwrite SDK session verification
   try {
     const user = await account.get();
     const prefs = (user.prefs || {}) as Record<string, any>;
@@ -122,23 +167,20 @@ export async function getCurrentPassenger(): Promise<PassengerProfile | null> {
       return null;
     }
 
-    return {
+    const profile: PassengerProfile = {
       id: user.$id,
       name: user.name || prefs?.name || user.email?.split('@')[0] || 'Passenger',
       email: user.email || prefs?.email || 'passenger@gmail.com',
       role: 'passenger',
       isEmailVerified: true,
     };
-  } catch (err) {
-    // Check fallback session storage for verified session
+
     try {
-      const stored = sessionStorage.getItem('beego_active_passenger');
-      if (stored) {
-        return JSON.parse(stored) as PassengerProfile;
-      }
-    } catch (e) {
-      // Ignore
-    }
+      sessionStorage.setItem('beego_active_passenger', JSON.stringify(profile));
+    } catch (e) {}
+
+    return profile;
+  } catch (err) {
     return null;
   }
 }
@@ -150,7 +192,7 @@ export async function sendPassengerRegistrationOtp(
   name: string,
   email: string,
   password?: string
-): Promise<{ success: boolean; userId: string; message: string }> {
+): Promise<OtpSendResult> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
     throw new Error(check.error);
@@ -197,6 +239,7 @@ export async function sendPassengerRegistrationOtp(
       success: true,
       userId: assignedUserId,
       message: data.message || `Verification code sent to ${cleanEmail}`,
+      devOtp: data.devOtp,
     };
   } catch (error: any) {
     throw new Error(error?.message || 'Failed to send verification code.');
@@ -208,7 +251,7 @@ export async function sendPassengerRegistrationOtp(
  */
 export async function sendPassengerLoginOtp(
   email: string
-): Promise<{ success: boolean; userId: string; message: string }> {
+): Promise<OtpSendResult> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
     throw new Error(check.error);
@@ -244,6 +287,7 @@ export async function sendPassengerLoginOtp(
       success: true,
       userId: assignedUserId,
       message: data.message || `Verification code sent to ${cleanEmail}`,
+      devOtp: data.devOtp,
     };
   } catch (error: any) {
     throw new Error(error?.message || 'Failed to send verification code.');
@@ -276,7 +320,6 @@ export async function verifyPassengerOtp(
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email: targetEmail,
-        userId: pending?.userId || (userIdOrEmail && !userIdOrEmail.includes('@') ? userIdOrEmail : undefined),
         otp: cleanOtp,
         name: targetName,
         password: targetPassword,
@@ -288,13 +331,14 @@ export async function verifyPassengerOtp(
       throw new Error(data.error || 'Invalid verification code. Please check your email and try again.');
     }
 
-    // If active session token was established, set it on client
+    // If active session token was established, store it
     if (data.sessionSecret) {
       try {
         client.setSession(data.sessionSecret);
-      } catch (e) {
-        // Continue
-      }
+      } catch (e) {}
+      try {
+        sessionStorage.setItem('beego_session_token', data.sessionSecret);
+      } catch (e) {}
     }
 
     clearPendingRegistration();
@@ -302,9 +346,7 @@ export async function verifyPassengerOtp(
     if (data.profile) {
       try {
         sessionStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
       return data.profile as PassengerProfile;
     }
 
@@ -350,25 +392,29 @@ export async function loginPassengerWithPassword(
     if (data.sessionSecret) {
       try {
         client.setSession(data.sessionSecret);
-      } catch (e) {
-        // Continue
-      }
+      } catch (e) {}
+      try {
+        sessionStorage.setItem('beego_session_token', data.sessionSecret);
+      } catch (e) {}
     }
 
     if (data.profile) {
       try {
         sessionStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
       return data.profile as PassengerProfile;
     }
 
     throw new Error('Sign in failed. Please check your credentials.');
   } catch (serverErr: any) {
-    // If server login threw a business error (like invalid credentials), rethrow it
+    // If server login threw a specific business error, rethrow it
     const msg = (serverErr?.message || '').toLowerCase();
-    if (msg.includes('incorrect email') || msg.includes('access denied') || msg.includes('wait a moment')) {
+    if (
+      msg.includes('incorrect password') ||
+      msg.includes('no account found') ||
+      msg.includes('access denied') ||
+      msg.includes('wait a moment')
+    ) {
       throw serverErr;
     }
 
@@ -400,9 +446,7 @@ export async function loginPassengerWithPassword(
 
       try {
         sessionStorage.setItem('beego_active_passenger', JSON.stringify(profile));
-      } catch (e) {
-        // Ignore
-      }
+      } catch (e) {}
 
       return profile;
     } catch (sdkError: any) {
@@ -425,7 +469,7 @@ export async function loginPassengerWithPassword(
  */
 export async function sendPasswordResetOtp(
   email: string
-): Promise<{ success: boolean; userId: string; message: string }> {
+): Promise<OtpSendResult> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
     throw new Error(check.error);
@@ -451,6 +495,7 @@ export async function sendPasswordResetOtp(
       success: true,
       userId: assignedUserId,
       message: data.message || `Reset code sent to ${cleanEmail}`,
+      devOtp: data.devOtp,
     };
   } catch (error: any) {
     throw new Error(error?.message || 'Failed to send reset code.');
@@ -486,15 +531,26 @@ export async function resetPasswordWithOtp(
  * Logout current passenger
  */
 export async function logoutPassenger(): Promise<void> {
+  const token = sessionStorage.getItem('beego_session_token');
+  if (token) {
+    try {
+      await fetch('/api/auth/logout', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'x-appwrite-session': token,
+        },
+      });
+    } catch (e) {}
+  }
+
   try {
     await account.deleteSession({ sessionId: 'current' });
-  } catch (e) {
-    // Ignore
-  }
+  } catch (e) {}
+
   clearPendingRegistration();
   try {
     sessionStorage.removeItem('beego_active_passenger');
-  } catch (e) {
-    // Ignore
-  }
+    sessionStorage.removeItem('beego_session_token');
+  } catch (e) {}
 }

@@ -1,300 +1,418 @@
 import React, { useState } from 'react';
 import {
   User,
-  Copy,
-  Check,
-  Star,
-  Shield,
-  CreditCard,
-  Key,
-  RotateCcw,
-  LogOut,
-  PhoneCall,
-  ExternalLink,
-  ChevronRight,
-  Bike,
-  Sparkles,
-  Wallet,
-  Mail,
   ShieldCheck,
+  CreditCard,
+  Wallet,
+  MapPin,
+  Tag,
+  Share2,
+  Globe,
+  Lock,
+  PhoneCall,
+  HelpCircle,
+  FileText,
+  Sparkles,
+  Bike,
+  LogOut,
+  ChevronRight,
+  X,
+  Briefcase,
+  AlertTriangle,
+  Info,
+  Check,
+  Building,
 } from 'lucide-react';
 import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
-import { APPWRITE_PROJECT_NAME } from '../lib/appwrite';
 
 interface PassengerAccountSectionProps {
   passengerId: string;
   passengerProfile?: PassengerProfile | null;
   onSwitchToRider: () => void;
-  onReplayIntro?: () => void;
+  onClose?: () => void;
   onSignOut: () => void;
+  onOpenOffers?: () => void;
 }
 
 export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = ({
   passengerId,
   passengerProfile,
   onSwitchToRider,
-  onReplayIntro,
+  onClose,
   onSignOut,
+  onOpenOffers,
 }) => {
-  const [copied, setCopied] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [activeNotice, setActiveNotice] = useState<string | null>(null);
 
-  const displayName = passengerProfile?.name || 'Guest Passenger';
-  const displayEmail = passengerProfile?.email || 'guest.session@beego.internal';
-  const isGmailVerified = passengerProfile?.email?.endsWith('@gmail.com');
+  const displayName = passengerProfile?.name || 'BeeGo Passenger';
+  const displayEmail = passengerProfile?.email || 'guest@beegovoltx.com';
 
-  const initials = displayName
-    .split(' ')
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase() || 'GP';
+  const initials =
+    displayName
+      .split(' ')
+      .map((n) => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase() || 'BP';
 
-  const handleCopyId = () => {
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(passengerProfile?.id || passengerId);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+  const handleItemClick = (title: string, action?: () => void) => {
+    if (action) {
+      action();
+      return;
     }
-  };
-
-  const handleExecuteSignOut = async () => {
-    setIsSigningOut(true);
-    try {
-      await logoutPassenger();
-    } catch (e) {
-      console.warn('Sign out error:', e);
-    } finally {
-      setIsSigningOut(false);
-      setShowSignOutConfirm(false);
-      onSignOut();
-    }
+    setActiveNotice(title);
+    setTimeout(() => setActiveNotice(null), 2500);
   };
 
   return (
-    <div
-      id="passenger-account-section"
-      className="w-full max-w-xl mx-auto px-4 py-6 flex flex-col gap-5"
-    >
-      {/* Top Header */}
-      <div>
-        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-          {passengerProfile ? 'Passenger Account' : 'Guest Account'}
-        </h2>
-        <p className="text-xs text-zinc-400 mt-0.5">
-          {passengerProfile
-            ? `Authenticated via Appwrite • ${APPWRITE_PROJECT_NAME}`
-            : 'Temporary guest session active in Dhaka, Bangladesh'}
-        </p>
-      </div>
-
-      {/* Passenger Profile Card */}
-      <div className="rounded-3xl bg-zinc-950 border border-zinc-800/80 p-5 sm:p-6 shadow-xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 w-32 h-32 bg-amber-500/10 rounded-full blur-2xl pointer-events-none" />
-
-        <div className="flex items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-amber-400 text-black font-black text-xl flex items-center justify-center shadow-md shrink-0">
-            {initials}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h3 className="text-lg font-extrabold text-white truncate">
-                {displayName}
-              </h3>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 font-bold uppercase">
-                {passengerProfile ? 'Passenger' : 'Guest'}
-              </span>
-            </div>
-
-            {/* Email Address */}
-            <div className="flex items-center gap-1.5 mt-1">
-              <Mail className="w-3.5 h-3.5 text-zinc-500 shrink-0" />
-              <span className="text-xs text-zinc-300 font-mono truncate">
-                {displayEmail}
-              </span>
-              {isGmailVerified && (
-                <span className="text-[9px] px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold">
-                  Gmail OTP
-                </span>
-              )}
-            </div>
-
-            {/* Account ID with copy button */}
-            <div className="flex items-center gap-1.5 mt-1">
-              <span className="text-[11px] text-zinc-500 font-mono truncate max-w-[170px] sm:max-w-[220px]">
-                ID: {passengerProfile?.id || passengerId}
-              </span>
-              <button
-                type="button"
-                onClick={handleCopyId}
-                className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 transition-colors cursor-pointer"
-                title="Copy ID"
-              >
-                {copied ? (
-                  <Check className="w-3.5 h-3.5 text-amber-400" />
-                ) : (
-                  <Copy className="w-3.5 h-3.5" />
-                )}
-              </button>
-            </div>
-
-            {/* Rating and Badges */}
-            <div className="flex items-center gap-3 mt-2 text-xs">
-              <div className="flex items-center gap-1 text-amber-400 font-bold">
-                <Star className="w-3.5 h-3.5 fill-amber-400" />
-                <span>5.0</span>
-              </div>
-              <span className="text-zinc-600">•</span>
-              <span className="text-zinc-400">Dhaka Metro, BD</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Switch to Rider CTA */}
-        <div className="mt-5 pt-4 border-t border-zinc-900 flex items-center justify-between">
-          <div className="text-xs text-zinc-400">Want to accept rides as Captain?</div>
+    <div className="w-full h-full min-h-screen bg-[#F8F9FA] text-[#1A1A1A] flex flex-col p-5 select-none max-w-[430px] mx-auto pb-28">
+      {/* Top Bar with Close button */}
+      <div className="flex items-center justify-between pb-3 pt-1 border-b border-zinc-200 shrink-0">
+        <h1 className="text-base font-black text-[#1A1A1A]">My Account</h1>
+        {onClose && (
           <button
             type="button"
-            onClick={onSwitchToRider}
-            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-black text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer shadow-md shadow-amber-400/20"
+            onClick={onClose}
+            className="w-8 h-8 rounded-full bg-white hover:bg-zinc-100 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer border border-zinc-200"
           >
-            <Bike className="w-3.5 h-3.5" />
-            <span>Switch to Rider</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Wallet / Payment Section */}
-      <div className="rounded-2xl bg-zinc-950 border border-zinc-800/80 p-5 shadow-lg">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-amber-400" />
-            <h4 className="text-sm font-bold text-white">Beego Wallet & Payments</h4>
-          </div>
-          <span className="text-xs font-black text-amber-400">৳150 Credits</span>
-        </div>
-
-        <div className="grid grid-cols-3 gap-2 text-center text-xs">
-          <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col items-center gap-1">
-            <span className="text-pink-400 font-bold">bKash</span>
-            <span className="text-[10px] text-zinc-500">Connected</span>
-          </div>
-          <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col items-center gap-1">
-            <span className="text-orange-400 font-bold">Nagad</span>
-            <span className="text-[10px] text-zinc-500">Ready</span>
-          </div>
-          <div className="p-3 rounded-xl bg-zinc-900 border border-zinc-800 flex flex-col items-center gap-1">
-            <span className="text-amber-400 font-bold">Cash</span>
-            <span className="text-[10px] text-zinc-500">Default</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Settings & App Preferences */}
-      <div className="rounded-2xl bg-zinc-950 border border-zinc-800/80 overflow-hidden shadow-lg divide-y divide-zinc-900">
-        {onReplayIntro && (
-          <button
-            type="button"
-            onClick={onReplayIntro}
-            className="w-full p-4 flex items-center justify-between hover:bg-zinc-900/80 transition-colors text-left cursor-pointer"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-zinc-900 flex items-center justify-center text-zinc-400">
-                <RotateCcw className="w-4 h-4 text-amber-400" />
-              </div>
-              <div>
-                <div className="text-xs sm:text-sm font-bold text-white">Replay Introduction</div>
-                <div className="text-[11px] text-zinc-500">View splash screen and feature highlights</div>
-              </div>
-            </div>
-            <ChevronRight className="w-4 h-4 text-zinc-500" />
+            <X className="w-4 h-4" />
           </button>
         )}
+      </div>
 
-        {/* 24/7 Safety SOS Hotline */}
-        <a
-          href="tel:999"
-          className="p-4 flex items-center justify-between hover:bg-red-950/20 transition-colors text-left cursor-pointer block"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-950/40 border border-red-900/60 flex items-center justify-center text-red-400">
-              <PhoneCall className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs sm:text-sm font-bold text-white">Police Emergency 999</div>
-              <div className="text-[11px] text-zinc-500">National Emergency Helpline Bangladesh</div>
-            </div>
+      {/* Notice Toast */}
+      {activeNotice && (
+        <div className="mt-3 p-3 rounded-2xl bg-zinc-900 text-white text-xs flex items-center justify-between shadow-lg animate-in fade-in">
+          <span>{activeNotice} settings loaded</span>
+          <Check className="w-3.5 h-3.5 text-[#F5C518]" />
+        </div>
+      )}
+
+      {/* 1. PROFILE HEADER CARD */}
+      <div className="mt-4 p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-sm flex items-center gap-3.5">
+        {/* Avatar */}
+        <div className="w-14 h-14 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-lg font-black text-[#E6A800] shadow-sm shrink-0">
+          {initials}
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h2 className="text-base font-black text-[#1A1A1A] truncate">{displayName}</h2>
+            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active" />
           </div>
-          <span className="text-xs font-mono font-bold text-red-400 px-2 py-1 rounded bg-red-950/60 border border-red-900/60">
-            999
+          <p className="text-xs text-zinc-500 truncate mt-0.5">{displayEmail}</p>
+          <span className="inline-block mt-1 text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.2 rounded-full border border-emerald-200">
+            Verified Passenger
           </span>
-        </a>
+        </div>
+      </div>
 
-        {/* Sign Out Button */}
+      {/* 2. SWITCH TO RIDER PROMO CARD */}
+      <div className="mt-3 p-4 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white shadow-md flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0">
+            <Bike className="w-5 h-5 stroke-[2.5]" />
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-white">Become a Rider / Driver</h3>
+            <p className="text-[10px] text-zinc-300">Earn daily with BeeGo Voltx fleet</p>
+          </div>
+        </div>
+
         <button
           type="button"
-          onClick={() => setShowSignOutConfirm(true)}
-          className="w-full p-4 flex items-center justify-between hover:bg-red-950/20 transition-colors text-left cursor-pointer group"
+          onClick={onSwitchToRider}
+          className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 shrink-0"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-red-950/30 border border-red-900/40 flex items-center justify-center text-red-400 group-hover:scale-105 transition-transform">
-              <LogOut className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-xs sm:text-sm font-bold text-red-400">Exit Session</div>
-              <div className="text-[11px] text-zinc-500">Return to role selector</div>
-            </div>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-600 group-hover:text-red-400 transition-colors" />
+          Switch
         </button>
       </div>
 
-      {/* SIGN OUT CONFIRMATION MODAL */}
-      {showSignOutConfirm && (
-        <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
-          onClick={() => setShowSignOutConfirm(false)}
+      {/* 3. PATHAO-MIRRORED ACCOUNT SECTIONS LIST */}
+      <div className="mt-4 flex flex-col gap-1 bg-white rounded-3xl p-2 border border-zinc-200/90 shadow-sm divide-y divide-zinc-100">
+        {/* Profile */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Profile Details')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
         >
-          <div
-            className="w-full max-w-sm rounded-2xl bg-zinc-950 border border-zinc-800 p-6 shadow-2xl relative"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-center mb-4">
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <User className="w-4 h-4 text-zinc-400" />
+            <span>Profile</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Authentication */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Authentication Security')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Authentication</span>
+          </div>
+          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-semibold">
+            Gmail OTP Active
+          </span>
+        </button>
+
+        {/* Business Profile */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Business Profile')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Briefcase className="w-4 h-4 text-zinc-400" />
+            <span>Business Profile</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Digital Payment (Coming Soon per prompt) */}
+        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left opacity-75">
+          <div className="flex items-center gap-3 text-xs font-bold text-zinc-600">
+            <CreditCard className="w-4 h-4 text-zinc-400" />
+            <span>Digital Payment</span>
+          </div>
+          <span className="text-[9px] font-mono font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">
+            Coming Soon
+          </span>
+        </div>
+
+        {/* Payout Method (Coming Soon per prompt) */}
+        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left opacity-75">
+          <div className="flex items-center gap-3 text-xs font-bold text-zinc-600">
+            <Wallet className="w-4 h-4 text-zinc-400" />
+            <span>Payout Method</span>
+          </div>
+          <span className="text-[9px] font-mono font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">
+            Coming Soon
+          </span>
+        </div>
+
+        {/* Saved Address */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Saved Addresses')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <MapPin className="w-4 h-4 text-zinc-400" />
+            <span>Saved Address</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Promo */}
+        <button
+          type="button"
+          onClick={() => {
+            if (onOpenOffers) {
+              onOpenOffers();
+              if (onClose) onClose();
+            } else {
+              handleItemClick('Promotions');
+            }
+          }}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Tag className="w-4 h-4 text-[#E6A800]" />
+            <span>Promo</span>
+          </div>
+          <span className="text-[10px] text-[#E6A800] font-bold">4 Available</span>
+        </button>
+
+        {/* Referral */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Referral Program')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Share2 className="w-4 h-4 text-zinc-400" />
+            <span>Referral</span>
+          </div>
+          <span className="text-[10px] text-zinc-500 font-mono font-bold">VOLTX2026</span>
+        </button>
+
+        {/* Language */}
+        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left">
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Globe className="w-4 h-4 text-zinc-400" />
+            <span>Language</span>
+          </div>
+          <span className="text-xs font-semibold text-zinc-500">English</span>
+        </div>
+
+        {/* Permissions */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('App Permissions')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Lock className="w-4 h-4 text-zinc-400" />
+            <span>Permissions</span>
+          </div>
+          <span className="text-[10px] text-emerald-600 font-medium">Location Granted</span>
+        </button>
+
+        {/* Safety */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Safety Center')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <ShieldCheck className="w-4 h-4 text-zinc-400" />
+            <span>Safety</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Emergency Support */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Emergency Support (999)')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-rose-600">
+            <PhoneCall className="w-4 h-4 text-rose-500" />
+            <span>Emergency Support</span>
+          </div>
+          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
+            24/7 Hotline
+          </span>
+        </button>
+
+        {/* Help & Support */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Help Center')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <HelpCircle className="w-4 h-4 text-zinc-400" />
+            <span>Help & Support</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Request */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Support Requests')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <FileText className="w-4 h-4 text-zinc-400" />
+            <span>Request</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* Policies */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('Terms & Privacy Policies')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Info className="w-4 h-4 text-zinc-400" />
+            <span>Policies</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
+        {/* New in BeeGo Voltx */}
+        <button
+          type="button"
+          onClick={() => handleItemClick('What is New v2.4')}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Sparkles className="w-4 h-4 text-[#E6A800]" />
+            <span>New in BeeGo Voltx</span>
+          </div>
+          <span className="text-[10px] font-bold text-[#E6A800] bg-[#FFF9E6] px-2 py-0.5 rounded-md">
+            v2.4 Release
+          </span>
+        </button>
+
+        {/* Logout (soft red) */}
+        <button
+          type="button"
+          onClick={() => setShowSignOutConfirm(true)}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-rose-50 rounded-2xl transition-colors cursor-pointer text-left text-rose-600"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold">
+            <LogOut className="w-4 h-4 text-rose-500" />
+            <span>Logout</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-rose-400" />
+        </button>
+      </div>
+
+      {/* Subtle Social Media Icons & Footer per prompt */}
+      <div className="pt-6 pb-2 flex flex-col items-center gap-3">
+        <div className="flex items-center gap-4 text-zinc-400">
+          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
+            f
+          </span>
+          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
+            in
+          </span>
+          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
+            𝕏
+          </span>
+          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
+            yt
+          </span>
+        </div>
+        <div className="text-center text-[11px] text-zinc-400 font-medium">
+          Crafted with love from BeeGo Voltx • Dhaka, Bangladesh
+        </div>
+      </div>
+
+      {/* Logout Confirmation Modal */}
+      {showSignOutConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+          <div className="w-full max-w-[340px] bg-white rounded-3xl p-5 shadow-2xl border border-zinc-200 flex flex-col gap-3.5 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center mx-auto">
               <LogOut className="w-6 h-6" />
             </div>
-
-            <h3 className="text-lg font-bold text-white mb-1.5">Sign out of Beego?</h3>
-            <p className="text-xs text-zinc-400 mb-6 leading-relaxed">
-              You will be signed out of your current passenger session and returned to the main role selection screen.
+            <h3 className="text-base font-black text-[#1A1A1A]">Log Out of BeeGo Voltx?</h3>
+            <p className="text-xs text-zinc-500 leading-relaxed">
+              You will be signed out from this device. You can log back in anytime with your Gmail address.
             </p>
-
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 pt-2">
               <button
                 type="button"
                 onClick={() => setShowSignOutConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 text-xs font-semibold transition-colors cursor-pointer"
+                className="flex-1 py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="button"
-                disabled={isSigningOut}
-                onClick={handleExecuteSignOut}
-                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                onClick={async () => {
+                  await logoutPassenger();
+                  setShowSignOutConfirm(false);
+                  onSignOut();
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs transition-colors cursor-pointer shadow-sm shadow-rose-600/20"
               >
-                {isSigningOut ? 'Signing Out...' : 'Sign Out'}
+                Confirm Logout
               </button>
             </div>
           </div>
         </div>
       )}
-
-      {/* Footer Info */}
-      <div className="text-center text-[11px] text-zinc-600 mt-2">
-        Beego Rides v2.4 • Built for Bangladesh • ৳70/km Flat Rate
-      </div>
     </div>
   );
 };

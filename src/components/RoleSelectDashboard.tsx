@@ -1,390 +1,170 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React from 'react';
 import {
   User,
   Bike,
-  ShieldCheck,
-  Radio,
-  RotateCcw,
-  ChevronsRight,
   ArrowRight,
-  LogIn,
-  UserPlus,
-  Lock,
+  ShieldCheck,
+  Zap,
+  Sparkles,
+  RotateCcw,
 } from 'lucide-react';
 import { UserRole } from '../types';
-import { RATE_PER_KM_TAKA } from '../services/rideSync';
+import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
 
 interface RoleSelectDashboardProps {
   onSelectRole: (role: UserRole) => void;
   onOpenPassengerAuth?: (mode: 'signup' | 'login') => void;
+  onOpenDriverAuth?: (mode: 'register' | 'login') => void;
   onReplayIntro?: () => void;
 }
-
-interface AndroidSliderCardProps {
-  id: string;
-  role: UserRole;
-  title: string;
-  subtitle: string;
-  slideLabel: string;
-  variant: 'passenger' | 'captain';
-  onConfirm: () => void;
-}
-
-const AndroidSliderCard: React.FC<AndroidSliderCardProps> = ({
-  id,
-  title,
-  subtitle,
-  slideLabel,
-  variant,
-  onConfirm,
-}) => {
-  const isPassenger = variant === 'passenger';
-  const trackRef = useRef<HTMLDivElement>(null);
-  const [maxDragPx, setMaxDragPx] = useState(140);
-  const [currentPx, setCurrentPx] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isUnlocked, setIsUnlocked] = useState(false);
-
-  const isDraggingRef = useRef(false);
-  const startXRef = useRef(0);
-  const startThumbXRef = useRef(0);
-
-  useEffect(() => {
-    const updateDimensions = () => {
-      if (!trackRef.current) return;
-      const trackWidth = trackRef.current.clientWidth;
-      const thumbWidth = 46;
-      const padding = 8;
-      const available = Math.max(60, trackWidth - thumbWidth - padding);
-      setMaxDragPx(available);
-    };
-
-    updateDimensions();
-    window.addEventListener('resize', updateDimensions);
-    return () => window.removeEventListener('resize', updateDimensions);
-  }, []);
-
-  const triggerConfirm = useCallback(() => {
-    setIsUnlocked(true);
-    setCurrentPx(maxDragPx);
-    setTimeout(() => {
-      onConfirm();
-    }, 180);
-  }, [maxDragPx, onConfirm]);
-
-  const handlePointerDown = (clientX: number) => {
-    if (isUnlocked) return;
-    isDraggingRef.current = true;
-    setIsDragging(true);
-    startXRef.current = clientX;
-    startThumbXRef.current = currentPx;
-  };
-
-  const handlePointerMove = useCallback(
-    (clientX: number) => {
-      if (!isDraggingRef.current || isUnlocked) return;
-      const deltaX = clientX - startXRef.current;
-      const nextX = Math.max(0, Math.min(maxDragPx, startThumbXRef.current + deltaX));
-      setCurrentPx(nextX);
-
-      if (nextX >= maxDragPx * 0.72) {
-        isDraggingRef.current = false;
-        setIsDragging(false);
-        triggerConfirm();
-      }
-    },
-    [maxDragPx, isUnlocked, triggerConfirm]
-  );
-
-  const handlePointerUp = useCallback(() => {
-    if (!isDraggingRef.current || isUnlocked) return;
-    isDraggingRef.current = false;
-    setIsDragging(false);
-
-    if (currentPx >= maxDragPx * 0.72) {
-      triggerConfirm();
-    } else {
-      setCurrentPx(0);
-    }
-  }, [currentPx, maxDragPx, isUnlocked, triggerConfirm]);
-
-  useEffect(() => {
-    const onWindowPointerMove = (e: MouseEvent) => {
-      if (isDraggingRef.current) handlePointerMove(e.clientX);
-    };
-    const onWindowPointerUp = () => {
-      if (isDraggingRef.current) handlePointerUp();
-    };
-
-    window.addEventListener('mousemove', onWindowPointerMove);
-    window.addEventListener('mouseup', onWindowPointerUp);
-    return () => {
-      window.removeEventListener('mousemove', onWindowPointerMove);
-      window.removeEventListener('mouseup', onWindowPointerUp);
-    };
-  }, [handlePointerMove, handlePointerUp]);
-
-  const progressRatio = maxDragPx > 0 ? Math.min(1, currentPx / maxDragPx) : 0;
-
-  return (
-    <div
-      className={`w-full rounded-2xl p-3 sm:p-3.5 transition-all duration-200 border flex flex-col justify-between ${
-        isPassenger
-          ? 'bg-zinc-950/90 border-zinc-800/90 hover:border-zinc-700 shadow-md'
-          : 'bg-zinc-950/90 border-amber-500/50 hover:border-amber-400 shadow-md shadow-amber-950/30'
-      }`}
-    >
-      {/* Top Details & Direct 1-Tap Enter Button for Android */}
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center font-bold shrink-0 ${
-              isPassenger
-                ? 'bg-zinc-800 text-zinc-200 border border-zinc-700'
-                : 'bg-amber-400 text-black shadow-md shadow-amber-400/20'
-            }`}
-          >
-            {isPassenger ? (
-              <User className="w-5 h-5 stroke-[2.2]" />
-            ) : (
-              <Bike className="w-5 h-5 stroke-[2.2]" />
-            )}
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="text-sm font-black text-white tracking-tight">{title}</span>
-              <span
-                className={`text-[9px] font-mono font-bold px-1.5 py-0.2 rounded ${
-                  isPassenger
-                    ? 'bg-zinc-800 text-zinc-300'
-                    : 'bg-amber-400 text-black font-black'
-                }`}
-              >
-                {isPassenger ? 'GUEST' : 'FLEET'}
-              </span>
-            </div>
-            <p className="text-[11px] text-zinc-400 truncate max-w-[200px]">{subtitle}</p>
-          </div>
-        </div>
-
-        {/* 1-Tap Quick Action Button */}
-        <button
-          id={id}
-          type="button"
-          onClick={onConfirm}
-          className={`px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1 shrink-0 cursor-pointer active:scale-95 transition-all ${
-            isPassenger
-              ? 'bg-zinc-800 hover:bg-zinc-700 text-white border border-zinc-700'
-              : 'bg-amber-400 hover:bg-amber-300 text-black shadow-sm'
-          }`}
-        >
-          <span>Enter</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </button>
-      </div>
-
-      {/* Swipe to Unlock Slider Track */}
-      <div
-        ref={trackRef}
-        onMouseDown={(e) => handlePointerDown(e.clientX)}
-        onTouchStart={(e) => handlePointerDown(e.touches[0].clientX)}
-        onTouchMove={(e) => handlePointerMove(e.touches[0].clientX)}
-        onTouchEnd={handlePointerUp}
-        className={`relative w-full h-11 rounded-xl p-1 flex items-center select-none overflow-hidden cursor-pointer ${
-          isPassenger
-            ? 'bg-zinc-900 border border-zinc-800'
-            : 'bg-amber-950/30 border border-amber-500/40'
-        }`}
-      >
-        {/* Dynamic Progress Fill Behind Thumb */}
-        <div
-          style={{
-            width: `${Math.max(currentPx + 24, isUnlocked ? maxDragPx + 48 : 0)}px`,
-          }}
-          className={`absolute left-0 top-0 bottom-0 pointer-events-none transition-all ${
-            isDragging ? 'duration-0' : 'duration-200'
-          } ${
-            isPassenger
-              ? 'bg-gradient-to-r from-zinc-800 to-zinc-700'
-              : 'bg-gradient-to-r from-amber-950 to-amber-700/60'
-          }`}
-        />
-
-        {/* Center Prompt Text */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none px-8">
-          <span
-            className={`text-[11px] font-bold tracking-wide uppercase transition-all duration-150 flex items-center gap-1.5 ${
-              progressRatio > 0.35 ? 'opacity-20 translate-x-2' : 'opacity-80'
-            } ${isPassenger ? 'text-zinc-300' : 'text-amber-300'}`}
-          >
-            <span>{isUnlocked ? 'Opening...' : slideLabel}</span>
-            <ChevronsRight className="w-3.5 h-3.5 animate-pulse text-amber-400" />
-          </span>
-        </div>
-
-        {/* Draggable Slider Thumb */}
-        <div
-          style={{
-            transform: `translateX(${currentPx}px)`,
-          }}
-          className={`relative z-10 w-9 h-9 rounded-lg flex items-center justify-center font-bold shadow-md cursor-grab active:cursor-grabbing transition-transform ${
-            isDragging ? 'duration-0' : 'duration-200 ease-out'
-          } ${
-            isPassenger
-              ? 'bg-white text-black hover:bg-zinc-100'
-              : 'bg-amber-400 text-black hover:bg-amber-300 shadow-amber-400/30'
-          }`}
-        >
-          {isPassenger ? (
-            <User className="w-4 h-4 stroke-[2.4]" />
-          ) : (
-            <Bike className="w-4 h-4 stroke-[2.4]" />
-          )}
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
   onSelectRole,
   onOpenPassengerAuth,
+  onOpenDriverAuth,
   onReplayIntro,
 }) => {
   return (
-    <div
-      id="role-select-dashboard"
-      className="w-full h-full flex flex-col justify-between bg-black text-white overflow-hidden select-none bg-bee-honeycomb"
-    >
-      {/* 1. TOP APP BAR */}
-      <header className="w-full h-12 border-b border-zinc-900 bg-black/95 px-4 flex items-center justify-between shrink-0 z-20">
-        <div className="flex items-center gap-2">
-          <span className="text-xl font-black tracking-tight text-white">Beego</span>
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shadow-sm shadow-amber-400/50" />
-          <span className="text-[10px] font-mono text-amber-400 bg-amber-950/60 px-1.5 py-0.2 rounded border border-amber-500/30">
-            Dhaka
+    <div className="w-full min-h-screen bg-[#F8F9FA] text-[#1A1A1A] flex flex-col justify-between p-6 select-none max-w-[430px] mx-auto shadow-2xl relative">
+      {/* Top Bar with Brand & Replay Intro */}
+      <div className="w-full flex items-center justify-between pt-2">
+        <BeeGoVoltxLogo size="md" />
+
+        {onReplayIntro && (
+          <button
+            type="button"
+            onClick={onReplayIntro}
+            className="flex items-center gap-1 text-xs font-semibold text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 rounded-lg cursor-pointer"
+            title="Replay Intro Slides"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Intro</span>
+          </button>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="my-auto py-6 flex flex-col gap-6">
+        <div className="text-center px-2">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[#E6A800] bg-[#FFF9E6] px-3 py-1 rounded-full border border-[#F5C518]/30 inline-block mb-3">
+            Welcome to BeeGo Voltx
           </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-amber-950/40 border border-amber-500/30 text-[11px] font-mono text-amber-300">
-            <Radio className="w-3 h-3 text-amber-400 animate-pulse" />
-            <span>৳{RATE_PER_KM_TAKA}/km</span>
-          </div>
-
-          {onReplayIntro && (
-            <button
-              type="button"
-              onClick={onReplayIntro}
-              className="p-1 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-amber-400 border border-zinc-800 cursor-pointer"
-              title="Replay Intro Splash"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      </header>
-
-      {/* 2. CENTER CONTENT (Sized for fluid Mobile View) */}
-      <main className="flex-1 w-full px-4 py-4 flex flex-col justify-center items-center gap-5 max-w-sm mx-auto">
-        {/* Clean Header */}
-        <div className="text-center flex flex-col gap-1">
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight text-white">
-            Choose your role
+          <h1 className="text-2xl font-black text-[#1A1A1A] tracking-tight">
+            How would you like to continue?
           </h1>
-          <p className="text-xs text-zinc-400">
-            Select how you would like to use Beego
+          <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">
+            Choose your role to enter the appropriate dashboard. You can switch between roles at any time.
           </p>
         </div>
 
-        {/* Roles Container */}
-        <div className="w-full flex flex-col gap-3">
-          {/* ================= PASSENGER CARD ================= */}
-          <div className="w-full rounded-2xl p-4 bg-zinc-950 border border-zinc-800 hover:border-zinc-700 shadow-xl flex flex-col gap-3 transition-all">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-md shadow-amber-400/20">
-                <User className="w-5 h-5 stroke-[2.2]" />
+        {/* Two Large Role Cards */}
+        <div className="flex flex-col gap-4">
+          {/* Card 1: Continue as Passenger */}
+          <button
+            type="button"
+            id="role-select-passenger-card"
+            onClick={() => onSelectRole('passenger')}
+            className="group w-full p-5 rounded-3xl bg-white border-2 border-zinc-200/80 hover:border-[#F5C518] hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col justify-between gap-4 cursor-pointer relative overflow-hidden active:scale-[0.98]"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-[#FFF9E6] rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="w-14 h-14 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800] shadow-sm">
+                <User className="w-7 h-7 stroke-[2.2]" />
               </div>
-              <div className="min-w-0">
-                <h2 className="text-base font-bold text-white tracking-tight">Passenger</h2>
-                <p className="text-xs text-zinc-400">
-                  Request fast motorcycle rides across Dhaka
-                </p>
-              </div>
+              <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
+                Commute & Swap
+              </span>
             </div>
 
-            {/* Passenger Action Buttons */}
-            <div className="grid grid-cols-2 gap-2 pt-1">
+            <div className="relative z-10">
+              <div className="text-lg font-black text-[#1A1A1A] group-hover:text-[#E6A800] transition-colors flex items-center gap-1.5">
+                <span>Continue as Passenger</span>
+                <ArrowRight className="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
+              </div>
+              <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                Request instant rides, locate power stations, swap batteries, and enjoy flat ৳70/km fares.
+              </p>
+            </div>
+
+            <div className="relative z-10 pt-2 border-t border-zinc-100 flex items-center justify-between text-xs font-bold text-[#E6A800]">
+              <span>Ride or Swap Power</span>
+              <div className="w-7 h-7 rounded-full bg-[#F5C518] flex items-center justify-center text-black">
+                <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              </div>
+            </div>
+          </button>
+
+          {/* Card 2: Continue as Driver with Login and Register options */}
+          <div
+            id="role-select-rider-card"
+            className="w-full p-5 rounded-3xl bg-white border-2 border-zinc-200/80 hover:border-[#F5C518] shadow-sm hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col justify-between gap-4 relative overflow-hidden"
+          >
+            <div className="absolute top-0 right-0 w-24 h-24 bg-zinc-100 rounded-bl-full -z-0" />
+
+            <div className="relative z-10 flex items-start justify-between">
+              <div className="w-14 h-14 rounded-2xl bg-zinc-900 flex items-center justify-center text-[#F5C518] shadow-md shadow-zinc-900/10">
+                <Bike className="w-7 h-7 stroke-[2.2]" />
+              </div>
+              <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-[#FFF9E6] text-[#E6A800] border border-[#F5C518]/30">
+                Earn & Drive
+              </span>
+            </div>
+
+            <div className="relative z-10">
+              <div className="text-lg font-black text-[#1A1A1A] flex items-center gap-1.5">
+                <span>Continue as Driver</span>
+              </div>
+              <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+                Accept incoming passenger requests, earn flexible daily income, and access battery swap hubs across Dhaka.
+              </p>
+            </div>
+
+            {/* Two Clear Options: Login and Register as Driver */}
+            <div className="relative z-10 pt-3 border-t border-zinc-100 flex flex-col sm:flex-row gap-2">
               <button
-                id="passenger-signup-button"
                 type="button"
                 onClick={() => {
-                  if (onOpenPassengerAuth) {
-                    onOpenPassengerAuth('signup');
+                  if (onOpenDriverAuth) {
+                    onOpenDriverAuth('login');
                   } else {
-                    onSelectRole('passenger');
+                    onSelectRole('rider');
                   }
                 }}
-                className="py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-xs flex items-center justify-center gap-1.5 transition-all shadow-md shadow-amber-400/10 cursor-pointer active:scale-95"
+                className="flex-1 py-2.5 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-xs font-black text-[#1A1A1A] text-center transition-all cursor-pointer border border-zinc-200/80"
               >
-                <UserPlus className="w-4 h-4 stroke-[2.5]" />
-                <span>Sign Up</span>
+                Driver Login
               </button>
 
               <button
-                id="passenger-login-button"
                 type="button"
                 onClick={() => {
-                  if (onOpenPassengerAuth) {
-                    onOpenPassengerAuth('login');
+                  if (onOpenDriverAuth) {
+                    onOpenDriverAuth('register');
                   } else {
-                    onSelectRole('passenger');
+                    onSelectRole('rider');
                   }
                 }}
-                className="py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-850 text-zinc-200 hover:text-white border border-zinc-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95"
+                className="flex-1 py-2.5 px-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black text-center transition-all cursor-pointer shadow-sm flex items-center justify-center gap-1.5"
               >
-                <LogIn className="w-4 h-4 text-amber-400" />
-                <span>Sign In</span>
-              </button>
-            </div>
-          </div>
-
-          {/* ================= CAPTAIN CARD ================= */}
-          <div className="w-full rounded-2xl p-4 bg-zinc-950 border border-zinc-800 hover:border-zinc-700 shadow-xl flex flex-col gap-3 transition-all">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-10 h-10 rounded-xl bg-zinc-900 text-zinc-200 border border-zinc-800 flex items-center justify-center font-bold shrink-0">
-                  <Bike className="w-5 h-5 stroke-[2.2] text-amber-400" />
-                </div>
-                <div className="min-w-0">
-                  <h2 className="text-base font-bold text-white tracking-tight">Captain</h2>
-                  <p className="text-xs text-zinc-400">
-                    Accept ride requests & earn on your bike
-                  </p>
-                </div>
-              </div>
-
-              {/* Captain Direct Enter */}
-              <button
-                id="continue-as-rider-button"
-                type="button"
-                onClick={() => onSelectRole('rider')}
-                className="px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shrink-0 bg-zinc-900 hover:bg-zinc-850 text-amber-400 border border-zinc-800 hover:border-amber-400/40 cursor-pointer active:scale-95 transition-all"
-              >
-                <span>Captain Portal</span>
-                <ArrowRight className="w-3.5 h-3.5" />
+                <span>Register as Driver</span>
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
             </div>
           </div>
         </div>
-      </main>
+      </div>
 
-      {/* 3. FOOTER STRIP */}
-      <footer className="w-full h-10 border-t border-zinc-900 px-4 flex items-center justify-between text-xs font-medium text-zinc-500 shrink-0">
-        <span className="text-amber-500/80">BEEGO • DHAKA MOTO</span>
-        <span>24/7 Service</span>
-      </footer>
+      {/* Footer Info & Auth Quick Link */}
+      <div className="w-full flex flex-col items-center gap-2 pt-2 pb-2 text-center">
+        <div className="flex items-center gap-1 text-[11px] text-zinc-500">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Verified safety & transparent ৳70/km flat rate across Dhaka</span>
+        </div>
+        <p className="text-[10px] text-zinc-400">
+          Crafted with love from BeeGo Voltx
+        </p>
+      </div>
     </div>
   );
 };
-

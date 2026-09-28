@@ -72,12 +72,12 @@ export const NavigationMap: React.FC<NavigationMapProps> = ({
     // Add zoom control top right
     L.control.zoom({ position: 'topright' }).addTo(map);
 
-    // Tiles: Geoapify dark matter purple roads tiles with activeKey
+    // Tiles: Light theme carto voyager or osm-bright
     const tileUrl = activeKey
-      ? `https://maps.geoapify.com/v1/tile/dark-matter-purple-roads/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(
+      ? `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(
           activeKey
         )}`
-      : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+      : 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
 
     L.tileLayer(tileUrl, {
       attribution:

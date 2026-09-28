@@ -1,138 +1,123 @@
 @import "tailwindcss";
 @import "leaflet/dist/leaflet.css";
 
+:root {
+  --primary-yellow: #f5c518;
+  --primary-yellow-hover: #e6a800;
+  --primary-yellow-light: #fff9e6;
+  --primary-yellow-muted: #fef3c7;
+  --bg-app: #ffffff;
+  --bg-muted: #f8f9fa;
+  --bg-subtle: #f1f3f5;
+  --text-primary: #1a1a1a;
+  --text-secondary: #6c757d;
+  --border-light: #e9ecef;
+}
+
 html, body, #root {
   height: 100%;
   margin: 0;
   padding: 0;
-  background-color: #000000;
-  color: #ffffff;
-  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  background-color: #f1f3f5;
+  color: #1a1a1a;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Custom styling for Leaflet controls on dark theme */
+/* Custom styling for Leaflet controls on clean light theme */
 .leaflet-container {
-  background-color: #0a0a0a !important;
+  background-color: #f8f9fa !important;
   font-family: inherit;
   width: 100%;
   height: 100%;
 }
 
 .leaflet-bar a {
-  background-color: #18181b !important;
-  color: #ffffff !important;
-  border-bottom-color: #27272a !important;
+  background-color: #ffffff !important;
+  color: #1a1a1a !important;
+  border-bottom: 1px solid #e9ecef !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08) !important;
 }
 
 .leaflet-bar a:hover {
-  background-color: #27272a !important;
-  color: #ffffff !important;
+  background-color: #f8f9fa !important;
+  color: #000000 !important;
 }
 
 .leaflet-control-attribution {
-  background: rgba(0, 0, 0, 0.75) !important;
-  color: #71717a !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  color: #868e96 !important;
   font-size: 10px !important;
+  backdrop-filter: blur(4px);
 }
 
 .leaflet-control-attribution a {
-  color: #a1a1aa !important;
+  color: #495057 !important;
 }
 
-/* Selection style with signature Bee Gold */
+/* Selection style with BeeGo Voltx soft golden yellow */
 ::selection {
-  background-color: #f59e0b;
-  color: #000000;
+  background-color: #f5c518;
+  color: #1a1a1a;
 }
 
-/* Signature Beego Bee Gold & Honey Shimmer Animation */
-@keyframes beegoShimmer {
-  0% {
-    background-position: -200% 0;
-    opacity: 0.25;
-    transform: scale(0.96);
-    filter: drop-shadow(0 0 0 rgba(245, 158, 11, 0));
-  }
-  35% {
-    opacity: 1;
-    transform: scale(1);
-    filter: drop-shadow(0 0 25px rgba(251, 191, 36, 0.85));
-  }
-  70% {
-    background-position: 200% 0;
-    opacity: 1;
-    transform: scale(1.02);
-    filter: drop-shadow(0 0 35px rgba(245, 158, 11, 0.95));
-  }
-  100% {
-    background-position: 250% 0;
-    opacity: 1;
-    transform: scale(1);
-    filter: drop-shadow(0 0 22px rgba(251, 191, 36, 0.6));
-  }
+/* Smooth mobile-like pull to refresh spinner */
+@keyframes spinSlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
-.beego-shining-text {
-  background: linear-gradient(
-    105deg,
-    rgba(217, 119, 6, 0.4) 0%,
-    rgba(245, 158, 11, 0.8) 25%,
-    #fbbf24 45%,
-    #ffffff 52%,
-    #fef08a 60%,
-    rgba(245, 158, 11, 0.9) 75%,
-    rgba(180, 83, 9, 0.4) 100%
-  );
-  background-size: 250% 100%;
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  animation: beegoShimmer 2.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+@keyframes scanLaser {
+  0% { top: 10%; opacity: 0.2; }
+  50% { top: 85%; opacity: 1; }
+  100% { top: 10%; opacity: 0.2; }
 }
 
-/* Radiant Golden Honeycomb Orb behind the Beego logo */
-@keyframes beegoGlowOrb {
-  0%, 100% {
-    transform: scale(0.85);
-    opacity: 0.25;
-  }
-  50% {
-    transform: scale(1.15);
-    opacity: 0.6;
-  }
+.animate-scan-laser {
+  animation: scanLaser 2.2s ease-in-out infinite;
 }
 
-.beego-glow-orb {
-  animation: beegoGlowOrb 2.2s ease-in-out infinite;
-}
-
-/* Bee Honeycomb Hexagonal Subtle Background Pattern */
-.bg-bee-honeycomb {
-  background-color: #000000;
-  background-image: radial-gradient(rgba(245, 158, 11, 0.08) 1px, transparent 0);
-  background-size: 24px 24px;
-}
-
-/* Laser scanner beam animation */
-@keyframes laserScan {
-  0%, 100% {
-    top: 5%;
-    opacity: 0.4;
-  }
-  50% {
-    top: 90%;
-    opacity: 1;
-  }
-}
-
-.animate-laser-scan {
-  animation: laserScan 2.4s ease-in-out infinite;
-}
-
-/* Hide scrollbar for clean app experience */
+/* Hide scrollbars for clean Pathao-like horizontal scrolls */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* Subtle micro-press scale for native-app tactile feel */
+.touch-press {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.15s ease;
+}
+.touch-press:active {
+  transform: scale(0.97);
+  opacity: 0.9;
+}
+
+/* Subtle volt pulse glow */
+@keyframes voltPulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(245, 197, 24, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(245, 197, 24, 0);
+  }
+}
+
+.volt-pulse {
+  animation: voltPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Mobile-first centered app frame on desktop */
+.app-mobile-frame {
+  width: 100%;
+  max-width: 430px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  background-color: #ffffff;
+  position: relative;
+  overflow-x: hidden;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.06);
 }

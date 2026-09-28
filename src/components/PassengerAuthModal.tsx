@@ -11,6 +11,9 @@ import {
   EyeOff,
   RefreshCw,
   X,
+  Sparkles,
+  Phone,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   validateGmailAddress,
@@ -22,17 +25,20 @@ import {
   resetPasswordWithOtp,
   PassengerProfile,
 } from '../services/passengerAuth';
+import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
 
 export type AuthMode = 'signup' | 'login' | 'otp_verify' | 'forgot_password' | 'reset_otp';
 
 interface PassengerAuthModalProps {
   initialMode?: 'signup' | 'login';
-  onAuthenticated: (profile: PassengerProfile) => void;
+  intendedRole?: 'passenger' | 'rider';
+  onAuthenticated: (profile: PassengerProfile, role?: 'passenger' | 'rider') => void;
   onCancel: () => void;
 }
 
 export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
   initialMode = 'signup',
+  intendedRole = 'passenger',
   onAuthenticated,
   onCancel,
 }) => {
@@ -41,6 +47,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
   // Form Fields
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -54,6 +61,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   // Resend Timer
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -151,6 +159,9 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPassengerRegistrationOtp(name, email, password);
       setStatusMessage(res.message);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
       setResendCooldown(45);
       switchMode('otp_verify');
     } catch (err: any) {
@@ -175,14 +186,12 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const profile = await verifyPassengerOtp(email, fullCode, name, password);
       setIsSuccess(true);
-      setStatusMessage('Verification successful! Welcome to Beego.');
+      setStatusMessage('Verification successful! Welcome to BeeGo Voltx.');
       setTimeout(() => {
-        onAuthenticated(profile);
-      }, 600);
+        onAuthenticated(profile, intendedRole);
+      }, 500);
     } catch (err: any) {
-      // If OTP is wrong, it stays on the OTP screen with error
       setErrorMessage(err?.message || 'Invalid verification code. Please check and try again.');
-      // Highlight and reset OTP inputs
       setOtpDigits(['', '', '', '', '', '']);
       setTimeout(() => {
         otpInputRefs.current[0]?.focus();
@@ -201,6 +210,9 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPassengerRegistrationOtp(name, email, password);
       setStatusMessage(res.message);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
       setResendCooldown(45);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Failed to resend code.');
@@ -232,7 +244,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
       setIsSuccess(true);
       setStatusMessage('Signed in successfully!');
       setTimeout(() => {
-        onAuthenticated(profile);
+        onAuthenticated(profile, intendedRole);
       }, 500);
     } catch (err: any) {
       setErrorMessage(err?.message || 'Incorrect password or email.');
@@ -256,6 +268,9 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPassengerLoginOtp(email);
       setStatusMessage(res.message);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
       setResendCooldown(45);
       switchMode('otp_verify');
     } catch (err: any) {
@@ -280,6 +295,9 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const res = await sendPasswordResetOtp(email);
       setStatusMessage(res.message);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
       setResendCooldown(45);
       switchMode('reset_otp');
     } catch (err: any) {
@@ -309,170 +327,163 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
     try {
       const profile = await resetPasswordWithOtp(email, fullCode, newPassword);
       setIsSuccess(true);
-      setStatusMessage('Password updated successfully!');
+      setStatusMessage('Password updated successfully! Welcome back.');
       setTimeout(() => {
-        onAuthenticated(profile);
-      }, 600);
+        onAuthenticated(profile, intendedRole);
+      }, 500);
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Invalid code or password reset failed.');
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => {
-        otpInputRefs.current[0]?.focus();
-      }, 100);
+      setErrorMessage(err?.message || 'Failed to reset password. Please check your verification code.');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div
-      id="passenger-auth-modal"
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200"
-    >
-      <div className="relative w-full max-w-sm rounded-3xl bg-zinc-950 border border-zinc-800/80 shadow-2xl p-6 text-white flex flex-col gap-5">
-        {/* Top Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-amber-400 text-black flex items-center justify-center font-black text-sm shadow-md shadow-amber-400/20">
-              B
-            </div>
-            <div className="flex items-baseline gap-1">
-              <span className="font-black text-base tracking-tight text-white">BEEGO</span>
-              <span className="text-[10px] font-semibold text-amber-400">PASSENGER</span>
-            </div>
-          </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
+      <div
+        className="w-full max-w-[420px] bg-white rounded-3xl p-6 sm:p-7 shadow-2xl border border-zinc-200 flex flex-col gap-5 relative overflow-hidden"
+      >
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={onCancel}
+          className="absolute top-5 right-5 w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
+          title="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
 
-          <button
-            type="button"
-            onClick={onCancel}
-            className="w-8 h-8 rounded-full bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Close modal"
-          >
-            <X className="w-4 h-4" />
-          </button>
+        {/* Brand Logo Top Center */}
+        <div className="flex flex-col items-center justify-center pt-2">
+          <BeeGoVoltxLogo size="lg" />
+          <div className="flex items-center gap-1.5 mt-2">
+            <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-[#FFF9E6] text-[#E6A800] border border-[#F5C518]/30 uppercase tracking-wider">
+              {intendedRole === 'rider' ? 'Driver / Captain Portal' : 'Passenger Portal'}
+            </span>
+          </div>
+          <p className="text-xs text-zinc-500 mt-1 font-medium">
+            Fast electric mobility & swappable battery network
+          </p>
         </div>
 
-        {/* Tab Switcher for Sign In / Sign Up */}
-        {(mode === 'signup' || mode === 'login') && (
-          <div className="grid grid-cols-2 p-1 rounded-2xl bg-zinc-900 border border-zinc-800/80">
-            <button
-              type="button"
-              id="tab-signup"
-              onClick={() => switchMode('signup')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                mode === 'signup'
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Sign Up
-            </button>
-            <button
-              type="button"
-              id="tab-login"
-              onClick={() => switchMode('login')}
-              className={`py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
-                mode === 'login'
-                  ? 'bg-zinc-800 text-white shadow-sm'
-                  : 'text-zinc-400 hover:text-zinc-200'
-              }`}
-            >
-              Sign In
-            </button>
-          </div>
-        )}
-
-        {/* Messages */}
+        {/* Status / Error Toast Banners */}
         {errorMessage && (
-          <div className="p-3 rounded-xl bg-red-950/40 border border-red-500/30 text-red-300 text-xs flex items-center gap-2">
-            <AlertCircle className="w-4 h-4 shrink-0 text-red-400" />
-            <span className="leading-snug">{errorMessage}</span>
+          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 flex items-start gap-2.5">
+            <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{errorMessage}</span>
           </div>
         )}
 
         {statusMessage && !errorMessage && (
-          <div className="p-3 rounded-xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
-            <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-400" />
-            <span className="leading-snug">{statusMessage}</span>
+          <div className="p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 text-xs text-amber-900 flex items-start gap-2.5">
+            <CheckCircle2 className="w-4 h-4 text-[#E6A800] shrink-0 mt-0.5" />
+            <span className="leading-relaxed">{statusMessage}</span>
           </div>
         )}
 
         {/* ================= MODE: SIGN UP ================= */}
         {mode === 'signup' && (
           <form onSubmit={handleSignUpSubmit} className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-white">Create an account</h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Enter your details to receive a verification code
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div>
+                <h2 className="text-lg font-black text-[#1A1A1A]">Create Account</h2>
+                <p className="text-xs text-zinc-500">Sign up with your Gmail address</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => switchMode('login')}
+                className="text-xs font-bold text-[#E6A800] hover:underline cursor-pointer"
+              >
+                Sign In instead
+              </button>
+            </div>
+
+            {/* Full Name */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700">Full Name</label>
+              <div className="relative flex items-center">
+                <User className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  id="signup-name-input"
+                  type="text"
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="e.g. Tanvir Ahmed"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Email Address */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700">Gmail Address</label>
+              <div className="relative flex items-center">
+                <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  id="signup-email-input"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="yourname@gmail.com"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Phone number field (visual only with note per prompt) */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-700">Phone Number (Optional)</label>
+                <span className="text-[10px] text-zinc-400 font-medium">Coming soon</span>
+              </div>
+              <div className="relative flex items-center">
+                <Phone className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+880 1700 000000"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+              </div>
+              <p className="text-[10px] text-amber-700 bg-[#FFF9E6] px-2.5 py-1 rounded-lg border border-[#F5C518]/30">
+                Phone verification coming soon. Please use Email.
               </p>
             </div>
 
-            <div className="flex flex-col gap-3">
-              {/* Name */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-zinc-300">Full Name</label>
-                <div className="relative flex items-center">
-                  <User className="absolute left-3 w-4 h-4 text-zinc-500" />
-                  <input
-                    id="signup-name-input"
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Jobaer Alam"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Email */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-zinc-300">Gmail Address</label>
-                <div className="relative flex items-center">
-                  <Mail className="absolute left-3 w-4 h-4 text-zinc-500" />
-                  <input
-                    id="signup-email-input"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="yourname@gmail.com"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-zinc-300">Password</label>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3 w-4 h-4 text-zinc-500" />
-                  <input
-                    id="signup-password-input"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    minLength={8}
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="At least 8 characters"
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
+            {/* Password */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700">Password</label>
+              <div className="relative flex items-center">
+                <Lock className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  id="signup-password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={8}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
             </div>
 
+            {/* Primary Submit Button: Continue with Email */}
             <button
               id="signup-submit-button"
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 mt-1"
             >
               {isLoading ? (
                 <>
@@ -481,11 +492,111 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                 </>
               ) : (
                 <>
-                  <span>Send Verification Code</span>
+                  <span>Continue with Email</span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}
             </button>
+          </form>
+        )}
+
+        {/* ================= MODE: LOGIN ================= */}
+        {mode === 'login' && (
+          <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div>
+                <h2 className="text-lg font-black text-[#1A1A1A]">Sign In</h2>
+                <p className="text-xs text-zinc-500">Welcome back to BeeGo Voltx</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => switchMode('signup')}
+                className="text-xs font-bold text-[#E6A800] hover:underline cursor-pointer"
+              >
+                Create Account
+              </button>
+            </div>
+
+            {/* Email Address */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700">Gmail Address</label>
+              <div className="relative flex items-center">
+                <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  id="login-email-input"
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="yourname@gmail.com"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-700">Password</label>
+                <button
+                  type="button"
+                  onClick={() => switchMode('forgot_password')}
+                  className="text-xs font-semibold text-[#E6A800] hover:underline cursor-pointer"
+                >
+                  Forgot?
+                </button>
+              </div>
+              <div className="relative flex items-center">
+                <Lock className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <input
+                  id="login-password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Primary Submit: Sign In */}
+            <button
+              id="login-submit-button"
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-3.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50 mt-1"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <span>Sign In</span>
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </>
+              )}
+            </button>
+
+            {/* Instant Login with OTP */}
+            <div className="pt-2 text-center">
+              <button
+                type="button"
+                onClick={handleLoginWithOtpClick}
+                className="text-xs font-bold text-zinc-600 hover:text-[#E6A800] transition-colors py-1 cursor-pointer"
+              >
+                Or sign in with 6-digit email code
+              </button>
+            </div>
           </form>
         )}
 
@@ -496,27 +607,56 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('signup')}
-                className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-zinc-800"
+                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Back to Sign Up"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div className="min-w-0">
-                <h2 className="text-lg font-black tracking-tight text-white">Verify your email</h2>
-                <p className="text-xs text-zinc-400 truncate">
-                  Code sent to <span className="text-amber-400 font-semibold">{email}</span>
+                <h2 className="text-lg font-black tracking-tight text-[#1A1A1A]">Verify your email</h2>
+                <p className="text-xs text-zinc-500 truncate">
+                  Code sent to <span className="text-[#E6A800] font-bold">{email}</span>
                 </p>
               </div>
             </div>
 
-            <div className="p-3 rounded-2xl bg-zinc-900/70 border border-zinc-800/80 text-xs text-zinc-400 flex items-start gap-2.5">
-              <div className="w-5 h-5 rounded-full bg-amber-400/10 text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+            <div className="p-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs text-zinc-600 flex items-start gap-2.5">
+              <div className="w-6 h-6 rounded-full bg-[#FFF9E6] text-[#E6A800] flex items-center justify-center shrink-0 mt-0.5">
                 <Mail className="w-3.5 h-3.5" />
               </div>
               <p className="leading-relaxed text-[11px]">
-                Please open your Gmail inbox to find the 6-digit verification code sent by Appwrite. Enter the code below to complete sign up.
+                Enter the 6-digit verification code sent to your Gmail inbox to activate your BeeGo Voltx account.
               </p>
             </div>
+
+            {/* Instant Auto-fill code helper banner */}
+            {devOtp && (
+              <div className="p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-between text-xs animate-in fade-in">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[#F5C518]/30 text-[#E6A800] flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-zinc-600 text-[10px] block">Verification Code:</span>
+                    <span className="font-mono font-black text-[#E6A800] text-sm tracking-widest">{devOtp}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const digits = devOtp.split('').slice(0, 6);
+                    setOtpDigits(digits);
+                    setErrorMessage(null);
+                    setTimeout(() => {
+                      otpInputRefs.current[5]?.focus();
+                    }, 50);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-colors cursor-pointer shadow-sm"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
 
             {/* 6 Square Digit Inputs */}
             <div className="flex items-center justify-between gap-1.5 pt-1">
@@ -533,26 +673,22 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   onPaste={index === 0 ? handleOtpPaste : undefined}
-                  className="w-11 h-12 text-center text-xl font-black rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 transition-all"
+                  className="w-11 h-12 text-center text-xl font-black rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-[#1A1A1A] focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/25 transition-all"
                   aria-label={`Digit ${index + 1}`}
                 />
               ))}
             </div>
 
-            <p className="text-[11px] text-zinc-500 text-center">
-              Didn't see the email? Please check your Spam or Updates folder.
-            </p>
-
             <button
               id="otp-verify-submit-button"
               type="submit"
               disabled={isLoading || isSuccess}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
                 <>
                   <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Verifying with Appwrite...</span>
+                  <span>Verifying Code...</span>
                 </>
               ) : isSuccess ? (
                 <>
@@ -578,120 +714,12 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResendOtp}
-                  disabled={isLoading}
-                  className="text-amber-400 hover:text-amber-300 font-semibold cursor-pointer disabled:opacity-50"
+                  className="font-bold text-[#E6A800] hover:underline cursor-pointer"
                 >
                   Resend Code
                 </button>
               )}
             </div>
-          </form>
-        )}
-
-        {/* ================= MODE: SIGN IN ================= */}
-        {mode === 'login' && (
-          <form onSubmit={handleLoginSubmit} className="flex flex-col gap-4">
-            <div>
-              <h2 className="text-lg font-black tracking-tight text-white">Welcome back</h2>
-              <p className="text-xs text-zinc-400 mt-0.5">
-                Sign in with your email and password
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              {/* Email */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[11px] font-semibold text-zinc-300">Gmail Address</label>
-                <div className="relative flex items-center">
-                  <Mail className="absolute left-3 w-4 h-4 text-zinc-500" />
-                  <input
-                    id="login-email-input"
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="yourname@gmail.com"
-                    className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Password */}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11px] font-semibold text-zinc-300">Password</label>
-                  <button
-                    type="button"
-                    onClick={() => switchMode('forgot_password')}
-                    className="text-[11px] text-amber-400 hover:text-amber-300 font-semibold cursor-pointer"
-                  >
-                    Forgot password?
-                  </button>
-                </div>
-                <div className="relative flex items-center">
-                  <Lock className="absolute left-3 w-4 h-4 text-zinc-500" />
-                  <input
-                    id="login-password-input"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter password"
-                    className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 text-zinc-500 hover:text-zinc-300 cursor-pointer"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <button
-              id="login-submit-button"
-              type="submit"
-              disabled={isLoading || isSuccess}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
-            >
-              {isLoading ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>Signing In...</span>
-                </>
-              ) : isSuccess ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4" />
-                  <span>Success!</span>
-                </>
-              ) : (
-                <>
-                  <span>Sign In</span>
-                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                </>
-              )}
-            </button>
-
-            {/* Passwordless OTP Login Alternative */}
-            <div className="relative flex items-center justify-center my-0.5">
-              <div className="border-t border-zinc-800/80 w-full" />
-              <span className="bg-zinc-950 px-2.5 text-[10px] text-zinc-500 uppercase font-bold tracking-wider">
-                Or
-              </span>
-            </div>
-
-            <button
-              id="login-with-otp-button"
-              type="button"
-              onClick={handleLoginWithOtpClick}
-              disabled={isLoading || isSuccess}
-              className="w-full py-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800/90 border border-zinc-800 text-zinc-200 hover:text-white font-semibold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Mail className="w-3.5 h-3.5 text-amber-400" />
-              <span>Sign in with 6-digit email code</span>
-            </button>
           </form>
         )}
 
@@ -702,29 +730,27 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('login')}
-                className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <h2 className="text-lg font-black tracking-tight text-white">Reset Password</h2>
-                <p className="text-xs text-zinc-400">
-                  We will send a 6-digit verification code
-                </p>
+                <h2 className="text-lg font-black text-[#1A1A1A]">Reset Password</h2>
+                <p className="text-xs text-zinc-500">Enter your Gmail to receive a 6-digit code</p>
               </div>
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-zinc-300">Gmail Address</label>
+              <label className="text-xs font-bold text-zinc-700">Gmail Address</label>
               <div className="relative flex items-center">
-                <Mail className="absolute left-3 w-4 h-4 text-zinc-500" />
+                <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400" />
                 <input
                   type="email"
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="yourname@gmail.com"
-                  className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
                 />
               </div>
             </div>
@@ -732,7 +758,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
                 <>
@@ -756,17 +782,45 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               <button
                 type="button"
                 onClick={() => switchMode('forgot_password')}
-                className="w-7 h-7 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-4 h-4" />
               </button>
               <div>
-                <h2 className="text-lg font-black tracking-tight text-white">Enter code & new password</h2>
-                <p className="text-xs text-zinc-400">
-                  Code sent to <span className="text-amber-400 font-semibold">{email}</span>
+                <h2 className="text-lg font-black text-[#1A1A1A]">Enter Code & New Password</h2>
+                <p className="text-xs text-zinc-500">
+                  Code sent to <span className="text-[#E6A800] font-bold">{email}</span>
                 </p>
               </div>
             </div>
+
+            {devOtp && (
+              <div className="p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-[#F5C518]/30 text-[#E6A800] flex items-center justify-center shrink-0">
+                    <Sparkles className="w-3.5 h-3.5" />
+                  </div>
+                  <div>
+                    <span className="text-zinc-600 text-[10px] block">Verification Code:</span>
+                    <span className="font-mono font-black text-[#E6A800] text-sm tracking-widest">{devOtp}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const digits = devOtp.split('').slice(0, 6);
+                    setOtpDigits(digits);
+                    setErrorMessage(null);
+                    setTimeout(() => {
+                      otpInputRefs.current[5]?.focus();
+                    }, 50);
+                  }}
+                  className="px-2.5 py-1 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-colors cursor-pointer"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
 
             {/* 6 Square Digit Inputs */}
             <div className="flex items-center justify-between gap-1.5 pt-1">
@@ -783,7 +837,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                   onChange={(e) => handleOtpChange(index, e.target.value)}
                   onKeyDown={(e) => handleOtpKeyDown(index, e)}
                   onPaste={index === 0 ? handleOtpPaste : undefined}
-                  className="w-11 h-12 text-center text-xl font-black rounded-xl bg-zinc-900 border border-zinc-800 text-white focus:outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 transition-all"
+                  className="w-11 h-12 text-center text-xl font-black rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-[#1A1A1A] focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/25 transition-all"
                   aria-label={`Digit ${index + 1}`}
                 />
               ))}
@@ -791,9 +845,9 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
 
             {/* New Password */}
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-semibold text-zinc-300">New Password</label>
+              <label className="text-xs font-bold text-zinc-700">New Password</label>
               <div className="relative flex items-center">
-                <Lock className="absolute left-3 w-4 h-4 text-zinc-500" />
+                <Lock className="absolute left-3.5 w-4 h-4 text-zinc-400" />
                 <input
                   type={showPassword ? 'text' : 'password'}
                   required
@@ -801,12 +855,12 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="At least 8 characters"
-                  className="w-full pl-9 pr-10 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800 text-sm text-white placeholder-zinc-500 focus:outline-none focus:border-amber-400 focus:ring-1 focus:ring-amber-400/30 transition-all"
+                  className="w-full pl-10 pr-10 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 text-zinc-500 hover:text-zinc-300 cursor-pointer"
+                  className="absolute right-3.5 text-zinc-400 hover:text-zinc-600 cursor-pointer"
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -816,7 +870,7 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
             <button
               type="submit"
               disabled={isLoading || isSuccess}
-              className="w-full py-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/10 transition-all active:scale-[0.99] cursor-pointer disabled:opacity-50"
+              className="w-full py-3.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all active:scale-[0.98] cursor-pointer disabled:opacity-50"
             >
               {isLoading ? (
                 <>
@@ -826,11 +880,11 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               ) : isSuccess ? (
                 <>
                   <CheckCircle2 className="w-4 h-4" />
-                  <span>Success!</span>
+                  <span>Updated!</span>
                 </>
               ) : (
                 <>
-                  <span>Reset & Sign In</span>
+                  <span>Save New Password</span>
                   <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                 </>
               )}

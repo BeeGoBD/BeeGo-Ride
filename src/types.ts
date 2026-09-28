@@ -29,6 +29,24 @@ export interface RouteData {
 export type UserRole = 'passenger' | 'rider';
 export type RideStage = 'request' | 'navigation';
 
+export type DriverVerificationStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
+
+export interface DriverProfile {
+  id: string; // e.g. DRV-7892
+  name: string;
+  phone: string;
+  nidFrontUrl: string;
+  nidBackUrl: string;
+  selfieUrl: string;
+  verificationStatus: DriverVerificationStatus;
+  createdAt: number;
+  submittedAtFormatted: string;
+  statusNotes?: string;
+  vehicleModel?: string;
+  plateNumber?: string;
+  rating?: number;
+}
+
 export type RideStatus =
   | 'idle'
   | 'requested'
