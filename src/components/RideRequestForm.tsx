@@ -114,11 +114,13 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
         setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
         updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
 
-        const point = await reverseGeocode(res.lat, res.lon, activeKey);
-        if (!isMounted) return;
-        setPickup(point);
-        setPickupInput(point.formatted);
-        setIsPickupLiveGps(true);
+        if (!pickup) {
+          const point = await reverseGeocode(res.lat, res.lon, activeKey);
+          if (!isMounted) return;
+          setPickup(point);
+          setPickupInput(point.formatted);
+          setIsPickupLiveGps(true);
+        }
       } catch (err) {
         console.warn('Auto GPS notice:', err);
       } finally {

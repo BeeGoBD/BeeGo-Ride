@@ -11,9 +11,11 @@ async function startServer() {
   const APPWRITE_UPSTREAM = process.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
   const APPWRITE_PROJECT_ID = process.env.VITE_APPWRITE_PROJECT_ID || '6aaec93d001b38fee383';
 
-  // Persistent storage setup for passengers and sessions
+  // Persistent storage setup for passengers, drivers, restrictions and sessions
   const DATA_DIR = path.join(process.cwd(), 'data');
   const PASSENGERS_FILE = path.join(DATA_DIR, 'beego_passengers.json');
+  const DRIVERS_FILE = path.join(DATA_DIR, 'beego_drivers.json');
+  const RESTRICTIONS_FILE = path.join(DATA_DIR, 'beego_restrictions.json');
   const SESSIONS_FILE = path.join(DATA_DIR, 'beego_sessions.json');
 
   if (!fs.existsSync(DATA_DIR)) {
@@ -27,6 +29,7 @@ async function startServer() {
   interface StoredPassenger {
     id: string;
     email: string;
+    phone?: string;
     name: string;
     passwordHash?: string;
     salt?: string;
@@ -34,6 +37,47 @@ async function startServer() {
     isEmailVerified: boolean;
     createdAt: number;
     updatedAt: number;
+  }
+
+  interface StoredDriver {
+    id: string;
+    name: string;
+    phone: string;
+    secondaryPhone?: string;
+    email: string;
+    passwordHash?: string;
+    salt?: string;
+    nidNumber?: string;
+    nidFrontUrl?: string;
+    nidBackUrl?: string;
+    selfieUrl?: string;
+    verificationStatus: 'pending' | 'approved' | 'rejected';
+    vehicleModel: string;
+    plateNumber: string;
+    rating: number;
+    statusNotes?: string;
+    rejectionReason?: string;
+    createdAt: number;
+    submittedAtFormatted: string;
+    updatedAt: number;
+    pendingUpdateRequest?: {
+      newName?: string;
+      newPhone?: string;
+      newSecondaryPhone?: string;
+      reason?: string;
+      requestedAt: number;
+    };
+  }
+
+  interface StoredRestriction {
+    id: string;
+    targetType: 'passenger' | 'driver';
+    targetId: string;
+    name: string;
+    phone: string;
+    email?: string;
+    reason: string;
+    restrictedAt: number;
   }
 
   interface StoredSession {
@@ -56,13 +100,74 @@ async function startServer() {
     return {};
   }
 
-  // Save passengers to disk
   function savePassengers(passengers: Record<string, StoredPassenger>) {
     try {
       fs.writeFileSync(PASSENGERS_FILE, JSON.stringify(passengers, null, 2), 'utf-8');
     } catch (e) {
       console.warn('[Storage] Error saving passengers file:', e);
     }
+  }
+
+  // Load drivers from disk
+  function loadDrivers(): Record<string, StoredDriver> {
+    try {
+      if (fs.existsSync(DRIVERS_FILE)) {
+        const raw = fs.readFileSync(DRIVERS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Storage] Error reading drivers file:', e);
+    }
+    return {};
+  }
+
+  function saveDrivers(drivers: Record<string, StoredDriver>) {
+    try {
+      fs.writeFileSync(DRIVERS_FILE, JSON.stringify(drivers, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving drivers file:', e);
+    }
+  }
+
+  // Load restrictions from disk
+  function loadRestrictions(): Record<string, StoredRestriction> {
+    try {
+      if (fs.existsSync(RESTRICTIONS_FILE)) {
+        const raw = fs.readFileSync(RESTRICTIONS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Storage] Error reading restrictions file:', e);
+    }
+    return {};
+  }
+
+  function saveRestrictions(restrictions: Record<string, StoredRestriction>) {
+    try {
+      fs.writeFileSync(RESTRICTIONS_FILE, JSON.stringify(restrictions, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving restrictions file:', e);
+    }
+  }
+
+  // Check if a phone or email is restricted
+  function isTargetRestricted(phone?: string, email?: string): boolean {
+    const restrictions = loadRestrictions();
+    const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+    const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+    for (const r of Object.values(restrictions)) {
+      const rPhone = (r.phone || '').replace(/[^0-9]/g, '');
+      const rEmail = (r.email || '').trim().toLowerCase();
+
+      if (cleanPhone && rPhone && (cleanPhone === rPhone || cleanPhone.includes(rPhone) || rPhone.includes(cleanPhone))) {
+        return true;
+      }
+      if (cleanEmail && rEmail && cleanEmail === rEmail) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // Load sessions from disk
@@ -119,12 +224,31 @@ async function startServer() {
   // POST /api/auth/otp/send - Dispatches 6-digit OTP code to passenger's Gmail
   app.post('/api/auth/otp/send', async (req, res) => {
     try {
-      const { email, name, password } = req.body || {};
+      const { email, name, phone, password } = req.body || {};
       const cleanEmail = (email || '').trim().toLowerCase();
       const cleanName = (name || '').trim() || cleanEmail.split('@')[0] || 'Passenger';
+      const cleanPhone = (phone || '').trim();
 
       if (!cleanEmail || !cleanEmail.endsWith('@gmail.com')) {
         return res.status(400).json({ error: 'A valid @gmail.com email address is required.' });
+      }
+
+      // Check restriction
+      if (isTargetRestricted(cleanPhone, cleanEmail)) {
+        return res.status(403).json({
+          error: 'This account has been restricted by Admin. Please contact support.',
+        });
+      }
+
+      // Segregation check: Driver cannot register or login as Passenger
+      const drivers = loadDrivers();
+      const driverWithEmail = Object.values(drivers).find(
+        (d) => d.email && d.email.trim().toLowerCase() === cleanEmail
+      );
+      if (driverWithEmail) {
+        return res.status(403).json({
+          error: 'This email is registered as a Driver account. Drivers cannot log in as passengers.',
+        });
       }
 
       // Generate unique user ID candidate
@@ -359,6 +483,24 @@ async function startServer() {
         return res.status(400).json({ error: 'Please enter your password.' });
       }
 
+      // Restriction check
+      if (isTargetRestricted(undefined, cleanEmail)) {
+        return res.status(403).json({
+          error: 'This account has been restricted by Admin. Please contact support.',
+        });
+      }
+
+      // Segregation check: Driver cannot login as Passenger
+      const drivers = loadDrivers();
+      const driverWithEmail = Object.values(drivers).find(
+        (d) => d.email && d.email.trim().toLowerCase() === cleanEmail
+      );
+      if (driverWithEmail) {
+        return res.status(403).json({
+          error: 'This email is registered as a Driver. Drivers cannot log in as passengers.',
+        });
+      }
+
       // Try Appwrite sessions first if available
       try {
         const controller = new AbortController();
@@ -529,6 +671,517 @@ async function startServer() {
       return res.json({ success: true, message: 'Logged out successfully.' });
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to logout.' });
+    }
+  });
+
+  // Admin and Driver JSON parsing middleware
+  app.use('/api/admin', express.json({ limit: '15mb' }));
+  app.use('/api/driver', express.json({ limit: '15mb' }));
+
+  // POST /api/admin/auth/login - Secret Admin Panel Authentication
+  app.post('/api/admin/auth/login', (req, res) => {
+    try {
+      const { id, password } = req.body || {};
+      const cleanId = (id || '').trim();
+      const cleanPw = (password || '').trim();
+
+      // Easy default admin credentials (can be updated by admin)
+      if ((cleanId === 'admin' || cleanId === 'beego_admin') && (cleanPw === 'admin' || cleanPw === 'admin123')) {
+        const token = 'admin_sess_' + crypto.randomBytes(24).toString('hex');
+        return res.json({
+          success: true,
+          token,
+          user: { id: 'admin', role: 'super_admin', name: 'BeeGo Master Admin' },
+        });
+      }
+
+      return res.status(401).json({
+        error: 'Invalid Secret Admin ID or Password. Access denied.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Admin authentication failed.' });
+    }
+  });
+
+  // GET /api/admin/stats - Quick telemetry counts
+  app.get('/api/admin/stats', (req, res) => {
+    try {
+      const drivers = Object.values(loadDrivers());
+      const passengers = Object.values(loadPassengers());
+      const restrictions = Object.values(loadRestrictions());
+
+      const pendingDrivers = drivers.filter((d) => d.verificationStatus === 'pending').length;
+      const approvedDrivers = drivers.filter((d) => d.verificationStatus === 'approved').length;
+      const rejectedDrivers = drivers.filter((d) => d.verificationStatus === 'rejected').length;
+
+      return res.json({
+        success: true,
+        stats: {
+          pendingDrivers,
+          approvedDrivers,
+          rejectedDrivers,
+          totalDrivers: drivers.length,
+          totalPassengers: passengers.length,
+          totalRestricted: restrictions.length,
+        },
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch admin stats.' });
+    }
+  });
+
+  // GET /api/admin/drivers - Full driver directory with verification details
+  app.get('/api/admin/drivers', (req, res) => {
+    try {
+      const drivers = Object.values(loadDrivers()).sort((a, b) => b.createdAt - a.createdAt);
+      return res.json({ success: true, drivers });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch drivers.' });
+    }
+  });
+
+  // POST /api/admin/drivers/status - Approve or reject driver application
+  app.post('/api/admin/drivers/status', (req, res) => {
+    try {
+      const { driverId, status, notes } = req.body || {};
+      if (!driverId || !['approved', 'rejected', 'pending'].includes(status)) {
+        return res.status(400).json({ error: 'Invalid driver ID or verification status.' });
+      }
+
+      const drivers = loadDrivers();
+      const driver = drivers[driverId];
+      if (!driver) {
+        return res.status(404).json({ error: 'Driver profile not found.' });
+      }
+
+      driver.verificationStatus = status;
+      driver.updatedAt = Date.now();
+      if (notes) {
+        driver.statusNotes = notes;
+      }
+      if (status === 'rejected') {
+        driver.rejectionReason = notes || 'Documentation could not be verified.';
+      } else if (status === 'approved') {
+        driver.statusNotes = 'Approved by BeeGo Operations Admin.';
+      }
+
+      drivers[driverId] = driver;
+      saveDrivers(drivers);
+
+      return res.json({
+        success: true,
+        driver,
+        message: `Driver ${driver.name} is now ${status}.`,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update driver status.' });
+    }
+  });
+
+  // POST /api/driver/register - Driver sign-up with duplicate check
+  app.post('/api/driver/register', (req, res) => {
+    try {
+      const {
+        name,
+        phone,
+        secondaryPhone,
+        email,
+        password,
+        nidNumber,
+        nidFrontUrl,
+        nidBackUrl,
+        selfieUrl,
+        vehicleModel,
+        plateNumber,
+      } = req.body || {};
+
+      const cleanName = (name || '').trim();
+      const cleanPhone = (phone || '').trim();
+      const cleanSecondaryPhone = (secondaryPhone || '').trim();
+      const cleanEmail = (email || '').trim().toLowerCase();
+
+      if (!cleanName || !cleanPhone || !cleanEmail) {
+        return res.status(400).json({ error: 'Full name, primary phone, and email are required.' });
+      }
+
+      // Check restriction
+      if (isTargetRestricted(cleanPhone, cleanEmail) || (cleanSecondaryPhone && isTargetRestricted(cleanSecondaryPhone))) {
+        return res.status(403).json({
+          error: 'This phone number or email is restricted. Please contact BeeGo admin.',
+        });
+      }
+
+      const drivers = loadDrivers();
+      const passengers = loadPassengers();
+
+      const rawPhone = cleanPhone.replace(/[^0-9]/g, '');
+
+      // Duplicate phone check: 1 number for 1 account
+      for (const d of Object.values(drivers)) {
+        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+        if (dPhone && (dPhone === rawPhone || rawPhone.includes(dPhone) || dPhone.includes(rawPhone))) {
+          return res.status(400).json({
+            error: 'A driver account already exists with this phone number. Multiple accounts are not allowed.',
+          });
+        }
+        if (d.email && d.email.trim().toLowerCase() === cleanEmail) {
+          return res.status(400).json({
+            error: 'A driver account already exists with this email address. Multiple accounts are not allowed.',
+          });
+        }
+      }
+
+      // Cross-role segregation check: Passenger cannot log in or register as driver
+      for (const p of Object.values(passengers)) {
+        if (p.email && p.email.trim().toLowerCase() === cleanEmail) {
+          return res.status(400).json({
+            error: 'This email is already registered as a Passenger. Passengers cannot register as drivers.',
+          });
+        }
+      }
+
+      const driverId = 'DRV-' + Math.floor(1000 + Math.random() * 9000);
+      const now = Date.now();
+      const dateStr = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      let pwInfo: { hash?: string; salt?: string } = {};
+      if (password) {
+        pwInfo = hashPassword(password);
+      }
+
+      const newDriver: StoredDriver = {
+        id: driverId,
+        name: cleanName,
+        phone: cleanPhone,
+        secondaryPhone: cleanSecondaryPhone,
+        email: cleanEmail,
+        passwordHash: pwInfo.hash,
+        salt: pwInfo.salt,
+        nidNumber: nidNumber || '',
+        nidFrontUrl: nidFrontUrl || '',
+        nidBackUrl: nidBackUrl || '',
+        selfieUrl: selfieUrl || '',
+        verificationStatus: 'pending', // Driver must wait for admin verification
+        vehicleModel: vehicleModel || 'Voltx Eco Speed Bike (Electric)',
+        plateNumber: plateNumber || 'Dhaka Metro-Ha 45-8921',
+        rating: 5.0,
+        createdAt: now,
+        submittedAtFormatted: dateStr,
+        updatedAt: now,
+        statusNotes: 'Under review by BeeGo Operations Admin. Verification call pending.',
+      };
+
+      drivers[driverId] = newDriver;
+      saveDrivers(drivers);
+
+      return res.json({
+        success: true,
+        driver: newDriver,
+        message: 'Driver application submitted successfully. Verification pending approval by admin.',
+      });
+    } catch (err: any) {
+      console.error('[Driver Register Error]', err);
+      return res.status(500).json({ error: 'Failed to submit driver application.' });
+    }
+  });
+
+  // POST /api/driver/login - Driver login with status and restriction check
+  app.post('/api/driver/login', (req, res) => {
+    try {
+      const { phone, password } = req.body || {};
+      const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+
+      if (!cleanPhone) {
+        return res.status(400).json({ error: 'Please enter your registered phone number.' });
+      }
+
+      // Check restriction
+      if (isTargetRestricted(cleanPhone)) {
+        return res.status(403).json({
+          error: 'Your driver account has been restricted by Admin. Please contact support.',
+        });
+      }
+
+      const drivers = loadDrivers();
+      const driver = Object.values(drivers).find((d) => {
+        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+        return dPhone && (dPhone === cleanPhone || dPhone.includes(cleanPhone) || cleanPhone.includes(dPhone));
+      });
+
+      if (!driver) {
+        return res.status(404).json({
+          error: 'No driver account found with this phone number. Please register first.',
+        });
+      }
+
+      // Check verification status
+      if (driver.verificationStatus === 'pending') {
+        return res.status(403).json({
+          error: 'Your driver application is under review. Our team will verify your details and call you to approve your account shortly.',
+          status: 'pending',
+        });
+      }
+
+      if (driver.verificationStatus === 'rejected') {
+        return res.status(403).json({
+          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo support.'}`,
+          status: 'rejected',
+        });
+      }
+
+      // Verify password if provided
+      if (password && driver.passwordHash && driver.salt) {
+        const isValid = verifyPassword(password, driver.passwordHash, driver.salt);
+        if (!isValid) {
+          return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+        }
+      }
+
+      return res.json({
+        success: true,
+        driver,
+        message: 'Driver logged in successfully.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Driver login failed.' });
+    }
+  });
+
+  // POST /api/driver/request-update - Driver requests change to name, phone, etc.
+  app.post('/api/driver/request-update', (req, res) => {
+    try {
+      const { driverId, newName, newPhone, newSecondaryPhone, reason } = req.body || {};
+      if (!driverId) {
+        return res.status(400).json({ error: 'Driver ID is required.' });
+      }
+
+      const drivers = loadDrivers();
+      const driver = drivers[driverId];
+      if (!driver) {
+        return res.status(404).json({ error: 'Driver not found.' });
+      }
+
+      const pendingUpdate = {
+        newName: (newName || '').trim(),
+        newPhone: (newPhone || '').trim(),
+        newSecondaryPhone: (newSecondaryPhone || '').trim(),
+        reason: (reason || '').trim(),
+        requestedAt: Date.now(),
+      };
+
+      driver.pendingUpdateRequest = pendingUpdate;
+      driver.statusNotes = `Account update requested: ${pendingUpdate.newName ? 'Name: ' + pendingUpdate.newName + '; ' : ''}${pendingUpdate.newPhone ? 'Phone: ' + pendingUpdate.newPhone : ''}. Verification call required.`;
+      driver.updatedAt = Date.now();
+
+      drivers[driverId] = driver;
+      saveDrivers(drivers);
+
+      return res.json({
+        success: true,
+        message: 'Update request submitted to BeeGo Admin. An operations officer will call you to verify your details.',
+        driver,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to submit update request.' });
+    }
+  });
+
+  // POST /api/driver/reset-phone/request-otp - Send email OTP to reset driver phone number
+  app.post('/api/driver/reset-phone/request-otp', (req, res) => {
+    try {
+      const { email } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'Registered email address is required.' });
+      }
+
+      const drivers = loadDrivers();
+      const driver = Object.values(drivers).find((d) => d.email && d.email.trim().toLowerCase() === cleanEmail);
+
+      if (!driver) {
+        return res.status(404).json({ error: 'No driver account found with this email address.' });
+      }
+
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 10 * 60 * 1000;
+
+      otpStore.set(cleanEmail, {
+        userId: driver.id,
+        email: cleanEmail,
+        name: driver.name,
+        otp: generatedOtp,
+        expiresAt,
+        attempts: 0,
+        isFallback: true,
+      });
+
+      console.log(`[Beego Driver] Phone reset OTP for ${cleanEmail}: ${generatedOtp}`);
+
+      return res.json({
+        success: true,
+        message: `Verification code sent to ${cleanEmail}. Enter the code to reset your phone number.`,
+        devOtp: generatedOtp,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to send reset code.' });
+    }
+  });
+
+  // POST /api/driver/reset-phone/verify-otp - Verify OTP and update driver phone
+  app.post('/api/driver/reset-phone/verify-otp', (req, res) => {
+    try {
+      const { email, otp, newPhone } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanOtp = (otp || '').trim();
+      const cleanPhone = (newPhone || '').trim();
+
+      if (!cleanEmail || !cleanOtp || !cleanPhone) {
+        return res.status(400).json({ error: 'Email, 6-digit OTP, and new phone number are required.' });
+      }
+
+      const record = otpStore.get(cleanEmail);
+      if (!record || Date.now() > record.expiresAt) {
+        return res.status(400).json({ error: 'OTP code has expired or is invalid. Please request a new code.' });
+      }
+
+      if (record.otp !== cleanOtp) {
+        return res.status(400).json({ error: 'Invalid verification code.' });
+      }
+
+      if (isTargetRestricted(cleanPhone)) {
+        return res.status(403).json({ error: 'This phone number is restricted.' });
+      }
+
+      const drivers = loadDrivers();
+      const driver = Object.values(drivers).find((d) => d.email && d.email.trim().toLowerCase() === cleanEmail);
+
+      if (!driver) {
+        return res.status(404).json({ error: 'Driver account not found.' });
+      }
+
+      driver.phone = cleanPhone;
+      driver.updatedAt = Date.now();
+      driver.statusNotes = `Phone number reset via verified Email OTP on ${new Date().toLocaleString()}.`;
+
+      drivers[driver.id] = driver;
+      saveDrivers(drivers);
+      otpStore.delete(cleanEmail);
+
+      return res.json({
+        success: true,
+        message: 'Phone number updated successfully.',
+        driver,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to reset phone number.' });
+    }
+  });
+
+  // GET /api/admin/passengers - Passenger directory (name, phone/email, restriction state)
+  app.get('/api/admin/passengers', (req, res) => {
+    try {
+      const passengers = Object.values(loadPassengers()).map((p) => ({
+        id: p.id,
+        name: p.name,
+        email: p.email,
+        phone: p.phone || '',
+        createdAt: p.createdAt,
+        role: p.role,
+        isRestricted: isTargetRestricted(p.phone, p.email),
+      }));
+
+      return res.json({ success: true, passengers });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch passengers.' });
+    }
+  });
+
+  // GET /api/admin/restrictions - List of restricted users
+  app.get('/api/admin/restrictions', (req, res) => {
+    try {
+      const restrictions = Object.values(loadRestrictions()).sort((a, b) => b.restrictedAt - a.restrictedAt);
+      return res.json({ success: true, restrictions });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch restrictions.' });
+    }
+  });
+
+  // POST /api/admin/restrictions/add - Restrict a passenger or driver
+  app.post('/api/admin/restrictions/add', (req, res) => {
+    try {
+      const { targetType, targetId, name, phone, email, reason } = req.body || {};
+      if (!targetType || (!targetId && !phone && !email)) {
+        return res.status(400).json({ error: 'Target details required for restriction.' });
+      }
+
+      const restrictions = loadRestrictions();
+      const restrictionId = 'REST-' + Date.now().toString(36);
+
+      const entry: StoredRestriction = {
+        id: restrictionId,
+        targetType: targetType === 'driver' ? 'driver' : 'passenger',
+        targetId: targetId || restrictionId,
+        name: name || 'User',
+        phone: phone || '',
+        email: email || '',
+        reason: reason || 'Restricted by BeeGo Administrator due to policy violation.',
+        restrictedAt: Date.now(),
+      };
+
+      restrictions[restrictionId] = entry;
+      saveRestrictions(restrictions);
+
+      return res.json({
+        success: true,
+        restriction: entry,
+        message: `${entry.name} (${targetType}) has been restricted.`,
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to add restriction.' });
+    }
+  });
+
+  // POST /api/admin/restrictions/remove - Unrestrict / reactivate user
+  app.post('/api/admin/restrictions/remove', (req, res) => {
+    try {
+      const { id, targetId, phone, email } = req.body || {};
+      const restrictions = loadRestrictions();
+      let removed = false;
+
+      const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+      const cleanEmail = email ? email.trim().toLowerCase() : '';
+
+      for (const [key, r] of Object.entries(restrictions)) {
+        const rPhone = (r.phone || '').replace(/[^0-9]/g, '');
+        const rEmail = (r.email || '').trim().toLowerCase();
+
+        if (
+          r.id === id ||
+          r.targetId === targetId ||
+          (cleanPhone && rPhone === cleanPhone) ||
+          (cleanEmail && rEmail === cleanEmail)
+        ) {
+          delete restrictions[key];
+          removed = true;
+        }
+      }
+
+      if (removed) {
+        saveRestrictions(restrictions);
+        return res.json({ success: true, message: 'Account unrestricted successfully.' });
+      }
+
+      return res.status(404).json({ error: 'Restriction record not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to remove restriction.' });
     }
   });
 

@@ -26,8 +26,16 @@ export interface RouteData {
   steps: RouteStep[];
 }
 
-export type UserRole = 'passenger' | 'rider';
+export type UserRole = 'passenger' | 'rider' | 'admin';
 export type RideStage = 'request' | 'navigation';
+
+export interface ChatMessage {
+  id: string;
+  sender: 'passenger' | 'rider';
+  senderName: string;
+  text: string;
+  timestamp: number;
+}
 
 export type DriverVerificationStatus = 'pending' | 'under_review' | 'approved' | 'rejected';
 
@@ -35,6 +43,8 @@ export interface DriverProfile {
   id: string; // e.g. DRV-7892
   name: string;
   phone: string;
+  secondaryPhone?: string;
+  email?: string;
   nidFrontUrl: string;
   nidBackUrl: string;
   selfieUrl: string;
@@ -42,6 +52,7 @@ export interface DriverProfile {
   createdAt: number;
   submittedAtFormatted: string;
   statusNotes?: string;
+  rejectionReason?: string;
   vehicleModel?: string;
   plateNumber?: string;
   rating?: number;
@@ -98,6 +109,7 @@ export interface RideRequest {
   routeData?: RouteData;
   pickupRouteData?: RouteData; // route from rider to pickup
   liveTracking?: LiveTrackingData;
+  chatMessages?: ChatMessage[];
   driverDetails?: {
     name: string;
     vehicleType?: 'bike' | 'car';

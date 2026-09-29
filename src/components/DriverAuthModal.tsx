@@ -46,9 +46,12 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   const [fullName, setFullName] = useState('');
   const [phoneCountryCode, setPhoneCountryCode] = useState('+880');
   const [phoneNumber, setPhoneNumber] = useState('');
+  const [secondaryPhone, setSecondaryPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
 
   // Photo uploads
   const [nidFrontUrl, setNidFrontUrl] = useState<string | null>(null);
@@ -93,7 +96,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   };
 
   // Submit Driver Registration
-  const handleRegisterSubmit = (e: React.FormEvent) => {
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -138,19 +141,20 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
 
     try {
       const fullPhone = `${phoneCountryCode} ${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
-      const driver = registerNewDriver({
+      const fullSecondary = secondaryPhone.trim() ? `${phoneCountryCode} ${secondaryPhone.trim().replace(/[^0-9]/g, '').slice(-10)}` : undefined;
+      await registerNewDriver({
         name: fullName.trim(),
         phone: fullPhone,
+        secondaryPhone: fullSecondary,
+        email: email.trim().toLowerCase(),
         nidFrontUrl,
         nidBackUrl,
         selfieUrl,
         password,
       });
 
-      setTimeout(() => {
-        setIsSubmitting(false);
-        onAuthenticated(driver);
-      }, 700);
+      setIsSubmitting(false);
+      setIsSubmittedSuccess(true);
     } catch (err: any) {
       setIsSubmitting(false);
       setErrorMessage(err.message || 'Registration failed. Please check your information.');
@@ -158,7 +162,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   };
 
   // Submit Driver Login
-  const handleLoginSubmit = (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
@@ -176,16 +180,9 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      const driver = loginDriver(cleanPhone, password);
-      if (driver) {
-        setTimeout(() => {
-          setIsSubmitting(false);
-          onAuthenticated(driver);
-        }, 500);
-      } else {
-        setIsSubmitting(false);
-        setErrorMessage('Driver account not found. Please click "Register as Driver" below.');
-      }
+      const driver = await loginDriver(cleanPhone, password);
+      setIsSubmitting(false);
+      onAuthenticated(driver);
     } catch (err: any) {
       setIsSubmitting(false);
       setErrorMessage(err.message || 'Login failed.');
@@ -256,61 +253,126 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
 
         {/* Scrollable Form Body */}
         <div className="overflow-y-auto p-5 space-y-4 flex-1">
-          {/* Error Banner */}
-          {errorMessage && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-              <div className="flex-1 font-semibold">{errorMessage}</div>
-            </div>
-          )}
-
-          {/* ========================================================
-              REGISTER AS DRIVER FORM
-          ======================================================== */}
-          {mode === 'register' ? (
-            <form onSubmit={handleRegisterSubmit} className="space-y-4">
-              {/* Section 1: Personal Details */}
-              <div className="space-y-3">
-                <div className="text-[11px] uppercase font-mono font-bold text-zinc-400 tracking-wider flex items-center gap-1.5">
-                  <User className="w-3.5 h-3.5 text-[#E6A800]" />
-                  <span>1. Personal Information</span>
-                </div>
-
-                {/* Full Name */}
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">
-                    Full Name <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="e.g. Tanvir Ahmed (as on NID)"
-                    className="w-full px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
-                  />
-                </div>
-
-                {/* Phone Number */}
-                <div>
-                  <label className="block text-xs font-bold text-zinc-700 mb-1">
-                    Mobile Phone Number <span className="text-rose-500">*</span>
-                  </label>
-                  <div className="flex gap-2">
-                    <span className="px-3 py-2.5 bg-zinc-100 border border-zinc-200 rounded-2xl text-xs font-bold font-mono text-zinc-700 flex items-center">
-                      🇧🇩 +880
-                    </span>
-                    <input
-                      type="tel"
-                      required
-                      value={phoneNumber}
-                      onChange={(e) => setPhoneNumber(e.target.value)}
-                      placeholder="1712-345678"
-                      className="flex-1 px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
-                    />
-                  </div>
-                </div>
+          {/* Submission Under Review State */}
+          {isSubmittedSuccess ? (
+            <div className="py-8 px-4 text-center flex flex-col items-center justify-center gap-3">
+              <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border-2 border-[#F5C518] text-[#E6A800] flex items-center justify-center shadow-lg shadow-amber-500/10">
+                <Clock className="w-8 h-8 stroke-[2.2]" />
               </div>
+              <h3 className="text-base font-black text-zinc-900">Application Under Review</h3>
+              <p className="text-xs text-zinc-600 max-w-xs leading-relaxed">
+                Thank you for applying, <span className="font-bold text-zinc-900">{fullName}</span>! Your documents are undergoing verification. Our operations admin team will verify your details and call you shortly to activate your driver account.
+              </p>
+              <div className="w-full p-3 rounded-2xl bg-zinc-100 border border-zinc-200 text-left text-xs font-mono space-y-1">
+                <div className="text-zinc-500 text-[10px] uppercase font-bold">Applicant Details:</div>
+                <div className="text-zinc-800">Phone: {phoneNumber}</div>
+                {secondaryPhone && <div className="text-zinc-500 text-[11px]">Alt Phone: {secondaryPhone}</div>}
+                <div className="text-zinc-800">Email: {email}</div>
+                <div className="text-amber-700 font-bold">Status: Pending Admin Approval</div>
+              </div>
+              <button
+                type="button"
+                onClick={onCancel}
+                className="w-full mt-2 py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md"
+              >
+                Back to Home
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Error Banner */}
+              {errorMessage && (
+                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
+                  <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
+                  <div className="flex-1 font-semibold">{errorMessage}</div>
+                </div>
+              )}
+
+              {/* ========================================================
+                  REGISTER AS DRIVER FORM
+              ======================================================== */}
+              {mode === 'register' ? (
+                <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  {/* Section 1: Personal Details */}
+                  <div className="space-y-3">
+                    <div className="text-[11px] uppercase font-mono font-bold text-zinc-400 tracking-wider flex items-center gap-1.5">
+                      <User className="w-3.5 h-3.5 text-[#E6A800]" />
+                      <span>1. Personal Information</span>
+                    </div>
+
+                    {/* Full Name */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 mb-1">
+                        Full Name <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value)}
+                        placeholder="e.g. Tanvir Ahmed (as on NID)"
+                        className="w-full px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
+                      />
+                    </div>
+
+                    {/* Primary Phone Number (Used for client calls) */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 mb-1">
+                        Primary Phone Number (For Client Calls) <span className="text-rose-500">*</span>
+                      </label>
+                      <div className="flex gap-2">
+                        <span className="px-3 py-2.5 bg-zinc-100 border border-zinc-200 rounded-2xl text-xs font-bold font-mono text-zinc-700 flex items-center">
+                          🇧🇩 +880
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          value={phoneNumber}
+                          onChange={(e) => setPhoneNumber(e.target.value)}
+                          placeholder="1712-345678"
+                          className="flex-1 px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Secondary Emergency Phone (Not used for client calls) */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 mb-1">
+                        Secondary / Emergency Phone <span className="text-rose-500">*</span>
+                        <span className="text-[10px] text-zinc-400 font-normal ml-1">
+                          (Won't be used for client calls)
+                        </span>
+                      </label>
+                      <div className="flex gap-2">
+                        <span className="px-3 py-2.5 bg-zinc-100 border border-zinc-200 rounded-2xl text-xs font-bold font-mono text-zinc-700 flex items-center">
+                          🇧🇩 +880
+                        </span>
+                        <input
+                          type="tel"
+                          required
+                          value={secondaryPhone}
+                          onChange={(e) => setSecondaryPhone(e.target.value)}
+                          placeholder="1812-987654"
+                          className="flex-1 px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Email Address */}
+                    <div>
+                      <label className="block text-xs font-bold text-zinc-700 mb-1">
+                        Gmail Address <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        placeholder="e.g. driver@gmail.com"
+                        className="w-full px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
+                      />
+                    </div>
+                  </div>
 
               {/* Section 2: NID Verification (Front & Back) */}
               <div className="space-y-3 pt-2 border-t border-zinc-100">
@@ -721,8 +783,10 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
               </div>
             </form>
           )}
-        </div>
-      </div>
+        </>
+      )}
     </div>
+  </div>
+</div>
   );
 };

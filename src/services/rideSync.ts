@@ -1,6 +1,7 @@
-import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData, PaymentMethod } from '../types';
+import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData, PaymentMethod, ChatMessage } from '../types';
+import { getCurrentDriver } from './driverAuth';
 
-export const RATE_PER_KM_TAKA = 70;
+export const RATE_PER_KM_TAKA = 25; // Flat ৳25/km guaranteed fair price
 const STORAGE_KEY = 'geoapify_active_ride';
 const CHANNEL_NAME = 'geoapify_ride_broadcast';
 export const REAL_TRIP_HISTORY_KEY = 'beego_real_trip_history';
@@ -205,16 +206,39 @@ export function updatePassengerLiveLocation(coords: { lat: number; lon: number }
 /**
  * Rider accepts the ride
  */
-export function acceptRide(riderId: string, pickupRouteData?: RouteData): RideRequest | null {
+export function acceptRide(
+  riderId: string,
+  pickupRouteData?: RouteData,
+  customDriverDetails?: {
+    name: string;
+    vehicleModel: string;
+    plateNumber: string;
+    rating: number;
+    phone: string;
+  }
+): RideRequest | null {
   const current = getStoredRide();
   if (!current) return null;
+
+  const activeDriver = getCurrentDriver();
+  const assignedDriver =
+    customDriverDetails ||
+    (activeDriver
+      ? {
+          name: activeDriver.name || 'Voltx Captain',
+          vehicleModel: activeDriver.vehicleModel || 'Voltx Eco Speed (Electric)',
+          plateNumber: activeDriver.plateNumber || 'Dhaka Metro-Ha 45-8921',
+          rating: activeDriver.rating || 4.96,
+          phone: activeDriver.phone || '+880 1712-345678',
+        }
+      : current.driverDetails || DEFAULT_DRIVER);
 
   const updated: RideRequest = {
     ...current,
     riderId,
     status: 'accepted',
     pickupRouteData: pickupRouteData || current.pickupRouteData,
-    driverDetails: current.driverDetails || DEFAULT_DRIVER,
+    driverDetails: assignedDriver,
   };
 
   saveAndBroadcastRide(updated);
@@ -357,4 +381,33 @@ export function cancelRide(): void {
  */
 export function clearCurrentRide(): void {
   saveAndBroadcastRide(null);
+}
+
+/**
+ * Send in-ride synchronized chat message between passenger and driver
+ */
+export function sendInRideChatMessage(
+  sender: 'passenger' | 'rider',
+  senderName: string,
+  text: string
+): RideRequest | null {
+  const current = getStoredRide();
+  if (!current) return null;
+
+  const newMessage: ChatMessage = {
+    id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+    sender,
+    senderName,
+    text: text.trim(),
+    timestamp: Date.now(),
+  };
+
+  const currentMessages = current.chatMessages || [];
+  const updated: RideRequest = {
+    ...current,
+    chatMessages: [...currentMessages, newMessage],
+  };
+
+  saveAndBroadcastRide(updated);
+  return updated;
 }

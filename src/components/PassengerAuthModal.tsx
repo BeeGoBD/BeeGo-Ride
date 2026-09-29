@@ -26,13 +26,14 @@ import {
   PassengerProfile,
 } from '../services/passengerAuth';
 import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
+import { UserRole } from '../types';
 
 export type AuthMode = 'signup' | 'login' | 'otp_verify' | 'forgot_password' | 'reset_otp';
 
 interface PassengerAuthModalProps {
   initialMode?: 'signup' | 'login';
-  intendedRole?: 'passenger' | 'rider';
-  onAuthenticated: (profile: PassengerProfile, role?: 'passenger' | 'rider') => void;
+  intendedRole?: UserRole;
+  onAuthenticated: (profile: PassengerProfile, role?: UserRole) => void;
   onCancel: () => void;
 }
 
@@ -157,7 +158,39 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
 
     setIsLoading(true);
     try {
-      const res = await sendPassengerRegistrationOtp(name, email, password);
+      const res = await sendPassengerRegistrationOtp(name, email, password, phone);
+      setStatusMessage(res.message);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
+      setResendCooldown(45);
+      switchMode('otp_verify');
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Failed to send verification code.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Direct Send OTP button clicked next to email input
+  const handleSendOtpDirectly = async () => {
+    setErrorMessage(null);
+    setStatusMessage(null);
+
+    const check = validateGmailAddress(email);
+    if (!check.isValid) {
+      setErrorMessage(check.error || 'Please enter a valid @gmail.com address.');
+      return;
+    }
+
+    if (!name.trim()) {
+      setErrorMessage('Please enter your full name first.');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const res = await sendPassengerRegistrationOtp(name, email, password || 'TempPass123!', phone);
       setStatusMessage(res.message);
       if (res.devOtp) {
         setDevOtp(res.devOtp);
@@ -415,11 +448,14 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
               </div>
             </div>
 
-            {/* Email Address */}
+            {/* Email Address with Send OTP */}
             <div className="flex flex-col gap-1">
-              <label className="text-xs font-bold text-zinc-700">Gmail Address</label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-zinc-700">Gmail Address</label>
+                <span className="text-[10px] text-zinc-400 font-medium">OTP dispatched to Gmail</span>
+              </div>
               <div className="relative flex items-center">
-                <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400 pointer-events-none" />
                 <input
                   id="signup-email-input"
                   type="email"
@@ -427,30 +463,34 @@ export const PassengerAuthModal: React.FC<PassengerAuthModalProps> = ({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="yourname@gmail.com"
-                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                  className="w-full pl-10 pr-26 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
                 />
+                <button
+                  type="button"
+                  disabled={isLoading || !email.includes('@')}
+                  onClick={handleSendOtpDirectly}
+                  className="absolute right-1.5 px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-xs active:scale-95 shrink-0"
+                >
+                  {isLoading ? 'Sending...' : 'Send OTP'}
+                </button>
               </div>
             </div>
 
-            {/* Phone number field (visual only with note per prompt) */}
+            {/* Mobile Number */}
             <div className="flex flex-col gap-1">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-bold text-zinc-700">Phone Number (Optional)</label>
-                <span className="text-[10px] text-zinc-400 font-medium">Coming soon</span>
-              </div>
+              <label className="text-xs font-bold text-zinc-700">Mobile Number</label>
               <div className="relative flex items-center">
-                <Phone className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                <Phone className="absolute left-3.5 w-4 h-4 text-zinc-400 pointer-events-none" />
                 <input
+                  id="signup-phone-input"
                   type="tel"
+                  required
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+880 1700 000000"
-                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium"
+                  placeholder="017xxxxxxxx"
+                  className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-sm text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all font-medium font-mono"
                 />
               </div>
-              <p className="text-[10px] text-amber-700 bg-[#FFF9E6] px-2.5 py-1 rounded-lg border border-[#F5C518]/30">
-                Phone verification coming soon. Please use Email.
-              </p>
             </div>
 
             {/* Password */}

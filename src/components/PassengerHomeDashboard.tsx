@@ -37,6 +37,7 @@ interface PassengerHomeDashboardProps {
   onOpenPowerStations: () => void;
   onOpenOffers: () => void;
   userLiveAddress?: string | null;
+  passengerName?: string | null;
 }
 
 export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
@@ -44,6 +45,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
   onOpenPowerStations,
   onOpenOffers,
   userLiveAddress,
+  passengerName,
 }) => {
   const [copiedCode, setCopiedCode] = useState(false);
   const [selectedService, setSelectedService] = useState<string>('bike');
@@ -58,20 +60,21 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
   const [spotlightTouchX, setSpotlightTouchX] = useState<number | null>(null);
   const [isSpotlightPaused, setIsSpotlightPaused] = useState(false);
 
-  // Time of day greeting
+  // Time of day greeting: Morning (5-11), Afternoon (12-16), Evening (17-20), Night (21-4)
   const [greeting, setGreeting] = useState<string>('Good day');
   useEffect(() => {
     const hour = new Date().getHours();
-    if (hour < 12) setGreeting('Good morning');
-    else if (hour < 17) setGreeting('Good afternoon');
-    else setGreeting('Good evening');
+    if (hour >= 5 && hour < 12) setGreeting('Good morning');
+    else if (hour >= 12 && hour < 17) setGreeting('Good afternoon');
+    else if (hour >= 17 && hour < 21) setGreeting('Good evening');
+    else setGreeting('Good night');
   }, []);
 
   const spotlightCards = [
     {
       id: 0,
-      title: 'Flat ৳70/km — Zero Surge Guarantee',
-      subtitle: 'Never pay peak or rain surge pricing anywhere in Dhaka',
+      title: 'Flat ৳25/km — Zero Surge Guarantee',
+      subtitle: 'Never pay peak or rain surge pricing anywhere in Bangladesh',
       tag: 'HONEST FARE',
       badgeBg: 'bg-[#F5C518] text-black',
       bgGradient: 'from-zinc-900 via-zinc-800 to-zinc-950',
@@ -83,7 +86,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
     {
       id: 1,
       title: 'Voltx Swap 50% Off First Month',
-      subtitle: 'Unlimited fast battery swaps at 12+ city hubs in Dhaka',
+      subtitle: 'Unlimited fast battery swaps at 12+ city hubs',
       tag: 'NEW LAUNCH',
       badgeBg: 'bg-emerald-500 text-white',
       bgGradient: 'from-[#1A1A1A] via-zinc-900 to-emerald-950',
@@ -153,17 +156,29 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
     }
   };
 
-  // Primary 4 Featured Services (Uber / Pathao Top Tier)
+  // District Detection from pickup/user address
+  const detectedDistrict = React.useMemo(() => {
+    const raw = (userLiveAddress || '').toLowerCase();
+    if (raw.includes('chittagong') || raw.includes('chattogram')) return 'chittagong';
+    if (raw.includes('rajshahi')) return 'rajshahi';
+    if (raw.includes('sylhet')) return 'sylhet';
+    if (raw.includes('khulna')) return 'khulna';
+    if (raw.includes('barisal') || raw.includes('barishal')) return 'barisal';
+    return 'dhaka';
+  }, [userLiveAddress]);
+
+  // Primary 4 Featured Services
   const primaryServices = [
     {
       id: 'bike',
       name: 'Bee Moto',
       desc: 'Fastest in traffic',
-      badge: '৳70/km',
+      badge: '৳25/km',
       icon: Bike,
       accentBg: 'bg-[#FFF9E6]',
       accentColor: 'text-[#E6A800]',
       highlight: true,
+      disabled: false,
       onClick: () => {
         setSelectedService('bike');
         onTakeRide();
@@ -173,39 +188,36 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       id: 'car',
       name: 'Bee Comfort',
       desc: 'AC & 4 seats',
-      badge: 'Popular',
+      badge: 'Coming Soon',
       icon: Car,
       accentBg: 'bg-zinc-100',
-      accentColor: 'text-zinc-800',
+      accentColor: 'text-zinc-500',
       highlight: false,
-      onClick: () => {
-        setSelectedService('car');
-        onTakeRide();
-      },
+      disabled: true,
+      onClick: () => {}, // Frozen
     },
     {
       id: 'power_station',
       name: 'Power Hub',
       desc: '90s Battery swap',
-      badge: '12 Hubs',
+      badge: 'Coming Soon',
       icon: Zap,
-      accentBg: 'bg-emerald-50',
-      accentColor: 'text-emerald-600',
+      accentBg: 'bg-zinc-100',
+      accentColor: 'text-zinc-500',
       highlight: false,
-      onClick: () => {
-        setSelectedService('power_station');
-        onOpenPowerStations();
-      },
+      disabled: true,
+      onClick: () => {}, // Frozen
     },
     {
       id: 'hour_station',
       name: 'Hourly Rent',
       desc: 'Flexible rental',
-      badge: 'Hourly',
+      badge: 'Available',
       icon: Clock,
       accentBg: 'bg-amber-50',
       accentColor: 'text-amber-700',
       highlight: false,
+      disabled: false,
       onClick: () => {
         setSelectedService('hour_station');
         onOpenPowerStations();
@@ -221,7 +233,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       icon: Package,
       onClick: () => {
         setSelectedService('parcel');
-        onTakeRide('Dhaka GPO / Parcel Center');
+        onTakeRide(detectedDistrict === 'chittagong' ? 'Chattogram GPO' : 'Dhaka GPO / Parcel Center');
       },
     },
     {
@@ -253,42 +265,79 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
     },
   ];
 
-  // Quick 1-tap Destination Shortcuts
-  const destinationShortcuts = [
-    { label: 'Home', icon: Home, query: 'Banani DOHS, Dhaka' },
-    { label: 'Work', icon: Briefcase, query: 'Gulshan 1 Circle, Dhaka' },
-    { label: 'Airport', icon: Plane, query: 'Hazrat Shahjalal Airport Terminal 1, Uttara' },
-    { label: 'Medical', icon: HeartPulse, query: 'United Hospital, Gulshan 2' },
-    { label: 'Coffee', icon: Coffee, query: 'Dhanmondi 27 Satmasjid Road' },
-  ];
+  // Quick 1-tap Destination Shortcuts adapted by District
+  const destinationShortcuts = React.useMemo(() => {
+    if (detectedDistrict === 'chittagong') {
+      return [
+        { label: 'GEC', icon: Home, query: 'GEC Circle, Chittagong' },
+        { label: 'Agrabad', icon: Briefcase, query: 'Agrabad Commercial Area, Chittagong' },
+        { label: 'Airport', icon: Plane, query: 'Shah Amanat International Airport, Chattogram' },
+        { label: 'Beach', icon: Compass, query: 'Patenga Sea Beach, Chattogram' },
+        { label: 'Station', icon: Coffee, query: 'Chattogram Railway Station' },
+      ];
+    }
+    if (detectedDistrict === 'rajshahi') {
+      return [
+        { label: 'Zero Point', icon: Home, query: 'Shaheb Bazar Zero Point, Rajshahi' },
+        { label: 'RU Campus', icon: Briefcase, query: 'Rajshahi University Campus' },
+        { label: 'Padma Park', icon: Compass, query: 'Padma Garden, Rajshahi' },
+        { label: 'Medical', icon: HeartPulse, query: 'Rajshahi Medical College Hospital' },
+      ];
+    }
+    if (detectedDistrict === 'sylhet') {
+      return [
+        { label: 'Zindabazar', icon: Home, query: 'Zindabazar Point, Sylhet' },
+        { label: 'Dargah', icon: Briefcase, query: 'Hazrat Shah Jalal Dargah, Sylhet' },
+        { label: 'Amberkhana', icon: Compass, query: 'Amberkhana Point, Sylhet' },
+        { label: 'Airport', icon: Plane, query: 'Osmani International Airport, Sylhet' },
+      ];
+    }
+    return [
+      { label: 'Home', icon: Home, query: 'Banani DOHS, Dhaka' },
+      { label: 'Work', icon: Briefcase, query: 'Gulshan 1 Circle, Dhaka' },
+      { label: 'Airport', icon: Plane, query: 'Hazrat Shahjalal Airport Terminal 1, Uttara' },
+      { label: 'Medical', icon: HeartPulse, query: 'United Hospital, Gulshan 2' },
+      { label: 'Coffee', icon: Coffee, query: 'Dhanmondi 27 Satmasjid Road' },
+    ];
+  }, [detectedDistrict]);
 
-  // Popular Hotspots with estimated distances and fares
-  const popularDestinations = [
-    {
-      name: 'Gulshan 2 Circle',
-      area: 'North Commercial Hub',
-      distKm: 1.4,
-      timeMins: 4,
-    },
-    {
-      name: 'Banani 11 Shopping',
-      area: 'Road 11 Lifestyle Hub',
-      distKm: 2.6,
-      timeMins: 8,
-    },
-    {
-      name: 'Dhanmondi 27 Hub',
-      area: 'Satmasjid Road',
-      distKm: 6.8,
-      timeMins: 18,
-    },
-    {
-      name: 'Airport Terminal 1',
-      area: 'Uttara, Dhaka',
-      distKm: 9.5,
-      timeMins: 22,
-    },
-  ];
+  // District-Aware Popular Hotspots (Without Any Prices Displayed)
+  const popularDestinations = React.useMemo(() => {
+    if (detectedDistrict === 'chittagong') {
+      return [
+        { name: 'GEC Circle', area: 'Central Commercial Hub' },
+        { name: 'Agrabad Commercial Area', area: 'Financial & Shipping District' },
+        { name: 'Patenga Sea Beach', area: 'Coastal Promenade' },
+        { name: 'Nasirabad CDA Avenue', area: 'Shopping & Dining' },
+        { name: 'New Market Chattogram', area: 'Station Road Retail' },
+        { name: 'Chattogram Railway Station', area: 'Intercity Transit Hub' },
+      ];
+    }
+    if (detectedDistrict === 'rajshahi') {
+      return [
+        { name: 'Shaheb Bazar Zero Point', area: 'City Center Hub' },
+        { name: 'Rajshahi University', area: 'Main Academic Campus' },
+        { name: 'Padma Garden Walkway', area: 'Riverfront Recreation' },
+        { name: 'Bornali More', area: 'Commercial Junction' },
+      ];
+    }
+    if (detectedDistrict === 'sylhet') {
+      return [
+        { name: 'Zindabazar Point', area: 'Central Commercial Area' },
+        { name: 'Hazrat Shah Jalal Dargah', area: 'Spiritual Center & Gate' },
+        { name: 'Amberkhana Point', area: 'Northern City Junction' },
+        { name: 'Osmani International Airport', area: 'Airport Road' },
+      ];
+    }
+    return [
+      { name: 'Gulshan 2 Circle', area: 'North Commercial Hub' },
+      { name: 'Banani 11 Shopping', area: 'Road 11 Lifestyle Hub' },
+      { name: 'Dhanmondi 27 Hub', area: 'Satmasjid Road' },
+      { name: 'Airport Terminal 1', area: 'Uttara, Dhaka' },
+      { name: 'Motijheel Commercial Area', area: 'Financial District' },
+      { name: 'Bashundhara R/A Gate', area: 'Residential & University Hub' },
+    ];
+  }, [detectedDistrict]);
 
   return (
     <div
@@ -321,7 +370,9 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
           </h1>
           <p className="text-[11px] text-zinc-500 font-medium flex items-center gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Dhaka • Fast Electric Ride Dispatch</span>
+            <span>
+              {passengerName ? `${passengerName} • Fast Electric Ride Dispatch` : 'Fast Electric Ride Dispatch'}
+            </span>
           </p>
         </div>
       </div>
@@ -384,7 +435,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
             Suggestions
           </h2>
           <span className="text-[10px] font-mono font-bold text-[#E6A800] bg-[#FFF9E6] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
-            Flat ৳70/km
+            Flat ৳25/km
           </span>
         </div>
 
@@ -397,17 +448,22 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               <button
                 key={service.id}
                 type="button"
-                onClick={service.onClick}
-                className={`p-3.5 rounded-3xl border-2 transition-all duration-200 flex flex-col justify-between text-left cursor-pointer active:scale-[0.98] group relative overflow-hidden ${
-                  isSelected
-                    ? 'bg-white border-[#F5C518] shadow-lg shadow-amber-500/10'
-                    : 'bg-white border-zinc-200/80 hover:border-[#F5C518] shadow-xs hover:shadow-md'
+                onClick={service.disabled ? undefined : service.onClick}
+                disabled={service.disabled}
+                className={`p-3.5 rounded-3xl border-2 transition-all duration-200 flex flex-col justify-between text-left group relative overflow-hidden ${
+                  service.disabled
+                    ? 'bg-zinc-50/80 border-zinc-200/70 opacity-60 cursor-not-allowed select-none'
+                    : isSelected
+                    ? 'bg-white border-[#F5C518] shadow-lg shadow-amber-500/10 cursor-pointer active:scale-[0.98]'
+                    : 'bg-white border-zinc-200/80 hover:border-[#F5C518] shadow-xs hover:shadow-md cursor-pointer active:scale-[0.98]'
                 }`}
               >
                 <div className="flex items-start justify-between">
                   <div
                     className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-                      isSelected
+                      service.disabled
+                        ? 'bg-zinc-200 text-zinc-400'
+                        : isSelected
                         ? 'bg-[#F5C518] text-black shadow-md'
                         : `${service.accentBg} ${service.accentColor} group-hover:scale-105`
                     }`}
@@ -415,7 +471,13 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
                     <Icon className="w-6 h-6 stroke-[2.2]" />
                   </div>
 
-                  <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-700 border border-zinc-200 font-mono">
+                  <span
+                    className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border font-mono ${
+                      service.disabled
+                        ? 'bg-zinc-200 text-zinc-500 border-zinc-300'
+                        : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                    }`}
+                  >
                     {service.badge}
                   </span>
                 </div>
@@ -456,54 +518,6 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 4. DUAL SHOWCASE CARDS: "WAYS TO RIDE & SWAP" */}
-      <div className="grid grid-cols-2 gap-2.5 pt-1">
-        {/* Card 1: Fast Moto Commute */}
-        <div
-          onClick={() => onTakeRide()}
-          className="p-3.5 rounded-3xl bg-gradient-to-br from-amber-50/80 via-white to-white border border-amber-200/80 shadow-xs hover:border-[#F5C518] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-3 group active:scale-[0.98]"
-        >
-          <div>
-            <div className="w-9 h-9 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-xs">
-              <Bike className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <h3 className="text-xs font-black text-[#1A1A1A] mt-2 leading-snug">
-              Instant Bike Dispatch
-            </h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
-              Bypass traffic with flat ৳70/km guarantee.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] font-black text-[#E6A800] pt-1 border-t border-amber-100">
-            <span>Ride Now</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-
-        {/* Card 2: Voltx Battery Swapping */}
-        <div
-          onClick={onOpenPowerStations}
-          className="p-3.5 rounded-3xl bg-gradient-to-br from-emerald-50/80 via-white to-white border border-emerald-200/80 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer flex flex-col justify-between gap-3 group active:scale-[0.98]"
-        >
-          <div>
-            <div className="w-9 h-9 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-              <BatteryCharging className="w-5 h-5 stroke-[2.2]" />
-            </div>
-            <h3 className="text-xs font-black text-[#1A1A1A] mt-2 leading-snug">
-              Battery Swap Hubs
-            </h3>
-            <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
-              12+ Fast swap stations across Dhaka.
-            </p>
-          </div>
-
-          <div className="flex items-center justify-between text-[11px] font-black text-emerald-600 pt-1 border-t border-emerald-100">
-            <span>Locate Hubs</span>
-            <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-          </div>
-        </div>
-      </div>
 
       {/* 5. SPOTLIGHT PROMOTIONAL CAROUSEL (Uber One / Pathao Rewards Luxury Style) */}
       <div className="space-y-2 pt-1">
@@ -599,38 +613,34 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         </div>
 
         <div className="space-y-2">
-          {popularDestinations.map((dest, i) => {
-            const estimatedFare = Math.round(dest.distKm * RATE_PER_KM_TAKA);
-            return (
-              <button
-                key={i}
-                type="button"
-                onClick={() => onTakeRide(dest.name)}
-                className="w-full p-3 rounded-2xl bg-white border border-zinc-200/80 hover:border-[#F5C518] hover:shadow-md text-left transition-all duration-200 shadow-2xs cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3 group"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-zinc-100 group-hover:bg-[#FFF9E6] text-zinc-700 group-hover:text-[#E6A800] flex items-center justify-center shrink-0 transition-colors">
-                    <MapPin className="w-4 h-4 stroke-[2]" />
-                  </div>
-                  <div className="min-w-0">
-                    <span className="text-xs font-black text-[#1A1A1A] block truncate group-hover:text-[#E6A800] transition-colors">
-                      {dest.name}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-medium block truncate">
-                      {dest.area} • ~{dest.timeMins} mins
-                    </span>
-                  </div>
+          {popularDestinations.map((dest, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onTakeRide(dest.name)}
+              className="w-full p-3 rounded-2xl bg-white border border-zinc-200/80 hover:border-[#F5C518] hover:shadow-md text-left transition-all duration-200 shadow-2xs cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3 group"
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 group-hover:bg-[#FFF9E6] text-zinc-700 group-hover:text-[#E6A800] flex items-center justify-center shrink-0 transition-colors">
+                  <MapPin className="w-4 h-4 stroke-[2]" />
                 </div>
+                <div className="min-w-0">
+                  <span className="text-xs font-black text-[#1A1A1A] block truncate group-hover:text-[#E6A800] transition-colors">
+                    {dest.name}
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-medium block truncate">
+                    {dest.area}
+                  </span>
+                </div>
+              </div>
 
-                <div className="flex items-center gap-2 shrink-0 text-right">
-                  <div className="text-xs font-mono font-black text-emerald-700">
-                    ৳{estimatedFare}
-                  </div>
-                  <ChevronRight className="w-3.5 h-3.5 text-zinc-300 group-hover:text-black group-hover:translate-x-0.5 transition-all" />
+              <div className="flex items-center gap-2 shrink-0 text-right">
+                <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-[#F5C518] text-zinc-600 group-hover:text-black flex items-center justify-center transition-colors">
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
                 </div>
-              </button>
-            );
-          })}
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 

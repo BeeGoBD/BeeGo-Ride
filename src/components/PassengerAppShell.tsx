@@ -159,6 +159,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
                 onOpenPowerStations={() => setIsPowerStationsOpen(true)}
                 onOpenOffers={() => setActiveTab('offers')}
                 userLiveAddress={props.pickup?.formatted}
+                passengerName={props.passengerProfile?.name || props.passengerId}
               />
             )}
 

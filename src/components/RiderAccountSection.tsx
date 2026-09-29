@@ -27,6 +27,9 @@ import {
   Eye,
   CheckCircle2,
   AlertCircle,
+  Phone,
+  Mail,
+  RefreshCw,
 } from 'lucide-react';
 import { RATE_PER_KM_TAKA } from '../services/rideSync';
 import {
@@ -61,8 +64,134 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
   const [activeNotice, setActiveNotice] = useState<string | null>(null);
 
+  // Profile update request modal state
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editSecondaryPhone, setEditSecondaryPhone] = useState('');
+  const [editReason, setEditReason] = useState('');
+  const [isSubmittingUpdate, setIsSubmittingUpdate] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
+
+  // Reset phone OTP modal state
+  const [showResetPhoneModal, setShowResetPhoneModal] = useState(false);
+  const [resetEmail, setResetEmail] = useState(driverProfile?.email || '');
+  const [resetOtp, setResetOtp] = useState('');
+  const [resetNewPhone, setResetNewPhone] = useState('');
+  const [resetStep, setResetStep] = useState<'email' | 'otp'>('email');
+  const [isSubmittingReset, setIsSubmittingReset] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetDevOtp, setResetDevOtp] = useState<string | null>(null);
+
   const status = driverProfile?.verificationStatus || 'under_review';
   const isPending = status === 'under_review' || status === 'pending';
+
+  const handleOpenUpdateModal = () => {
+    setEditName(driverProfile?.name || '');
+    setEditPhone(driverProfile?.phone || '');
+    setEditSecondaryPhone(driverProfile?.secondaryPhone || '');
+    setEditReason('');
+    setUpdateError(null);
+    setShowUpdateModal(true);
+  };
+
+  const handleUpdateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!driverProfile) return;
+    setIsSubmittingUpdate(true);
+    setUpdateError(null);
+
+    try {
+      const res = await fetch('/api/driver/request-update', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          driverId: driverProfile.id,
+          newName: editName,
+          newPhone: editPhone,
+          newSecondaryPhone: editSecondaryPhone,
+          reason: editReason,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to submit update request.');
+      }
+      setShowUpdateModal(false);
+      setActiveNotice(data.message || 'Request submitted. Operations team will call to verify.');
+    } catch (err: any) {
+      setUpdateError(err.message || 'Failed to submit request.');
+    } finally {
+      setIsSubmittingUpdate(false);
+    }
+  };
+
+  const handleSendResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetEmail.trim()) {
+      setResetError('Please enter your registered Gmail address.');
+      return;
+    }
+    setIsSubmittingReset(true);
+    setResetError(null);
+
+    try {
+      const res = await fetch('/api/driver/reset-phone/request-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to send reset code.');
+      }
+      if (data.devOtp) setResetDevOtp(data.devOtp);
+      setResetStep('otp');
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to send reset code.');
+    } finally {
+      setIsSubmittingReset(false);
+    }
+  };
+
+  const handleVerifyResetOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!resetOtp.trim() || resetOtp.trim().length < 6) {
+      setResetError('Please enter the 6-digit OTP received in your Gmail.');
+      return;
+    }
+    if (!resetNewPhone.trim() || resetNewPhone.trim().length < 9) {
+      setResetError('Please enter your new valid phone number.');
+      return;
+    }
+    setIsSubmittingReset(true);
+    setResetError(null);
+
+    try {
+      const res = await fetch('/api/driver/reset-phone/verify-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: resetEmail.trim(),
+          otp: resetOtp.trim(),
+          newPhone: resetNewPhone.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to verify OTP.');
+      }
+      if (data.driver) {
+        setDriverProfile(data.driver);
+      }
+      setShowResetPhoneModal(false);
+      setActiveNotice('Phone number successfully updated!');
+    } catch (err: any) {
+      setResetError(err.message || 'Failed to update phone number.');
+    } finally {
+      setIsSubmittingReset(false);
+    }
+  };
 
   const handleToggleStatus = (newStatus: DriverVerificationStatus) => {
     if (!driverProfile) return;
@@ -466,6 +595,42 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
           <ChevronRight className="w-4 h-4 text-zinc-400" />
         </button>
 
+        {/* Request Account Info Update */}
+        <button
+          type="button"
+          onClick={handleOpenUpdateModal}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <User className="w-4 h-4 text-[#E6A800]" />
+            <span>Request Profile / Number Change</span>
+          </div>
+          <span className="text-[10px] text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md font-semibold">
+            Admin Verification
+          </span>
+        </button>
+
+        {/* Reset Phone via Email OTP */}
+        <button
+          type="button"
+          onClick={() => {
+            setResetEmail(driverProfile?.email || '');
+            setResetOtp('');
+            setResetNewPhone('');
+            setResetStep('email');
+            setResetError(null);
+            setResetDevOtp(null);
+            setShowResetPhoneModal(true);
+          }}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Key className="w-4 h-4 text-zinc-500" />
+            <span>Reset Phone Number via Email OTP</span>
+          </div>
+          <ChevronRight className="w-4 h-4 text-zinc-400" />
+        </button>
+
         {/* Logout (soft red) */}
         <button
           type="button"
@@ -626,6 +791,196 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
                 className="max-h-[60vh] max-w-full object-contain rounded-xl"
               />
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Profile Update Request Modal */}
+      {showUpdateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm select-none">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-zinc-200 flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-[#1A1A1A]">Request Account Update</h3>
+                <p className="text-xs text-zinc-500">Changes require verification call by BeeGo Admin</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUpdateModal(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {updateError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                {updateError}
+              </div>
+            )}
+
+            <form onSubmit={handleUpdateSubmit} className="flex flex-col gap-3">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Official Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs font-semibold text-[#1A1A1A]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Primary Contact Phone</label>
+                <input
+                  type="tel"
+                  required
+                  value={editPhone}
+                  onChange={(e) => setEditPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs font-mono font-semibold text-[#1A1A1A]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Secondary Backup Phone (Optional)</label>
+                <input
+                  type="tel"
+                  value={editSecondaryPhone}
+                  onChange={(e) => setEditSecondaryPhone(e.target.value)}
+                  placeholder="e.g. 018xxxxxxxx"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs font-mono font-semibold text-[#1A1A1A]"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-zinc-700">Reason for Request</label>
+                <textarea
+                  rows={2}
+                  value={editReason}
+                  onChange={(e) => setEditReason(e.target.value)}
+                  placeholder="e.g. Updated phone number or official name change"
+                  className="w-full px-3.5 py-2 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs text-[#1A1A1A]"
+                />
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-900 leading-snug">
+                ⚠️ Notice: All profile changes are held in review. An administrator will call your registered number to verify before applying.
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmittingUpdate}
+                className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 mt-1"
+              >
+                {isSubmittingUpdate ? 'Submitting Request...' : 'Submit Request to Admin'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Phone via Email OTP Modal */}
+      {showResetPhoneModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-sm select-none">
+          <div className="w-full max-w-md bg-white rounded-3xl p-5 shadow-2xl border border-zinc-200 flex flex-col gap-4">
+            <div className="flex items-center justify-between border-b border-zinc-100 pb-3">
+              <div>
+                <h3 className="text-base font-black text-[#1A1A1A]">Reset Phone via Gmail OTP</h3>
+                <p className="text-xs text-zinc-500">Verify your registered email to update your number</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowResetPhoneModal(false)}
+                className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {resetError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold">
+                {resetError}
+              </div>
+            )}
+
+            {resetDevOtp && (
+              <div className="p-2.5 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/50 text-xs flex items-center justify-between font-mono font-bold text-amber-900">
+                <span>Verification OTP: {resetDevOtp}</span>
+                <button
+                  type="button"
+                  onClick={() => setResetOtp(resetDevOtp)}
+                  className="text-[11px] underline text-[#E6A800] cursor-pointer"
+                >
+                  Auto-fill
+                </button>
+              </div>
+            )}
+
+            {resetStep === 'email' ? (
+              <form onSubmit={handleSendResetOtp} className="flex flex-col gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Registered Gmail Address</label>
+                  <div className="relative flex items-center">
+                    <Mail className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                    <input
+                      type="email"
+                      required
+                      value={resetEmail}
+                      onChange={(e) => setResetEmail(e.target.value)}
+                      placeholder="driver@gmail.com"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs text-[#1A1A1A]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingReset}
+                  className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 mt-1"
+                >
+                  {isSubmittingReset ? 'Dispatching OTP...' : 'Send 6-Digit OTP to Gmail'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyResetOtp} className="flex flex-col gap-3">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">Enter 6-Digit Email OTP</label>
+                  <input
+                    type="text"
+                    required
+                    maxLength={6}
+                    value={resetOtp}
+                    onChange={(e) => setResetOtp(e.target.value)}
+                    placeholder="123456"
+                    className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-center font-mono font-black text-base tracking-widest text-[#1A1A1A]"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-zinc-700">New Mobile Number</label>
+                  <div className="relative flex items-center">
+                    <Phone className="absolute left-3.5 w-4 h-4 text-zinc-400" />
+                    <input
+                      type="tel"
+                      required
+                      value={resetNewPhone}
+                      onChange={(e) => setResetNewPhone(e.target.value)}
+                      placeholder="017xxxxxxxx"
+                      className="w-full pl-10 pr-3.5 py-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs font-mono font-semibold text-[#1A1A1A]"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmittingReset}
+                  className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider transition-all shadow-md active:scale-95 cursor-pointer disabled:opacity-50 mt-1"
+                >
+                  {isSubmittingReset ? 'Verifying & Updating...' : 'Confirm New Phone Number'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}

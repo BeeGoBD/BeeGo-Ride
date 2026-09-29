@@ -17,6 +17,9 @@ import { RiderAppShell } from './components/RiderAppShell';
 import { UberLiveTracking } from './components/UberLiveTracking';
 import { PassengerAuthModal } from './components/PassengerAuthModal';
 import { DriverAuthModal } from './components/DriverAuthModal';
+import { AdminDashboard } from './components/AdminDashboard';
+import { AdminSecretGateModal } from './components/AdminSecretGateModal';
+import { getAdminToken, logoutAdmin } from './services/adminService';
 import {
   getCurrentPassenger,
   logoutPassenger,
@@ -36,11 +39,11 @@ export default function App() {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const paramRole = params.get('role');
-      if (paramRole === 'passenger' || paramRole === 'rider') {
+      if (paramRole === 'passenger' || paramRole === 'rider' || paramRole === 'admin') {
         return paramRole as UserRole;
       }
       const storedRole = localStorage.getItem('beego_user_role');
-      if (storedRole === 'passenger' || storedRole === 'rider') {
+      if (storedRole === 'passenger' || storedRole === 'rider' || storedRole === 'admin') {
         return storedRole as UserRole;
       }
     }
@@ -48,6 +51,7 @@ export default function App() {
   });
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
+  const [isAdminGateOpen, setIsAdminGateOpen] = useState(false);
 
   // Generated Guest IDs
   const [passengerId] = useState<string>(() => {
@@ -279,6 +283,26 @@ export default function App() {
   // Render content based on current route/role
   let content: React.ReactNode = null;
 
+  // DEDICATED SEPARATE PAGE: SECURE ADMIN OPERATIONS PANEL
+  if (role === 'admin') {
+    return (
+      <div className="w-full h-[100dvh] bg-zinc-950 text-white overflow-hidden flex flex-col font-sans select-none">
+        <AdminDashboard
+          onExit={() => {
+            logoutAdmin();
+            setRole(null);
+            if (typeof window !== 'undefined') {
+              localStorage.removeItem('beego_user_role');
+              const url = new URL(window.location.href);
+              url.searchParams.delete('role');
+              window.history.replaceState({}, '', url.toString());
+            }
+          }}
+        />
+      </div>
+    );
+  }
+
   // 3. ROLE SELECTION: "Continue as Passenger" or "Continue as Rider"
   if (role === null) {
     content = (
@@ -291,7 +315,7 @@ export default function App() {
         onOpenDriverAuth={(driverMode) => {
           setDriverAuthModalMode(driverMode);
         }}
-        onReplayIntro={handleReplayIntro}
+        onOpenAdminGate={() => setIsAdminGateOpen(true)}
       />
     );
   } else if (role === 'rider') {
@@ -414,6 +438,19 @@ export default function App() {
             onCancel={() => setDriverAuthModalMode(null)}
           />
         )}
+
+        {/* Secret Admin Security Gate (Triggered by 10 taps on BeeGo Logo) */}
+        <AdminSecretGateModal
+          isOpen={isAdminGateOpen}
+          onClose={() => setIsAdminGateOpen(false)}
+          onAuthenticated={() => {
+            setIsAdminGateOpen(false);
+            setRole('admin');
+            if (typeof window !== 'undefined') {
+              localStorage.setItem('beego_user_role', 'admin');
+            }
+          }}
+        />
       </div>
     </div>
   );

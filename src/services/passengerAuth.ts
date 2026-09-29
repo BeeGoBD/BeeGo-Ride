@@ -73,11 +73,12 @@ export function validateGmailAddress(email: string): { isValid: boolean; error?:
   return { isValid: true };
 }
 
-// In-memory state for registration in progress (Name + Password kept until OTP is verified)
+// In-memory state for registration in progress (Name + Password + Phone kept until OTP is verified)
 interface PendingRegistration {
   userId: string;
   name: string;
   email: string;
+  phone?: string;
   password?: string;
   createdAt: number;
 }
@@ -191,7 +192,8 @@ export async function getCurrentPassenger(): Promise<PassengerProfile | null> {
 export async function sendPassengerRegistrationOtp(
   name: string,
   email: string,
-  password?: string
+  password?: string,
+  phone?: string
 ): Promise<OtpSendResult> {
   const check = validateGmailAddress(email);
   if (!check.isValid) {
@@ -217,6 +219,7 @@ export async function sendPassengerRegistrationOtp(
         name: cleanName,
         email: cleanEmail,
         password,
+        phone: phone?.trim(),
       }),
     });
 
@@ -231,6 +234,7 @@ export async function sendPassengerRegistrationOtp(
       userId: assignedUserId,
       name: cleanName,
       email: cleanEmail,
+      phone: phone?.trim(),
       password,
       createdAt: Date.now(),
     });

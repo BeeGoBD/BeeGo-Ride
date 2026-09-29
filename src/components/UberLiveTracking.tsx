@@ -29,6 +29,7 @@ import {
   Layers,
   Sparkles,
   Route,
+  ArrowRight,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, UserRole, LiveTrackingData } from '../types';
 import {
@@ -38,6 +39,7 @@ import {
   cancelRide,
   clearCurrentRide,
   updateLiveTracking,
+  sendInRideChatMessage,
   RATE_PER_KM_TAKA,
 } from '../services/rideSync';
 import { DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
@@ -50,13 +52,74 @@ import {
 } from '../utils/navigationHelper';
 
 interface UberLiveTrackingProps {
-  role: UserRole;
+  role: 'passenger' | 'rider';
   activeRide: RideRequest;
   apiKey: string;
   onBackToRoles?: () => void;
   onSwitchRole?: () => void;
   onResetRide?: () => void;
 }
+
+// Interactive Swipe to Confirm Slider (Pathao / Uber style for drivers)
+const SwipeActionSlider: React.FC<{
+  label: string;
+  onConfirm: () => void;
+  icon?: React.ReactNode;
+}> = ({ label, onConfirm, icon }) => {
+  const [sliderX, setSliderX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const startDrag = () => setIsDragging(true);
+
+  const onDrag = (clientX: number) => {
+    if (!isDragging || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const maxDrag = rect.width - 56;
+    const currentDrag = Math.max(0, Math.min(clientX - rect.left - 24, maxDrag));
+    setSliderX(currentDrag);
+
+    if (currentDrag >= maxDrag * 0.85) {
+      setIsDragging(false);
+      setSliderX(0);
+      onConfirm();
+    }
+  };
+
+  const stopDrag = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    setSliderX(0);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseMove={(e) => onDrag(e.clientX)}
+      onMouseUp={stopDrag}
+      onMouseLeave={stopDrag}
+      onTouchMove={(e) => onDrag(e.touches[0].clientX)}
+      onTouchEnd={stopDrag}
+      className="relative w-full h-14 rounded-2xl bg-zinc-900 border-2 border-[#F5C518]/50 overflow-hidden flex items-center p-1.5 select-none shadow-xl cursor-grab active:cursor-grabbing"
+    >
+      <div
+        style={{ width: `${sliderX + 50}px` }}
+        className="absolute left-0 top-0 bottom-0 bg-[#F5C518]/20 transition-all pointer-events-none"
+      />
+      <div className="w-full text-center text-xs font-black uppercase tracking-wider text-zinc-200 pointer-events-none z-10 flex items-center justify-center gap-1.5 px-12">
+        <span>{label}</span>
+      </div>
+      <div
+        style={{ transform: `translateX(${sliderX}px)` }}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
+        className="absolute left-1.5 w-11 h-11 rounded-xl bg-[#F5C518] text-black shadow-md flex items-center justify-center z-20 cursor-pointer active:scale-95 transition-transform"
+      >
+        {icon || <ArrowRight className="w-5 h-5 stroke-[2.5]" />}
+      </div>
+    </div>
+  );
+};
 
 export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   role,
@@ -104,8 +167,32 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   const [isRerouting, setIsRerouting] = useState<boolean>(false);
   const [rerouteNotice, setRerouteNotice] = useState<string | null>(null);
 
-  // Contact modal state
+  // Contact & Chat modal states
   const [contactMessage, setContactMessage] = useState<string | null>(null);
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInputText, setChatInputText] = useState('');
+
+  const quickChatPhrases = [
+    'I am here',
+    'Pick me up',
+    'Coming now',
+    'Please wait 2 mins',
+    'Where are you?',
+    'On the way',
+  ];
+
+  const handleSendChat = (text: string) => {
+    if (!text.trim()) return;
+    const senderRole = role;
+    const senderName = role === 'passenger' ? activeRide.passengerId : driver.name;
+    sendInRideChatMessage(senderRole, senderName, text.trim());
+    setChatInputText('');
+  };
+
+  const handleCallDriver = () => {
+    const cleanPhone = (driver.phone || '+8801712345678').replace(/[^0-9+]/g, '');
+    window.location.href = `tel:${cleanPhone}`;
+  };
 
   const status = activeRide.status;
   const isEnRouteToPickup = status === 'accepted';
@@ -677,7 +764,7 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
         <div className="bg-white/98 backdrop-blur-2xl border border-zinc-200/90 rounded-3xl p-4 shadow-2xl space-y-3">
           {/* Telemetry Stats Bar: Traveled, Speed, Fare, Payment */}
           {(() => {
-            const liveMeterTaka = Math.max(70, Math.round((traveledKm > 0 ? traveledKm : 0.1) * RATE_PER_KM_TAKA));
+            const liveMeterTaka = Math.max(25, Math.round((traveledKm > 0 ? traveledKm : 0.1) * RATE_PER_KM_TAKA));
             return (
               <div className="grid grid-cols-4 gap-2 bg-[#F8F9FA] p-2.5 rounded-2xl border border-zinc-200/80 text-center">
                 <div>
@@ -721,29 +808,32 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               </div>
             </div>
 
-            {/* Contact Actions for Passenger */}
-            {role === 'passenger' && (
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setContactMessage(`Calling captain ${driver.name} (${driver.phone})...`)}
-                  title="Call Captain"
-                  className="w-9 h-9 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-[#E6A800] flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-                >
-                  <Phone className="w-4 h-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setContactMessage(`Opened SMS chat with ${driver.name}: "I am waiting at the pickup spot."`)}
-                  title="Message Captain"
-                  className="w-9 h-9 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-                >
-                  <MessageSquare className="w-4 h-4" />
-                </button>
-              </div>
-            )}
+            {/* In-Ride Communications (Call Dialer & Synchronized Chat) */}
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleCallDriver}
+                title={`Call Captain: ${driver.phone}`}
+                className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+              >
+                <Phone className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(true)}
+                title="Chat with Captain"
+                className="w-9 h-9 rounded-xl bg-[#FFF9E6] hover:bg-[#F5C518] text-black border border-[#F5C518]/40 flex items-center justify-center transition-colors cursor-pointer active:scale-95 relative"
+              >
+                <MessageSquare className="w-4 h-4" />
+                {(activeRide.chatMessages?.length || 0) > 0 && (
+                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-[#E6A800] text-black text-[9px] font-black flex items-center justify-center">
+                    {activeRide.chatMessages!.length}
+                  </span>
+                )}
+              </button>
+            </div>
 
-            {/* Simulation Controls: Speed Toggle & Play/Pause (Available for both passenger & rider) */}
+            {/* Simulation Controls: Speed Toggle & Play/Pause */}
             {!isCompleted && (
               <div className="flex items-center gap-1 bg-zinc-100 px-2 py-1 rounded-xl border border-zinc-200">
                 <button
@@ -779,50 +869,38 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
             </div>
           )}
 
-          {/* ACTION BUTTONS BASED ON STAGE & ROLE */}
+          {/* ACTION BUTTONS & SLIDERS BASED ON STAGE & ROLE */}
           <div className="pt-1">
-            {/* Rider: Arrived at Pickup */}
+            {/* Rider: Slide to confirm Arrived at Pickup */}
             {role === 'rider' && isEnRouteToPickup && (
-              <button
-                type="button"
-                onClick={() => arriveAtPickupSpot()}
-                className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.99] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <CheckCircle className="w-4 h-4 text-black" />
-                <span>I Have Arrived at Pickup Spot</span>
-              </button>
+              <SwipeActionSlider
+                label="Slide: Reached Pickup Spot"
+                onConfirm={() => arriveAtPickupSpot()}
+                icon={<CheckCircle className="w-5 h-5 text-black" />}
+              />
             )}
 
-            {/* Passenger: En route to pickup quick action */}
+            {/* Passenger: En route to pickup notice */}
             {role === 'passenger' && isEnRouteToPickup && (
               <div className="flex items-center justify-between text-xs px-1 text-zinc-600 font-semibold">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  Captain is en route to your pickup spot
+                  Captain is riding to your pickup spot
                 </span>
-                <button
-                  type="button"
-                  onClick={() => arriveAtPickupSpot()}
-                  className="text-[11px] text-[#E6A800] hover:underline font-bold"
-                >
-                  Simulate Arrival
-                </button>
+                <span className="text-[11px] font-mono text-zinc-500">ETA: {etaMinutes}m</span>
               </div>
             )}
 
-            {/* Rider: Start Trip */}
+            {/* Rider: Slide to confirm Passenger Picked Up */}
             {role === 'rider' && isAtPickup && (
-              <button
-                type="button"
-                onClick={() => startTripToDestination()}
-                className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.99] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <Navigation className="w-4 h-4 fill-black" />
-                <span>Passenger Boarded • Start Navigation</span>
-              </button>
+              <SwipeActionSlider
+                label="Slide: Picked Up Passenger"
+                onConfirm={() => startTripToDestination()}
+                icon={<Navigation className="w-5 h-5 fill-black" />}
+              />
             )}
 
-            {/* Passenger Alert at Pickup + Action to Board */}
+            {/* Passenger Alert at Pickup */}
             {role === 'passenger' && isAtPickup && (
               <div className="space-y-2">
                 <div className="p-3 bg-[#FFF9E6] border border-[#F5C518]/50 rounded-2xl text-center">
@@ -846,8 +924,17 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               </div>
             )}
 
-            {/* In Transit: Trip In Progress Notice */}
-            {isInTransit && (
+            {/* Rider: Slide to Complete Ride at Destination */}
+            {role === 'rider' && isInTransit && (
+              <SwipeActionSlider
+                label="Slide: Complete Ride (Destination Reached)"
+                onConfirm={() => completeTrip(traveledKm)}
+                icon={<CheckCircle className="w-5 h-5 text-black" />}
+              />
+            )}
+
+            {/* Passenger In Transit notice */}
+            {role === 'passenger' && isInTransit && (
               <div className="flex items-center justify-between text-xs px-1 text-zinc-600 font-semibold">
                 <span className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
@@ -873,6 +960,111 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
           </div>
         </div>
       </div>
+
+      {/* 5. IN-RIDE REAL-TIME CHAT DRAWER */}
+      {isChatOpen && (
+        <div className="fixed inset-0 z-[2000] bg-black/60 backdrop-blur-xs flex flex-col justify-end">
+          <div className="w-full max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom duration-200">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800]">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-900">
+                    {role === 'passenger' ? `Chat with ${driver.name}` : `Chat with Passenger`}
+                  </h3>
+                  <p className="text-[11px] font-mono text-zinc-500 flex items-center gap-1.5">
+                    <span>Driver Phone: {driver.phone}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-200 hover:bg-zinc-300 text-zinc-700 flex items-center justify-center cursor-pointer text-sm font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Chat Messages Body */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-2.5 bg-[#F8F9FA] min-h-[220px]">
+              {(activeRide.chatMessages || []).length === 0 ? (
+                <div className="py-8 text-center text-zinc-400 text-xs flex flex-col items-center gap-1.5">
+                  <MessageSquare className="w-8 h-8 text-zinc-300 stroke-[1.5]" />
+                  <span>No messages yet. Send a 1-click message below!</span>
+                </div>
+              ) : (
+                activeRide.chatMessages!.map((msg) => {
+                  const isMe = msg.sender === role;
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                    >
+                      <span className="text-[10px] text-zinc-400 font-bold mb-0.5 px-1">
+                        {isMe ? 'You' : msg.senderName}
+                      </span>
+                      <div
+                        className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-xs font-medium leading-relaxed ${
+                          isMe
+                            ? 'bg-[#F5C518] text-black rounded-tr-xs shadow-xs'
+                            : 'bg-white border border-zinc-200 text-zinc-800 rounded-tl-xs shadow-xs'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                      <span className="text-[9px] text-zinc-400 mt-0.5 px-1">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* 1-Click Fast Quick Text Pills */}
+            <div className="p-2.5 bg-white border-t border-zinc-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {quickChatPhrases.map((phrase, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => handleSendChat(phrase)}
+                  className="px-3 py-1.5 rounded-full bg-[#FFF9E6] hover:bg-[#F5C518] text-black text-xs font-bold whitespace-nowrap transition-colors border border-[#F5C518]/30 cursor-pointer active:scale-95 shrink-0"
+                >
+                  {phrase}
+                </button>
+              ))}
+            </div>
+
+            {/* Chat Input Field */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendChat(chatInputText);
+              }}
+              className="p-3 bg-white border-t border-zinc-200 flex items-center gap-2"
+            >
+              <input
+                type="text"
+                value={chatInputText}
+                onChange={(e) => setChatInputText(e.target.value)}
+                placeholder="Type your message..."
+                className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-100 border border-zinc-200 text-xs text-zinc-900 focus:outline-hidden focus:border-[#F5C518]"
+              />
+              <button
+                type="submit"
+                disabled={!chatInputText.trim()}
+                className="px-4 py-2.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] disabled:opacity-40 text-black font-black text-xs transition-colors cursor-pointer"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   User,
   Bike,
@@ -6,7 +6,6 @@ import {
   ShieldCheck,
   Zap,
   Sparkles,
-  RotateCcw,
 } from 'lucide-react';
 import { UserRole } from '../types';
 import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
@@ -15,32 +14,40 @@ interface RoleSelectDashboardProps {
   onSelectRole: (role: UserRole) => void;
   onOpenPassengerAuth?: (mode: 'signup' | 'login') => void;
   onOpenDriverAuth?: (mode: 'register' | 'login') => void;
-  onReplayIntro?: () => void;
+  onOpenAdminGate?: () => void;
 }
 
 export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
   onSelectRole,
   onOpenPassengerAuth,
   onOpenDriverAuth,
-  onReplayIntro,
+  onOpenAdminGate,
 }) => {
+  const [logoClicks, setLogoClicks] = useState(0);
+
+  const handleLogoClick = () => {
+    const next = logoClicks + 1;
+    if (next >= 10) {
+      setLogoClicks(0);
+      if (onOpenAdminGate) {
+        onOpenAdminGate();
+      }
+    } else {
+      setLogoClicks(next);
+    }
+  };
+
   return (
     <div className="w-full h-full bg-[#F8F9FA] text-[#1A1A1A] flex flex-col justify-between p-6 select-none max-w-[430px] mx-auto shadow-2xl relative overflow-y-auto no-scrollbar">
-      {/* Top Bar with Brand & Replay Intro */}
+      {/* Top Bar with Brand (Tapping 10 times opens Secret Admin Gate) */}
       <div className="w-full flex items-center justify-between pt-2">
-        <BeeGoVoltxLogo size="md" />
-
-        {onReplayIntro && (
-          <button
-            type="button"
-            onClick={onReplayIntro}
-            className="flex items-center gap-1 text-xs font-semibold text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 rounded-lg cursor-pointer"
-            title="Replay Intro Slides"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span>Intro</span>
-          </button>
-        )}
+        <div
+          onClick={handleLogoClick}
+          className="cursor-pointer active:scale-95 transition-transform"
+          title="BeeGo Voltx"
+        >
+          <BeeGoVoltxLogo size="md" />
+        </div>
       </div>
 
       {/* Main Content Area */}
@@ -83,7 +90,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                 <ArrowRight className="w-4 h-4 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all" />
               </div>
               <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
-                Request instant rides, locate power stations, swap batteries, and enjoy flat ৳70/km fares.
+                Request instant rides, locate power stations, swap batteries, and enjoy flat ৳25/km fares.
               </p>
             </div>
 
@@ -159,7 +166,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
       <div className="w-full flex flex-col items-center gap-2 pt-2 pb-2 text-center">
         <div className="flex items-center gap-1 text-[11px] text-zinc-500">
           <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Verified safety & transparent ৳70/km flat rate across Dhaka</span>
+          <span>Verified safety & transparent ৳25/km flat rate across all districts</span>
         </div>
         <p className="text-[10px] text-zinc-400">
           Crafted with love from BeeGo Voltx

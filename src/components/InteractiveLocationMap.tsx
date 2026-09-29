@@ -74,6 +74,7 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
   const dropoffMarkerRef = useRef<L.Marker | null>(null);
   const routePolylineRef = useRef<L.Polyline | null>(null);
   const routeGlowRef = useRef<L.Polyline | null>(null);
+  const walkingGuideRef = useRef<L.Polyline | null>(null);
 
   const [isClickGeocoding, setIsClickGeocoding] = useState(false);
   const [statusNotification, setStatusNotification] = useState<string | null>(null);
@@ -178,16 +179,41 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
         liveGpsMarkerRef.current.setLatLng([userLiveGps.lat, userLiveGps.lon]);
       }
 
-      if (!dropoff && pickup) {
-        map.panTo([userLiveGps.lat, userLiveGps.lon], { animate: true });
+      // Render Uber-style dotted walking guide to pickup spot if user is walking to pickup
+      if (pickup && (Math.abs(userLiveGps.lat - pickup.lat) > 0.0001 || Math.abs(userLiveGps.lon - pickup.lon) > 0.0001)) {
+        const walkingCoords: [number, number][] = [
+          [userLiveGps.lat, userLiveGps.lon],
+          [pickup.lat, pickup.lon],
+        ];
+
+        if (!walkingGuideRef.current) {
+          walkingGuideRef.current = L.polyline(walkingCoords, {
+            color: '#10B981',
+            weight: 3.5,
+            dashArray: '3, 8',
+            opacity: 0.85,
+            lineCap: 'round',
+          }).addTo(map);
+        } else {
+          walkingGuideRef.current.setLatLngs(walkingCoords);
+        }
+      } else {
+        if (walkingGuideRef.current) {
+          map.removeLayer(walkingGuideRef.current);
+          walkingGuideRef.current = null;
+        }
       }
     } else {
       if (liveGpsMarkerRef.current) {
         map.removeLayer(liveGpsMarkerRef.current);
         liveGpsMarkerRef.current = null;
       }
+      if (walkingGuideRef.current) {
+        map.removeLayer(walkingGuideRef.current);
+        walkingGuideRef.current = null;
+      }
     }
-  }, [userLiveGps, dropoff, pickup]);
+  }, [userLiveGps, pickup]);
 
   // 3. Render Luxury Pickup Marker (Emerald Pin with Micro Badge)
   useEffect(() => {
@@ -362,7 +388,12 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
       }
 
       if (pickup && !dropoff) {
-        map.setView([pickup.lat, pickup.lon], Math.max(map.getZoom(), 15));
+        const currentCenter = map.getCenter();
+        const dist = Math.hypot(currentCenter.lat - pickup.lat, currentCenter.lng - pickup.lon);
+        // Only set view if map center is significantly far (> 5km away), preserving user's pan/pinpoint spot
+        if (dist > 0.05) {
+          map.setView([pickup.lat, pickup.lon], Math.max(map.getZoom(), 15));
+        }
       }
     }
   }, [routeData, pickup, dropoff]);

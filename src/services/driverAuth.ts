@@ -4,7 +4,10 @@ export interface DriverProfile {
   id: string; // e.g. DRIVER-7892
   name: string;
   phone: string;
+  secondaryPhone?: string;
+  email?: string;
   password?: string;
+  nidNumber?: string;
   nidFrontUrl: string; // Data URL or object URL
   nidBackUrl: string;
   selfieUrl: string;
@@ -12,6 +15,7 @@ export interface DriverProfile {
   createdAt: number;
   submittedAtFormatted: string;
   statusNotes?: string;
+  rejectionReason?: string;
   vehicleModel?: string;
   plateNumber?: string;
   rating?: number;
@@ -64,14 +68,17 @@ export function setCurrentDriver(driver: DriverProfile | null): void {
   }
 }
 
-export function registerNewDriver(params: {
+export async function registerNewDriver(params: {
   name: string;
   phone: string;
+  secondaryPhone?: string;
+  email?: string;
+  nidNumber?: string;
   nidFrontUrl: string;
   nidBackUrl: string;
   selfieUrl: string;
   password?: string;
-}): DriverProfile {
+}): Promise<DriverProfile> {
   const driverId = `DRV-${Math.floor(1000 + Math.random() * 9000)}`;
   const now = Date.now();
   const dateStr = new Date().toLocaleString('en-US', {
@@ -87,49 +94,104 @@ export function registerNewDriver(params: {
     id: driverId,
     name: params.name.trim(),
     phone: params.phone.trim(),
+    secondaryPhone: params.secondaryPhone?.trim(),
+    email: params.email?.trim().toLowerCase(),
     password: params.password,
+    nidNumber: params.nidNumber,
     nidFrontUrl: params.nidFrontUrl,
     nidBackUrl: params.nidBackUrl,
     selfieUrl: params.selfieUrl,
-    verificationStatus: 'under_review',
+    verificationStatus: 'pending', // Must wait for admin approval
     createdAt: now,
     submittedAtFormatted: dateStr,
-    statusNotes: 'Verification is currently in processing. Documents undergoing verification.',
-    vehicleModel: 'Voltx Eco Speed Bike (Yellow)',
+    statusNotes: 'Verification is in processing. BeeGo operations team will review documents.',
+    vehicleModel: 'Voltx Eco Speed Bike (Electric)',
     plateNumber: 'Dhaka Metro-Ha 45-8921',
     rating: 5.0,
   };
 
+  // Sync with backend API
+  try {
+    const res = await fetch('/api/driver/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newDriver),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Failed to register driver.');
+    }
+    if (data.driver) {
+      Object.assign(newDriver, data.driver);
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes('fetch')) {
+      throw err;
+    }
+  }
+
+  // Update local storage
   const drivers = getStoredDrivers();
-  const existingIdx = drivers.findIndex((d) => d.phone === newDriver.phone);
+  const existingIdx = drivers.findIndex((d) => d.phone === newDriver.phone || d.email === newDriver.email);
   if (existingIdx >= 0) {
     drivers[existingIdx] = newDriver;
   } else {
     drivers.unshift(newDriver);
   }
   saveStoredDrivers(drivers);
-  setCurrentDriver(newDriver);
 
   return newDriver;
 }
 
-export function loginDriver(phone: string, password?: string): DriverProfile | null {
-  const drivers = getStoredDrivers();
+export async function loginDriver(phone: string, password?: string): Promise<DriverProfile> {
   const cleanPhone = phone.replace(/[^0-9]/g, '');
+
+  // Attempt backend login first
+  try {
+    const res = await fetch('/api/driver/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, password }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      throw new Error(data.error || 'Driver login failed.');
+    }
+    if (data.driver) {
+      setCurrentDriver(data.driver);
+      return data.driver;
+    }
+  } catch (err: any) {
+    if (err.message && !err.message.includes('fetch')) {
+      throw err;
+    }
+  }
+
+  // Fallback to local check
+  const drivers = getStoredDrivers();
   const found = drivers.find((d) => {
     const dPhone = d.phone.replace(/[^0-9]/g, '');
     return dPhone.includes(cleanPhone) || cleanPhone.includes(dPhone);
   });
 
-  if (found) {
-    if (password && found.password && found.password !== password) {
-      throw new Error('Incorrect password. Please verify and try again.');
-    }
-    setCurrentDriver(found);
-    return found;
+  if (!found) {
+    throw new Error('No driver account found with this phone number. Please register first.');
   }
 
-  return null;
+  if (found.verificationStatus === 'pending') {
+    throw new Error('Your driver application is under review. Our team will verify your details and approve your account shortly.');
+  }
+
+  if (found.verificationStatus === 'rejected') {
+    throw new Error(`Your driver application was rejected. ${found.rejectionReason || 'Please contact BeeGo support.'}`);
+  }
+
+  if (password && found.password && found.password !== password) {
+    throw new Error('Incorrect password. Please verify and try again.');
+  }
+
+  setCurrentDriver(found);
+  return found;
 }
 
 export function updateDriverStatus(
