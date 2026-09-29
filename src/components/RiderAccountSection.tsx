@@ -320,37 +320,6 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
             </div>
           </div>
         </div>
-
-        {/* Demo Admin Status Simulator Switcher */}
-        <div className="pt-2 border-t border-zinc-200/60 flex items-center justify-between text-xs">
-          <span className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
-            Admin Testing Control
-          </span>
-          <div className="flex gap-1.5">
-            <button
-              type="button"
-              onClick={() => handleToggleStatus('under_review')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                isPending
-                  ? 'bg-amber-300 text-amber-950 font-black'
-                  : 'bg-zinc-200/80 text-zinc-700 hover:bg-zinc-300'
-              }`}
-            >
-              Set Under Review
-            </button>
-            <button
-              type="button"
-              onClick={() => handleToggleStatus('approved')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-bold cursor-pointer transition-colors ${
-                status === 'approved'
-                  ? 'bg-emerald-600 text-white font-black'
-                  : 'bg-zinc-200/80 text-zinc-700 hover:bg-zinc-300'
-              }`}
-            >
-              Approve Driver
-            </button>
-          </div>
-        </div>
       </div>
 
       {/* 2. EARNINGS & WALLET CARD */}

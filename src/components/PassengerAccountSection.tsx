@@ -22,6 +22,9 @@ import {
   Info,
   Check,
   Building,
+  Award,
+  Leaf,
+  Clock,
 } from 'lucide-react';
 import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
 
@@ -66,9 +69,9 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
   };
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#F8F9FA] text-[#1A1A1A] flex flex-col p-5 select-none max-w-[430px] mx-auto pb-28">
-      {/* Top Bar with Close button */}
-      <div className="flex items-center justify-between pb-3 pt-1 border-b border-zinc-200 shrink-0">
+    <div className="w-full flex-1 flex flex-col p-4 select-none pb-28 bg-[#F8F9FA] text-[#1A1A1A] overflow-y-auto no-scrollbar gap-3.5">
+      {/* Top Bar with Title & Close button */}
+      <div className="flex items-center justify-between pt-1 pb-2 border-b border-zinc-200/80">
         <h1 className="text-base font-black text-[#1A1A1A]">My Account</h1>
         {onClose && (
           <button
@@ -83,16 +86,16 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
 
       {/* Notice Toast */}
       {activeNotice && (
-        <div className="mt-3 p-3 rounded-2xl bg-zinc-900 text-white text-xs flex items-center justify-between shadow-lg animate-in fade-in">
+        <div className="p-3 rounded-2xl bg-zinc-900 text-white text-xs flex items-center justify-between shadow-lg animate-in fade-in">
           <span>{activeNotice} settings loaded</span>
           <Check className="w-3.5 h-3.5 text-[#F5C518]" />
         </div>
       )}
 
-      {/* 1. PROFILE HEADER CARD */}
-      <div className="mt-4 p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-sm flex items-center gap-3.5">
+      {/* 1. LUXURY PROFILE HEADER CARD */}
+      <div className="p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-xs flex items-center gap-3.5">
         {/* Avatar */}
-        <div className="w-14 h-14 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-lg font-black text-[#E6A800] shadow-sm shrink-0">
+        <div className="w-14 h-14 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-lg font-black text-[#E6A800] shadow-xs shrink-0">
           {initials}
         </div>
 
@@ -102,35 +105,65 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
             <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active" />
           </div>
           <p className="text-xs text-zinc-500 truncate mt-0.5">{displayEmail}</p>
-          <span className="inline-block mt-1 text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.2 rounded-full border border-emerald-200">
-            Verified Passenger
-          </span>
+          <div className="flex items-center gap-1.5 mt-1">
+            <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
+              Verified Passenger
+            </span>
+            <span className="text-[10px] text-zinc-400 font-mono">• {passengerId}</span>
+          </div>
         </div>
       </div>
 
-      {/* 2. SWITCH TO RIDER PROMO CARD */}
-      <div className="mt-3 p-4 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-zinc-900 text-white shadow-md flex items-center justify-between">
+      {/* 2. PASSENGER QUICK STATS ROW */}
+      <div className="grid grid-cols-3 gap-2">
+        <div className="p-3 rounded-2xl bg-white border border-zinc-200/80 text-center shadow-2xs">
+          <div className="w-7 h-7 rounded-xl bg-[#FFF9E6] text-[#E6A800] flex items-center justify-center mx-auto mb-1">
+            <Bike className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-sm font-black text-zinc-900 block font-mono">14</span>
+          <span className="text-[10px] text-zinc-400 font-medium">Total Rides</span>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-white border border-zinc-200/80 text-center shadow-2xs">
+          <div className="w-7 h-7 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center mx-auto mb-1">
+            <Leaf className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-sm font-black text-emerald-700 block font-mono">18.4 kg</span>
+          <span className="text-[10px] text-zinc-400 font-medium">CO₂ Saved</span>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-white border border-zinc-200/80 text-center shadow-2xs">
+          <div className="w-7 h-7 rounded-xl bg-amber-50 text-amber-700 flex items-center justify-center mx-auto mb-1">
+            <Award className="w-3.5 h-3.5" />
+          </div>
+          <span className="text-sm font-black text-zinc-900 block font-mono">240</span>
+          <span className="text-[10px] text-zinc-400 font-medium">BeePoints</span>
+        </div>
+      </div>
+
+      {/* 3. SWITCH TO RIDER PROMO CARD */}
+      <div className="p-4 rounded-3xl bg-gradient-to-r from-zinc-900 via-zinc-800 to-black text-white shadow-md flex items-center justify-between border border-zinc-700">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0">
-            <Bike className="w-5 h-5 stroke-[2.5]" />
+          <div className="w-10 h-10 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shrink-0 shadow-xs">
+            <Bike className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
-            <h3 className="text-xs font-black text-white">Become a Rider / Driver</h3>
-            <p className="text-[10px] text-zinc-300">Earn daily with BeeGo Voltx fleet</p>
+            <h3 className="text-xs font-black text-white">Become a Driver / Captain</h3>
+            <p className="text-[11px] text-zinc-300 mt-0.5">Earn daily with BeeGo Voltx fleet</p>
           </div>
         </div>
 
         <button
           type="button"
           onClick={onSwitchToRider}
-          className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 shrink-0"
+          className="px-3.5 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 shrink-0"
         >
           Switch
         </button>
       </div>
 
-      {/* 3. PATHAO-MIRRORED ACCOUNT SECTIONS LIST */}
-      <div className="mt-4 flex flex-col gap-1 bg-white rounded-3xl p-2 border border-zinc-200/90 shadow-sm divide-y divide-zinc-100">
+      {/* 4. SETTINGS & ACCOUNT SECTIONS LIST */}
+      <div className="space-y-1 bg-white rounded-3xl p-2 border border-zinc-200/90 shadow-xs divide-y divide-zinc-100">
         {/* Profile */}
         <button
           type="button"
@@ -139,210 +172,66 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
         >
           <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
             <User className="w-4 h-4 text-zinc-400" />
-            <span>Profile</span>
+            <span>Profile Details</span>
           </div>
           <ChevronRight className="w-4 h-4 text-zinc-400" />
         </button>
 
-        {/* Authentication */}
+        {/* Payment Methods */}
         <button
           type="button"
-          onClick={() => handleItemClick('Authentication Security')}
+          onClick={() => handleItemClick('Payment Methods')}
           className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
         >
           <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Authentication</span>
-          </div>
-          <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md font-semibold">
-            Gmail OTP Active
-          </span>
-        </button>
-
-        {/* Business Profile */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Business Profile')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Briefcase className="w-4 h-4 text-zinc-400" />
-            <span>Business Profile</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-400" />
-        </button>
-
-        {/* Digital Payment (Coming Soon per prompt) */}
-        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left opacity-75">
-          <div className="flex items-center gap-3 text-xs font-bold text-zinc-600">
             <CreditCard className="w-4 h-4 text-zinc-400" />
-            <span>Digital Payment</span>
+            <span>Payment Methods (Cash, bKash)</span>
           </div>
-          <span className="text-[9px] font-mono font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">
-            Coming Soon
+          <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md">
+            Cash Active
           </span>
-        </div>
-
-        {/* Payout Method (Coming Soon per prompt) */}
-        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left opacity-75">
-          <div className="flex items-center gap-3 text-xs font-bold text-zinc-600">
-            <Wallet className="w-4 h-4 text-zinc-400" />
-            <span>Payout Method</span>
-          </div>
-          <span className="text-[9px] font-mono font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">
-            Coming Soon
-          </span>
-        </div>
-
-        {/* Saved Address */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Saved Addresses')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <MapPin className="w-4 h-4 text-zinc-400" />
-            <span>Saved Address</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-400" />
         </button>
 
-        {/* Promo */}
-        <button
-          type="button"
-          onClick={() => {
-            if (onOpenOffers) {
-              onOpenOffers();
-              if (onClose) onClose();
-            } else {
-              handleItemClick('Promotions');
-            }
-          }}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Tag className="w-4 h-4 text-[#E6A800]" />
-            <span>Promo</span>
-          </div>
-          <span className="text-[10px] text-[#E6A800] font-bold">4 Available</span>
-        </button>
-
-        {/* Referral */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Referral Program')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Share2 className="w-4 h-4 text-zinc-400" />
-            <span>Referral</span>
-          </div>
-          <span className="text-[10px] text-zinc-500 font-mono font-bold">VOLTX2026</span>
-        </button>
-
-        {/* Language */}
-        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left">
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Globe className="w-4 h-4 text-zinc-400" />
-            <span>Language</span>
-          </div>
-          <span className="text-xs font-semibold text-zinc-500">English</span>
-        </div>
-
-        {/* Permissions */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('App Permissions')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Lock className="w-4 h-4 text-zinc-400" />
-            <span>Permissions</span>
-          </div>
-          <span className="text-[10px] text-emerald-600 font-medium">Location Granted</span>
-        </button>
-
-        {/* Safety */}
+        {/* Safety & Emergency */}
         <button
           type="button"
           onClick={() => handleItemClick('Safety Center')}
           className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
         >
           <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <ShieldCheck className="w-4 h-4 text-zinc-400" />
-            <span>Safety</span>
+            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <span>Safety & Emergency SOS</span>
           </div>
           <ChevronRight className="w-4 h-4 text-zinc-400" />
         </button>
 
-        {/* Emergency Support */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Emergency Support (999)')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-rose-600">
-            <PhoneCall className="w-4 h-4 text-rose-500" />
-            <span>Emergency Support</span>
+        {/* Offers & Rewards */}
+        {onOpenOffers && (
+          <button
+            type="button"
+            onClick={onOpenOffers}
+            className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+          >
+            <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+              <Tag className="w-4 h-4 text-[#E6A800]" />
+              <span>Offers & Promo Codes</span>
+            </div>
+            <span className="text-[10px] font-bold text-[#E6A800] bg-[#FFF9E6] px-2 py-0.5 rounded-md">
+              4 Available
+            </span>
+          </button>
+        )}
+
+        {/* App Version */}
+        <div className="w-full px-3.5 py-3 flex items-center justify-between text-left">
+          <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
+            <Sparkles className="w-4 h-4 text-zinc-400" />
+            <span>BeeGo Voltx Version</span>
           </div>
-          <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-2 py-0.5 rounded-md">
-            24/7 Hotline
+          <span className="text-[10px] font-mono font-bold text-zinc-400">
+            v2.4 Production
           </span>
-        </button>
-
-        {/* Help & Support */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Help Center')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <HelpCircle className="w-4 h-4 text-zinc-400" />
-            <span>Help & Support</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-400" />
-        </button>
-
-        {/* Request */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Support Requests')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <FileText className="w-4 h-4 text-zinc-400" />
-            <span>Request</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-400" />
-        </button>
-
-        {/* Policies */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('Terms & Privacy Policies')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Info className="w-4 h-4 text-zinc-400" />
-            <span>Policies</span>
-          </div>
-          <ChevronRight className="w-4 h-4 text-zinc-400" />
-        </button>
-
-        {/* New in BeeGo Voltx */}
-        <button
-          type="button"
-          onClick={() => handleItemClick('What is New v2.4')}
-          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
-        >
-          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Sparkles className="w-4 h-4 text-[#E6A800]" />
-            <span>New in BeeGo Voltx</span>
-          </div>
-          <span className="text-[10px] font-bold text-[#E6A800] bg-[#FFF9E6] px-2 py-0.5 rounded-md">
-            v2.4 Release
-          </span>
-        </button>
+        </div>
 
         {/* Logout (soft red) */}
         <button
@@ -358,25 +247,9 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
         </button>
       </div>
 
-      {/* Subtle Social Media Icons & Footer per prompt */}
-      <div className="pt-6 pb-2 flex flex-col items-center gap-3">
-        <div className="flex items-center gap-4 text-zinc-400">
-          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
-            f
-          </span>
-          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
-            in
-          </span>
-          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
-            𝕏
-          </span>
-          <span className="w-8 h-8 rounded-full bg-white border border-zinc-200 flex items-center justify-center text-zinc-500 hover:text-[#E6A800] transition-colors cursor-pointer text-xs font-black shadow-xs">
-            yt
-          </span>
-        </div>
-        <div className="text-center text-[11px] text-zinc-400 font-medium">
-          Crafted with love from BeeGo Voltx • Dhaka, Bangladesh
-        </div>
+      {/* Footer text */}
+      <div className="pt-4 pb-2 text-center text-[10px] text-zinc-400 font-medium">
+        Crafted with love for BeeGo Voltx • Dhaka, Bangladesh
       </div>
 
       {/* Logout Confirmation Modal */}
@@ -388,7 +261,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
             </div>
             <h3 className="text-base font-black text-[#1A1A1A]">Log Out of BeeGo Voltx?</h3>
             <p className="text-xs text-zinc-500 leading-relaxed">
-              You will be signed out from this device. You can log back in anytime with your Gmail address.
+              You will be signed out from this device. You can log back in anytime with your registered account.
             </p>
             <div className="flex items-center gap-2 pt-2">
               <button

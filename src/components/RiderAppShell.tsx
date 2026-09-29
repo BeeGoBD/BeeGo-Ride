@@ -42,7 +42,7 @@ export const RiderAppShell: React.FC<RiderAppShellProps> = ({
   const [isPowerStationsOpen, setIsPowerStationsOpen] = useState(false);
 
   return (
-    <div className="w-full h-full min-h-screen bg-white text-[#1A1A1A] flex flex-col justify-between overflow-hidden relative select-none max-w-[430px] mx-auto shadow-2xl">
+    <div className="w-full h-full bg-white text-[#1A1A1A] flex flex-col justify-between overflow-hidden relative select-none max-w-[430px] mx-auto shadow-2xl">
       {/* 1. STICKY TOP APPBAR */}
       <header className="sticky top-0 z-40 w-full h-14 bg-white/95 backdrop-blur-md border-b border-zinc-100 px-4 flex items-center justify-between shrink-0 shadow-xs">
         {/* Left: Brand Logo & Driver Tag */}
@@ -140,7 +140,7 @@ export const RiderAppShell: React.FC<RiderAppShellProps> = ({
       {/* 3. FIXED BOTTOM NAVIGATION BAR (3 Items Adapted for Rider) */}
       <nav
         id="rider-voltx-fixed-bottom-nav"
-        className="fixed bottom-0 left-0 right-0 z-40 max-w-[430px] mx-auto bg-white/98 backdrop-blur-md border-t border-zinc-200/90 h-16 px-4 flex items-center justify-around shadow-lg select-none"
+        className="shrink-0 w-full z-40 bg-white/98 backdrop-blur-md border-t border-zinc-200/90 h-16 px-4 flex items-center justify-around shadow-lg select-none"
       >
         {/* Item 1: Dispatch / Dashboard */}
         <button

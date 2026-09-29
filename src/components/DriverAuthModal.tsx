@@ -92,29 +92,6 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
     }
   };
 
-  // Demo auto-fill sample for quick testing
-  const handleDemoFill = () => {
-    setFullName('Tanvir Ahmed');
-    setPhoneNumber('1712345678');
-    setPassword('driver123');
-    setConfirmPassword('driver123');
-
-    // Sample high-quality placeholders for NID & Selfie
-    const sampleNidFront =
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" rx="16" fill="%23064e3b"/><rect x="15" y="15" width="290" height="170" rx="10" fill="%23047857"/><circle cx="55" cy="80" r="30" fill="%23fbbf24"/><rect x="100" y="55" width="160" height="14" rx="4" fill="%23ffffff"/><rect x="100" y="80" width="120" height="10" rx="3" fill="%23a7f3d0"/><rect x="100" y="98" width="140" height="10" rx="3" fill="%23a7f3d0"/><text x="160" y="165" font-family="sans-serif" font-weight="900" font-size="12" fill="%23fef3c7" text-anchor="middle">GOVERNMENT OF BANGLADESH - NID FRONT</text></svg>';
-
-    const sampleNidBack =
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="320" height="200" viewBox="0 0 320 200"><rect width="320" height="200" rx="16" fill="%231e293b"/><rect x="15" y="15" width="290" height="170" rx="10" fill="%23334155"/><rect x="25" y="40" width="270" height="30" fill="%230f172a"/><text x="160" y="105" font-family="monospace" font-size="11" fill="%2394a3b8" text-anchor="middle">NID NO: 9876543210987</text><rect x="40" y="125" width="240" height="8" rx="2" fill="%2364748b"/><text x="160" y="165" font-family="sans-serif" font-weight="900" font-size="12" fill="%23f8fafc" text-anchor="middle">NID BACK - BANGLADESH ELECTION COMMISSION</text></svg>';
-
-    const sampleSelfie =
-      'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="240" height="240" viewBox="0 0 240 240"><rect width="240" height="240" rx="24" fill="%23f59e0b"/><circle cx="120" cy="95" r="45" fill="%23ffffff"/><circle cx="105" cy="85" r="6" fill="%231f2937"/><circle cx="135" cy="85" r="6" fill="%231f2937"/><path d="M105 110 Q120 125 135 110" stroke="%231f2937" stroke-width="4" fill="none" stroke-linecap="round"/><path d="M60 210 Q120 160 180 210" fill="%23ffffff"/><text x="120" y="230" font-family="sans-serif" font-weight="bold" font-size="11" fill="%2378350f" text-anchor="middle">VERIFIED CAPTAIN SELFIE</text></svg>';
-
-    setNidFrontUrl(sampleNidFront);
-    setNidBackUrl(sampleNidBack);
-    setSelfieUrl(sampleSelfie);
-    setErrorMessage(null);
-  };
-
   // Submit Driver Registration
   const handleRegisterSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -206,17 +183,8 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
           onAuthenticated(driver);
         }, 500);
       } else {
-        // Fallback for demo: if no driver exists, create an active one or ask to register
-        const existing = getCurrentDriver();
-        if (existing) {
-          setTimeout(() => {
-            setIsSubmitting(false);
-            onAuthenticated(existing);
-          }, 500);
-        } else {
-          setIsSubmitting(false);
-          setErrorMessage('Driver account not found. Please click "Register as Driver" below.');
-        }
+        setIsSubmitting(false);
+        setErrorMessage('Driver account not found. Please click "Register as Driver" below.');
       }
     } catch (err: any) {
       setIsSubmitting(false);
@@ -293,23 +261,6 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
             <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
               <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
               <div className="flex-1 font-semibold">{errorMessage}</div>
-            </div>
-          )}
-
-          {/* Quick Demo Fill Pill for Reviewers */}
-          {mode === 'register' && (
-            <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/80 border border-amber-200/70 text-xs">
-              <div className="flex items-center gap-1.5 text-amber-900 font-bold">
-                <Sparkles className="w-3.5 h-3.5 text-[#E6A800]" />
-                <span>Testing out? Fill with sample verification data</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleDemoFill}
-                className="px-2.5 py-1 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] uppercase tracking-wider cursor-pointer active:scale-95 transition-all shadow-xs"
-              >
-                Auto-Fill
-              </button>
             </div>
           )}
 

@@ -41,63 +41,6 @@ export interface HistoryRideItem {
   status: 'completed';
 }
 
-const DEFAULT_PAST_TRIPS: HistoryRideItem[] = [
-  {
-    id: 'tr-001',
-    date: 'Today, 27 Sep',
-    time: '02:15 PM',
-    pickup: 'Gulshan 2 Circle, Dhaka',
-    dropoff: 'Banani 11, Block D, Dhaka',
-    distanceKm: 2.4,
-    fareTaka: 168,
-    vehicleType: 'bike',
-    tierName: 'Bee Moto',
-    ratePerKm: 70,
-    vehicleModel: 'Voltx Eco Electric (Green)',
-    plateNumber: 'Dhaka Metro-Ha 45-8921',
-    driverName: 'Rafiqul Islam',
-    driverRating: 4.9,
-    paymentMethod: 'Cash',
-    status: 'completed',
-  },
-  {
-    id: 'tr-002',
-    date: 'Yesterday, 26 Sep',
-    time: '06:40 PM',
-    pickup: 'Dhanmondi 27 (Rangs Square)',
-    dropoff: 'Kawran Bazar Metro, Dhaka',
-    distanceKm: 4.1,
-    fareTaka: 287,
-    vehicleType: 'bike',
-    tierName: 'Bee Moto',
-    ratePerKm: 70,
-    vehicleModel: 'Voltx Speed 2.0 (Yellow)',
-    plateNumber: 'Dhaka Metro-Ha 78-1204',
-    driverName: 'Kamal Hossain',
-    driverRating: 4.8,
-    paymentMethod: 'Cash',
-    status: 'completed',
-  },
-  {
-    id: 'tr-003',
-    date: '24 Sep 2026',
-    time: '11:10 AM',
-    pickup: 'Uttara Sector 3 (Jashimuddin Ave)',
-    dropoff: 'Hazrat Shahjalal Airport Terminal 1',
-    distanceKm: 3.5,
-    fareTaka: 245,
-    vehicleType: 'car',
-    tierName: 'Comfort AC',
-    ratePerKm: 70,
-    vehicleModel: 'Toyota Axio AC Sedan',
-    plateNumber: 'Dhaka Metro-Ga 23-4512',
-    driverName: 'Tariqul Alam',
-    driverRating: 5.0,
-    paymentMethod: 'Cash',
-    status: 'completed',
-  },
-];
-
 interface RideHistorySectionProps {
   onRebookRide?: (dropoffText: string) => void;
   activeRide?: RideRequest | null;
@@ -113,38 +56,40 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
 }) => {
   const [vehicleFilter, setVehicleFilter] = useState<'bike' | 'car' | 'all'>('bike');
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryRideItem | null>(null);
-  const [trips, setTrips] = useState<HistoryRideItem[]>(DEFAULT_PAST_TRIPS);
+
+  const loadRealTrips = (): HistoryRideItem[] => {
+    const realHistory = getRealTripHistory();
+    if (!realHistory || realHistory.length === 0) return [];
+    return realHistory.map((h, i) => ({
+      id: h.id || `real-${i}`,
+      date: h.date || new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+      time: h.time || new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      pickup: h.pickup,
+      dropoff: h.dropoff,
+      distanceKm: h.distanceKm,
+      fareTaka: h.fareTaka,
+      vehicleType: (h.vehicleType as 'bike' | 'car') || 'bike',
+      tierName: h.tierName || (h.vehicleType === 'car' ? 'Comfort AC' : 'Bee Moto'),
+      ratePerKm: h.ratePerKm || RATE_PER_KM_TAKA,
+      vehicleModel: h.vehicleModel || 'Voltx Eco Electric',
+      plateNumber: h.plateNumber || 'Dhaka Metro 45-8921',
+      driverName: h.driverName || 'Captain Tanvir',
+      driverRating: h.driverRating || 4.9,
+      paymentMethod: h.paymentMethod ? h.paymentMethod.toUpperCase() : 'Cash',
+      status: 'completed',
+    }));
+  };
+
+  const [trips, setTrips] = useState<HistoryRideItem[]>(() => loadRealTrips());
   const [copiedReceipt, setCopiedReceipt] = useState(false);
 
   useEffect(() => {
-    const realHistory = getRealTripHistory();
-    if (realHistory && realHistory.length > 0) {
-      const mapped: HistoryRideItem[] = realHistory.map((h, i) => ({
-        id: h.id || `real-${i}`,
-        date: new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-        time: new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        pickup: h.pickup,
-        dropoff: h.dropoff,
-        distanceKm: h.distanceKm,
-        fareTaka: h.fareTaka,
-        vehicleType: 'bike',
-        tierName: 'Bee Moto',
-        ratePerKm: 70,
-        vehicleModel: 'Voltx Eco Electric',
-        plateNumber: 'Dhaka Metro-Ha 55-9012',
-        driverName: h.driverName || 'Md. Jahangir',
-        driverRating: h.driverRating || 4.9,
-        paymentMethod: 'Cash',
-        status: 'completed',
-      }));
-      setTrips([...mapped, ...DEFAULT_PAST_TRIPS]);
-    }
-  }, []);
+    setTrips(loadRealTrips());
+  }, [activeRide?.status]);
 
-  const filteredTrips = trips.filter((t) => {
-    if (vehicleFilter === 'all') return true;
-    return t.vehicleType === vehicleFilter;
-  });
+  const filteredTrips = trips.filter(
+    (t) => vehicleFilter === 'all' || t.vehicleType === vehicleFilter
+  );
 
   const isOngoing =
     activeRide &&
@@ -154,30 +99,30 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
       activeRide.status === 'in_transit');
 
   return (
-    <div className="w-full h-full min-h-screen bg-[#F8F9FA] text-[#1A1A1A] flex flex-col p-5 select-none max-w-[430px] mx-auto pb-24">
-      {/* Header */}
-      <div className="flex items-center justify-between pb-3 pt-1 border-b border-zinc-200 shrink-0">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-[#F5C518] flex items-center justify-center text-black">
-            <Clock className="w-4 h-4" />
+    <div className="w-full flex-1 flex flex-col p-4 select-none pb-28 bg-[#F8F9FA] text-[#1A1A1A] overflow-y-auto no-scrollbar gap-3.5">
+      {/* 1. Header */}
+      <div className="flex items-center justify-between pt-1 pb-2 border-b border-zinc-200/80">
+        <div className="flex items-center gap-2.5">
+          <div className="w-10 h-10 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-xs">
+            <Clock className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div>
             <h1 className="text-base font-black text-[#1A1A1A]">Activity</h1>
-            <p className="text-[11px] text-zinc-500">Your ongoing and completed trips</p>
+            <p className="text-[11px] text-zinc-500 font-medium">Your ongoing and completed trips</p>
           </div>
         </div>
 
         {isOngoing && (
-          <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1.5 shadow-2xs">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
             1 In Progress
           </span>
         )}
       </div>
 
-      {/* 1. ONGOING RIDE CARD (if active) */}
+      {/* 2. ONGOING RIDE CARD (if active) */}
       {isOngoing && activeRide && (
-        <div className="mt-4 p-4 rounded-3xl bg-white border-2 border-[#F5C518] shadow-lg shadow-amber-500/10 flex flex-col gap-3 animate-in fade-in">
+        <div className="p-4 rounded-3xl bg-white border-2 border-[#F5C518] shadow-lg shadow-amber-500/10 flex flex-col gap-3 animate-in fade-in">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -185,7 +130,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
                 Ongoing Ride ({activeRide.status.replace(/_/g, ' ')})
               </span>
             </div>
-            <span className="text-xs font-black text-[#E6A800]">
+            <span className="text-xs font-mono font-black text-[#E6A800]">
               ৳{activeRide.fareTaka} Cash
             </span>
           </div>
@@ -204,9 +149,9 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
 
           {/* Rider Details */}
           {(activeRide.driverDetails || activeRide.riderId) && (
-            <div className="p-2.5 rounded-xl bg-[#F8F9FA] flex items-center justify-between text-xs">
+            <div className="p-2.5 rounded-2xl bg-[#F8F9FA] flex items-center justify-between text-xs">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-zinc-900 text-[#F5C518] flex items-center justify-center">
+                <div className="w-7 h-7 rounded-xl bg-zinc-900 text-[#F5C518] flex items-center justify-center">
                   <Bike className="w-4 h-4" />
                 </div>
                 <div>
@@ -251,20 +196,20 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
         </div>
       )}
 
-      {/* 2. FILTER TABS (Bike is default per prompt!) */}
-      <div className="mt-4 flex items-center justify-between border-b border-zinc-200 pb-2">
+      {/* 3. FILTER TABS (Bike is default) */}
+      <div className="flex items-center justify-between">
         <h2 className="text-xs font-black uppercase tracking-wider text-zinc-400">
           Past Trips
         </h2>
 
-        <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl">
+        <div className="flex items-center gap-1 p-1 bg-zinc-200/60 rounded-xl">
           <button
             type="button"
             onClick={() => setVehicleFilter('bike')}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               vehicleFilter === 'bike'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-zinc-500 hover:text-black'
+                ? 'bg-white text-black shadow-xs'
+                : 'text-zinc-600 hover:text-black'
             }`}
           >
             Bike
@@ -274,8 +219,8 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
             onClick={() => setVehicleFilter('car')}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               vehicleFilter === 'car'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-zinc-500 hover:text-black'
+                ? 'bg-white text-black shadow-xs'
+                : 'text-zinc-600 hover:text-black'
             }`}
           >
             Car
@@ -285,8 +230,8 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
             onClick={() => setVehicleFilter('all')}
             className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
               vehicleFilter === 'all'
-                ? 'bg-white text-black shadow-sm'
-                : 'text-zinc-500 hover:text-black'
+                ? 'bg-white text-black shadow-xs'
+                : 'text-zinc-600 hover:text-black'
             }`}
           >
             All
@@ -294,8 +239,8 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
         </div>
       </div>
 
-      {/* 3. PAST TRIPS LIST */}
-      <div className="mt-3 flex flex-col gap-3">
+      {/* 4. PAST TRIPS LIST */}
+      <div className="space-y-3">
         {filteredTrips.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-3xl border border-zinc-200 text-zinc-400 text-xs">
             No completed {vehicleFilter} trips found.
@@ -304,7 +249,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
           filteredTrips.map((trip) => (
             <div
               key={trip.id}
-              className="p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-sm hover:border-[#F5C518] hover:shadow-md transition-all flex flex-col gap-3"
+              className="p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-xs hover:border-[#F5C518] hover:shadow-md transition-all flex flex-col gap-3 group"
             >
               {/* Top row: Date, Vehicle, Fare */}
               <div className="flex items-center justify-between border-b border-zinc-100 pb-2.5">
@@ -320,17 +265,17 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
                     <span className="text-xs font-black text-[#1A1A1A] block">
                       {trip.tierName}
                     </span>
-                    <span className="text-[10px] text-zinc-400">
+                    <span className="text-[10px] text-zinc-400 font-medium">
                       {trip.date} • {trip.time}
                     </span>
                   </div>
                 </div>
 
                 <div className="text-right">
-                  <span className="text-sm font-black text-[#1A1A1A] block">
+                  <span className="text-sm font-black font-mono text-[#1A1A1A] block">
                     ৳{trip.fareTaka}
                   </span>
-                  <span className="text-[10px] text-emerald-600 font-semibold">
+                  <span className="text-[10px] text-emerald-600 font-bold">
                     Completed • {trip.paymentMethod}
                   </span>
                 </div>
@@ -372,7 +317,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
                     <button
                       type="button"
                       onClick={() => onRebookRide(trip.dropoff)}
-                      className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-all cursor-pointer shadow-sm active:scale-95 flex items-center gap-1"
+                      className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
                     >
                       <RotateCcw className="w-3 h-3 stroke-[2.5]" />
                       <span>Request Again</span>
@@ -385,7 +330,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
         )}
       </div>
 
-      {/* 4. RECEIPT DETAILS MODAL */}
+      {/* 5. RECEIPT DETAILS MODAL */}
       {selectedReceipt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm select-none">
           <div className="w-full max-w-[380px] bg-white rounded-3xl p-5 shadow-2xl border border-zinc-200 flex flex-col gap-4">

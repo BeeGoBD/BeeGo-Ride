@@ -25,7 +25,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
   onReplayIntro,
 }) => {
   return (
-    <div className="w-full min-h-screen bg-[#F8F9FA] text-[#1A1A1A] flex flex-col justify-between p-6 select-none max-w-[430px] mx-auto shadow-2xl relative">
+    <div className="w-full h-full bg-[#F8F9FA] text-[#1A1A1A] flex flex-col justify-between p-6 select-none max-w-[430px] mx-auto shadow-2xl relative overflow-y-auto no-scrollbar">
       {/* Top Bar with Brand & Replay Intro */}
       <div className="w-full flex items-center justify-between pt-2">
         <BeeGoVoltxLogo size="md" />

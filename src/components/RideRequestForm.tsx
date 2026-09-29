@@ -20,6 +20,9 @@ import {
   ShieldCheck,
   Lock,
   Compass,
+  Sparkles,
+  Zap,
+  Eye,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
@@ -144,6 +147,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   useEffect(() => {
     if (pickup) {
       setPickupInput(pickup.formatted);
+    } else {
+      setPickupInput('');
     }
   }, [pickup]);
 
@@ -154,6 +159,18 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
       setDropoffInput('');
     }
   }, [dropoff]);
+
+  // Purge route, destination, and inputs immediately if ride is cancelled or declined
+  useEffect(() => {
+    if (activeRide?.status === 'cancelled' || activeRide?.status === 'declined') {
+      setPickup(null);
+      setPickupInput('');
+      setDropoff(null);
+      setDropoffInput('');
+      setAutoRouteData(null);
+      setIsSearchCardCollapsed(false);
+    }
+  }, [activeRide?.status, setPickup, setDropoff]);
 
   // 3. Auto-calculate route whenever both pickup and dropoff are valid
   useEffect(() => {
@@ -471,7 +488,15 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
               <button
                 type="button"
-                onClick={onCancelRide}
+                onClick={() => {
+                  setPickup(null);
+                  setPickupInput('');
+                  setDropoff(null);
+                  setDropoffInput('');
+                  setAutoRouteData(null);
+                  setIsSearchCardCollapsed(false);
+                  onCancelRide();
+                }}
                 className="w-full max-w-sm mx-auto py-3 px-5 rounded-2xl text-xs font-bold text-zinc-600 hover:text-black bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition-all cursor-pointer active:scale-95 block"
               >
                 Cancel Ride Request
@@ -635,55 +660,62 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
         ) : (
           <div
             id="ride-request-card"
-            className="bg-white/95 backdrop-blur-md border border-zinc-200/90 rounded-[28px] p-3.5 shadow-[0_12px_36px_rgba(0,0,0,0.12)] relative animate-in fade-in duration-200"
+            className="bg-white/95 backdrop-blur-2xl border border-zinc-200/80 rounded-[30px] p-4 shadow-[0_16px_40px_rgba(0,0,0,0.12),0_2px_8px_rgba(0,0,0,0.04)] relative ring-1 ring-black/[0.03] transition-all animate-in fade-in duration-200 select-none"
           >
-            {/* Header with Back Button and Done Toggle */}
-            <div className="flex items-center justify-between mb-2 px-0.5">
+            {/* Header: Back Button, Brand Status Pill & View Map */}
+            <div className="flex items-center justify-between mb-3 px-0.5">
               <button
                 type="button"
                 onClick={onBackToRoles}
-                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-black text-xs font-bold transition-all cursor-pointer active:scale-95"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-700 hover:text-black text-xs font-bold transition-all cursor-pointer active:scale-95 shadow-2xs"
                 title="Back to Dashboard"
               >
                 <ArrowLeft className="w-3.5 h-3.5 stroke-[2.5]" />
                 <span>Back</span>
               </button>
-              <div className="flex items-center gap-2">
-                {dropoff && (
-                  <button
-                    type="button"
-                    onClick={() => setIsSearchCardCollapsed(true)}
-                    className="text-[11px] font-bold text-[#1A1A1A] px-2.5 py-0.5 rounded-lg bg-[#FFF9E6] border border-[#F5C518]/50 hover:bg-[#F5C518]/20 transition-colors cursor-pointer"
-                  >
-                    View Map
-                  </button>
-                )}
-                <span className="text-[11px] font-black uppercase tracking-wider text-zinc-400 font-mono">
-                  Trip Planner
-                </span>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-amber-50/80 border border-amber-200/60 text-zinc-800 text-[11px] font-bold shadow-2xs">
+                <Zap className="w-3.5 h-3.5 text-[#E6A800] fill-[#F5C518]" />
+                <span className="tracking-tight">EV Ride Dispatch</span>
               </div>
+
+              {dropoff ? (
+                <button
+                  type="button"
+                  onClick={() => setIsSearchCardCollapsed(true)}
+                  className="flex items-center gap-1 text-[11px] font-bold text-zinc-800 px-2.5 py-1 rounded-full bg-[#FFF9E6] border border-[#F5C518]/50 hover:bg-[#F5C518]/25 transition-colors cursor-pointer shadow-2xs active:scale-95"
+                  title="Collapse and view map"
+                >
+                  <Eye className="w-3.5 h-3.5 text-[#E6A800]" />
+                  <span>View Map</span>
+                </button>
+              ) : (
+                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 font-mono">
+                  Dhaka
+                </span>
+              )}
             </div>
 
-            {/* Input fields container with vertical transit line */}
-            <div className="relative space-y-2">
-              {/* Vertical transit line connecting pickup and drop-off with integrated Swap button */}
-              <div className="absolute left-[13px] top-[18px] bottom-[18px] w-0.5 bg-gradient-to-b from-emerald-500 via-zinc-300 to-[#1A1A1A] pointer-events-none flex items-center justify-center">
+            {/* Input fields container with vertical transit line & Swap */}
+            <div className="relative space-y-2.5">
+              {/* Vertical transit line connecting pickup and drop-off */}
+              <div className="absolute left-[13px] top-[19px] bottom-[19px] w-0.5 bg-gradient-to-b from-emerald-500 via-amber-300 to-[#1A1A1A] pointer-events-none flex items-center justify-center z-10">
                 <button
                   type="button"
                   onClick={handleSwitchLocations}
                   disabled={!pickup || !dropoff}
-                  className="pointer-events-auto w-6 h-6 rounded-full bg-white hover:bg-[#FFF9E6] border border-zinc-300 hover:border-[#F5C518] shadow-md flex items-center justify-center transition-all cursor-pointer active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed group"
+                  className="pointer-events-auto w-6.5 h-6.5 rounded-full bg-white hover:bg-[#FFF9E6] border border-zinc-200 hover:border-[#F5C518] shadow-md flex items-center justify-center transition-all cursor-pointer active:scale-90 disabled:opacity-30 disabled:cursor-not-allowed group"
                   title="Swap pickup and drop-off"
                 >
-                  <ArrowDownUp className="w-3 h-3 text-[#E6A800] group-hover:rotate-180 transition-transform duration-300" />
+                  <ArrowDownUp className="w-3.5 h-3.5 text-[#E6A800] group-hover:rotate-180 transition-transform duration-300" />
                 </button>
               </div>
 
-              {/* HOVER SECTION 1: PICKUP SPOT */}
+              {/* INPUT 1: PICKUP SPOT */}
               <div ref={pickupContainerRef} className="relative pl-7">
-                <div className="relative flex items-center">
+                <div className="relative flex items-center bg-[#F8F9FA] hover:bg-white focus-within:bg-white border border-zinc-200/90 focus-within:border-[#F5C518] focus-within:ring-2 focus-within:ring-[#F5C518]/25 rounded-2xl transition-all shadow-2xs">
                   {/* Green Pickup Dot */}
-                  <span className="absolute -left-5 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100 shrink-0" />
+                  <span className="absolute -left-5 w-3 h-3 rounded-full bg-emerald-500 ring-4 ring-emerald-100 shrink-0 z-20" />
 
                   <input
                     id="pickup-input"
@@ -696,13 +728,13 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         handlePickupChange(pickupInput);
                       }
                     }}
-                    placeholder="Pickup spot in Bangladesh..."
+                    placeholder="Pickup location in Dhaka / Bangladesh..."
                     autoComplete="off"
-                    className="w-full pl-3 pr-16 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200/80 rounded-2xl text-xs font-semibold text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/25 transition-all shadow-inner"
+                    className="w-full pl-3 pr-20 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
                   />
 
-                  {/* Right controls: GPS toggle or Clear */}
-                  <div className="absolute right-2 flex items-center gap-1">
+                  {/* Right controls: GPS status badge / toggle or Clear */}
+                  <div className="absolute right-2 flex items-center gap-1.5">
                     {isSearchingPickup && (
                       <Loader2 className="w-3.5 h-3.5 text-[#E6A800] animate-spin" />
                     )}
@@ -715,7 +747,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                           setIsPickupLiveGps(false);
                           setPickupSuggestions([]);
                         }}
-                        className="p-1 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                        className="p-1 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer transition-colors"
+                        title="Clear pickup"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -724,21 +757,27 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                       type="button"
                       onClick={handleResetToLiveGpsPickup}
                       disabled={isLocating}
-                      className={`p-1 rounded-lg transition-colors cursor-pointer ${
-                        isPickupLiveGps ? 'text-emerald-600 bg-emerald-50' : 'text-zinc-400 hover:text-[#E6A800]'
+                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
+                        isPickupLiveGps
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100'
+                          : 'bg-zinc-100 text-zinc-500 hover:text-[#E6A800] hover:bg-amber-50'
                       }`}
-                      title="Use my real-time GPS location"
+                      title={isPickupLiveGps ? 'GPS location active' : 'Use real-time GPS location'}
                     >
-                      <LocateFixed className="w-3.5 h-3.5" />
+                      <LocateFixed className={`w-3 h-3 ${isPickupLiveGps ? 'text-emerald-600 animate-pulse' : 'text-zinc-400'}`} />
+                      <span>{isPickupLiveGps ? 'GPS' : 'Locate'}</span>
                     </button>
                   </div>
                 </div>
 
                 {/* Autocomplete Suggestions Dropdown for Pickup */}
                 {isPickupFocused && pickupSuggestions.length > 0 && !pickup && (
-                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-zinc-200 rounded-2xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
-                    <div className="px-3 py-1.5 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase font-mono font-bold text-zinc-500 flex items-center justify-between">
-                      <span className="text-[#E6A800]">Suggested Pickups</span>
+                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white/98 backdrop-blur-xl border border-zinc-200/90 rounded-2xl shadow-[0_20px_48px_rgba(0,0,0,0.18)] overflow-hidden max-h-56 overflow-y-auto no-scrollbar animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3.5 py-1.5 bg-gradient-to-r from-zinc-50 to-amber-50/40 border-b border-zinc-100 text-[10px] uppercase font-mono font-bold text-zinc-500 flex items-center justify-between">
+                      <span className="text-[#E6A800] flex items-center gap-1">
+                        <MapPin className="w-3 h-3" />
+                        Suggested Pickups
+                      </span>
                       <span>Bangladesh</span>
                     </div>
                     {pickupSuggestions.map((item, idx) => (
@@ -746,11 +785,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         key={`pickup-sug-${item.placeId || idx}`}
                         type="button"
                         onClick={() => handleSelectPickup(item)}
-                        className="w-full text-left px-3 py-2.5 hover:bg-[#FFFDF5] border-b border-zinc-100 last:border-b-0 transition-colors flex items-start gap-2.5 cursor-pointer"
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-[#FFFDF5] border-b border-zinc-100 last:border-b-0 transition-colors flex items-start gap-2.5 cursor-pointer group"
                       >
                         {renderItemIcon(item, false)}
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-[#1A1A1A] truncate">
+                          <div className="text-xs font-bold text-[#1A1A1A] group-hover:text-[#E6A800] transition-colors truncate">
                             {item.addressLine1 || item.name || item.formatted.split(',')[0]}
                           </div>
                           <div className="text-[10px] text-zinc-500 truncate mt-0.5">
@@ -763,11 +802,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 )}
               </div>
 
-              {/* HOVER SECTION 2: DROP-OFF DESTINATION */}
+              {/* INPUT 2: DROP-OFF DESTINATION */}
               <div ref={dropoffContainerRef} className="relative pl-7">
-                <div className="relative flex items-center">
+                <div className="relative flex items-center bg-[#F8F9FA] hover:bg-white focus-within:bg-white border border-zinc-200/90 focus-within:border-[#F5C518] focus-within:ring-2 focus-within:ring-[#F5C518]/25 rounded-2xl transition-all shadow-2xs">
                   {/* Black Destination Diamond */}
-                  <span className="absolute -left-5 w-3 h-3 rounded-xs bg-[#1A1A1A] ring-4 ring-zinc-200 shrink-0 transform rotate-45" />
+                  <span className="absolute -left-5 w-3 h-3 rounded-xs bg-[#1A1A1A] ring-4 ring-zinc-200 shrink-0 transform rotate-45 z-20" />
 
                   <input
                     id="dropoff-input"
@@ -780,9 +819,9 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         handleDropoffChange(dropoffInput);
                       }
                     }}
-                    placeholder="Where to? (e.g. Gulshan, Dhanmondi, Airport)..."
+                    placeholder="Where to? (e.g. Gulshan, Airport, Dhanmondi)..."
                     autoComplete="off"
-                    className="w-full pl-3 pr-10 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200/80 rounded-2xl text-xs font-semibold text-[#1A1A1A] placeholder-zinc-400 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/25 transition-all shadow-inner"
+                    className="w-full pl-3 pr-12 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
                   />
 
                   <div className="absolute right-2 flex items-center gap-1">
@@ -798,7 +837,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                           setDropoffSuggestions([]);
                           setIsSearchCardCollapsed(false);
                         }}
-                        className="p-1 text-zinc-400 hover:text-zinc-700 cursor-pointer"
+                        className="p-1 rounded-full text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 cursor-pointer transition-colors"
+                        title="Clear destination"
                       >
                         <X className="w-3.5 h-3.5" />
                       </button>
@@ -808,9 +848,12 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
                 {/* Autocomplete Suggestions Dropdown for Drop-off */}
                 {isDropoffFocused && dropoffSuggestions.length > 0 && !dropoff && (
-                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white border border-zinc-200 rounded-2xl shadow-2xl overflow-hidden max-h-56 overflow-y-auto">
-                    <div className="px-3 py-1.5 bg-zinc-50 border-b border-zinc-200 text-[10px] uppercase font-mono font-bold text-zinc-500 flex items-center justify-between">
-                      <span className="text-[#E6A800]">Suggested Destinations</span>
+                  <div className="absolute z-50 left-0 right-0 mt-2 bg-white/98 backdrop-blur-xl border border-zinc-200/90 rounded-2xl shadow-[0_20px_48px_rgba(0,0,0,0.18)] overflow-hidden max-h-56 overflow-y-auto no-scrollbar animate-in fade-in zoom-in-95 duration-150">
+                    <div className="px-3.5 py-1.5 bg-gradient-to-r from-zinc-50 to-amber-50/40 border-b border-zinc-100 text-[10px] uppercase font-mono font-bold text-zinc-500 flex items-center justify-between">
+                      <span className="text-[#E6A800] flex items-center gap-1">
+                        <Navigation className="w-3 h-3" />
+                        Suggested Destinations
+                      </span>
                       <span>Dhaka & Beyond</span>
                     </div>
                     {dropoffSuggestions.map((item, idx) => (
@@ -818,11 +861,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         key={`dropoff-sug-${item.placeId || idx}`}
                         type="button"
                         onClick={() => handleSelectDropoff(item)}
-                        className="w-full text-left px-3 py-2.5 hover:bg-[#FFFDF5] border-b border-zinc-100 last:border-b-0 transition-colors flex items-start gap-2.5 cursor-pointer"
+                        className="w-full text-left px-3.5 py-2.5 hover:bg-[#FFFDF5] border-b border-zinc-100 last:border-b-0 transition-colors flex items-start gap-2.5 cursor-pointer group"
                       >
                         {renderItemIcon(item, true)}
                         <div className="min-w-0 flex-1">
-                          <div className="text-xs font-bold text-[#1A1A1A] truncate">
+                          <div className="text-xs font-bold text-[#1A1A1A] group-hover:text-[#E6A800] transition-colors truncate">
                             {item.addressLine1 || item.name || item.formatted.split(',')[0]}
                           </div>
                           <div className="text-[10px] text-zinc-500 truncate mt-0.5">
@@ -836,16 +879,74 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
               </div>
             </div>
 
-            {/* Micro hint: Drag markers on map */}
-            <div className="pt-2 mt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-400 font-medium">
-              <span className="flex items-center gap-1">
+            {/* Quick 1-Tap Popular Dhaka Destination Pills (Shown when destination is empty) */}
+            {!dropoff && (
+              <div className="pt-2.5 mt-1">
+                <div className="flex items-center justify-between mb-1.5 px-0.5">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#E6A800]" />
+                    Quick Destinations
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  {[
+                    {
+                      name: 'Gulshan 2',
+                      lat: 23.7925,
+                      lon: 90.4078,
+                      formatted: 'Gulshan 2 Circle, Dhaka',
+                      addressLine1: 'Gulshan 2 Circle',
+                      addressLine2: 'North Commercial Hub, Dhaka',
+                    },
+                    {
+                      name: 'Banani 11',
+                      lat: 23.7937,
+                      lon: 90.4042,
+                      formatted: 'Banani Road 11, Dhaka',
+                      addressLine1: 'Banani Road 11',
+                      addressLine2: 'Road 11 Lifestyle Hub, Dhaka',
+                    },
+                    {
+                      name: 'Airport T1',
+                      lat: 23.8433,
+                      lon: 90.4029,
+                      formatted: 'Hazrat Shahjalal Int. Airport Terminal 1, Dhaka',
+                      addressLine1: 'Airport Terminal 1',
+                      addressLine2: 'Uttara, Dhaka',
+                    },
+                    {
+                      name: 'Dhanmondi 27',
+                      lat: 23.7538,
+                      lon: 90.3768,
+                      formatted: 'Dhanmondi 27 Satmasjid Road, Dhaka',
+                      addressLine1: 'Dhanmondi 27',
+                      addressLine2: 'Satmasjid Road, Dhaka',
+                    },
+                  ].map((spot) => (
+                    <button
+                      key={spot.name}
+                      type="button"
+                      onClick={() => handleSelectDropoff(spot)}
+                      className="shrink-0 px-2.5 py-1 rounded-xl bg-zinc-100 hover:bg-[#FFF9E6] border border-zinc-200/80 hover:border-[#F5C518]/60 text-zinc-700 hover:text-black text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
+                    >
+                      <MapPin className="w-3 h-3 text-[#E6A800]" />
+                      <span>{spot.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Micro hint & Route status footer */}
+            <div className="pt-2 mt-2.5 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-400 font-medium">
+              <span className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full bg-[#F5C518]" />
-                Tip: Drag pins or tap on map to position spots
+                <span>Tip: Drag pins or tap map to relocate spots</span>
               </span>
               {isCalculatingRoute && (
                 <span className="text-[#E6A800] font-bold flex items-center gap-1">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  Updating route...
+                  Updating electric route...
                 </span>
               )}
             </div>

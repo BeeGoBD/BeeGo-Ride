@@ -368,16 +368,6 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 </span>
               </div>
             </div>
-
-            {/* Quick simulation for reviewers/testers */}
-            <button
-              type="button"
-              onClick={handleToggleAdminStatus}
-              className="px-2.5 py-1 rounded-xl bg-zinc-900 hover:bg-black text-[#F5C518] text-[10px] font-black uppercase tracking-wider shrink-0 cursor-pointer shadow-xs active:scale-95 transition-all"
-              title="Test approval mode"
-            >
-              Approve (Demo)
-            </button>
           </div>
 
           <p className="text-xs text-amber-900 font-semibold leading-relaxed bg-white/70 p-2.5 rounded-2xl border border-amber-200/80">

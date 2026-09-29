@@ -28,18 +28,10 @@ import './lib/appwrite';
 type AppIntroState = 'splash' | 'onboarding' | 'ready';
 
 export default function App() {
-  // Intro splash and slides lifecycle
-  const [introState, setIntroState] = useState<AppIntroState>(() => {
-    if (typeof window !== 'undefined') {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('skipIntro') === 'true') return 'ready';
-      const seen = sessionStorage.getItem('beego_intro_completed') || sessionStorage.getItem('bigo_intro_completed');
-      if (seen === 'true') return 'ready';
-    }
-    return 'splash';
-  });
+  // Intro splash: 2-second clean B logo & BeeGo text intro, then immediately starts the app
+  const [introState, setIntroState] = useState<AppIntroState>('splash');
 
-  // Role selection state: null = role selection screen shown first
+  // Role selection state: default to 'passenger' so the main dashboard with bottom navigation is shown immediately in first eye
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
@@ -52,7 +44,7 @@ export default function App() {
         return storedRole as UserRole;
       }
     }
-    return null;
+    return 'passenger';
   });
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
@@ -130,6 +122,11 @@ export default function App() {
           setStage('navigation');
         }
       } else if (!ride || ride.status === 'completed' || ride.status === 'cancelled' || ride.status === 'declined') {
+        if (ride?.status === 'cancelled' || ride?.status === 'declined') {
+          setPickup(null);
+          setDropoff(null);
+          setRouteData(null);
+        }
         if (stage === 'navigation') {
           setStage('request');
         }
@@ -247,6 +244,11 @@ export default function App() {
 
   const handleCancelRide = () => {
     cancelRide();
+    clearCurrentRide();
+    setPickup(null);
+    setDropoff(null);
+    setRouteData(null);
+    setStage('request');
   };
 
   const handleResetRide = () => {
@@ -257,9 +259,9 @@ export default function App() {
     setStage('request');
   };
 
-  // 1. INTRO SPLASH: BeeGo Voltx shining intro (~2s)
+  // 1. INTRO SPLASH: 2-second clean B logo & BeeGo text, then app starts directly
   if (introState === 'splash') {
-    return <BeegoIntroSplash onComplete={() => setIntroState('onboarding')} />;
+    return <BeegoIntroSplash onComplete={() => setIntroState('ready')} />;
   }
 
   // 2. ONBOARDING SLIDES: 4 slides with next/back buttons
@@ -375,8 +377,8 @@ export default function App() {
   }
 
   return (
-    <div className="w-full min-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:py-6 overflow-x-hidden font-sans text-[#1A1A1A]">
-      <div className="w-full max-w-[430px] min-h-[100dvh] sm:min-h-[880px] sm:max-h-[920px] sm:rounded-[36px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
+    <div className="w-full h-[100dvh] max-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:p-2 sm:py-3 overflow-hidden font-sans text-[#1A1A1A]">
+      <div className="w-full max-w-[430px] h-full sm:h-full sm:max-h-[880px] sm:rounded-[32px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
         {content}
 
         {/* Passenger Login / Signup Modal */}
