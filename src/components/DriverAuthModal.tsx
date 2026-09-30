@@ -190,10 +190,9 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-md max-h-[92dvh] sm:max-h-[880px] bg-white rounded-t-[32px] sm:rounded-[32px] shadow-2xl flex flex-col overflow-hidden border border-zinc-200 select-none animate-in slide-in-from-bottom-8 duration-300">
-        {/* Sticky Header with Title & Mode Switcher */}
-        <div className="p-4 sm:p-5 border-b border-zinc-100 bg-white/95 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between shrink-0">
+    <div className="w-full h-full flex flex-col bg-white overflow-hidden select-none relative">
+      {/* Sticky Header with Title & Mode Switcher */}
+      <div className="p-4 sm:p-5 border-b border-zinc-100 bg-white/95 backdrop-blur-md sticky top-0 z-20 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-10 h-10 rounded-2xl bg-zinc-900 text-[#F5C518] flex items-center justify-center shadow-sm">
               <Bike className="w-5 h-5 stroke-[2.2]" />
@@ -787,6 +786,5 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
       )}
     </div>
   </div>
-</div>
   );
 };

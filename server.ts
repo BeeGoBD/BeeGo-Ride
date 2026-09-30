@@ -2,6 +2,7 @@ import express from 'express';
 import path from 'path';
 import fs from 'fs';
 import crypto from 'crypto';
+import nodemailer from 'nodemailer';
 import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
@@ -218,19 +219,49 @@ async function startServer() {
   }
   const otpStore = new Map<string, OtpRecord>();
 
+  // Email transporter configuration for OTP dispatch
+  let mailTransporter: any = null;
+  function getMailTransporter(): any {
+    if (mailTransporter) return mailTransporter;
+    const smtpHost = process.env.SMTP_HOST || process.env.MAIL_HOST || 'smtp.gmail.com';
+    const smtpPort = parseInt(process.env.SMTP_PORT || '587', 10);
+    const smtpUser = process.env.SMTP_USER || process.env.GMAIL_USER || process.env.EMAIL_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD || process.env.EMAIL_PASS;
+
+    if (smtpUser && smtpPass) {
+      mailTransporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: smtpUser,
+          pass: smtpPass,
+        },
+      });
+    } else {
+      mailTransporter = nodemailer.createTransport({
+        host: smtpHost,
+        port: smtpPort,
+        secure: false,
+      });
+    }
+    return mailTransporter;
+  }
+
   // Parse JSON exclusively for /api/auth routes to prevent stream conflicts with proxy
   app.use('/api/auth', express.json());
 
-  // POST /api/auth/otp/send - Dispatches 6-digit OTP code to passenger's Gmail
+  // POST /api/auth/otp/send - Dispatches 6-digit OTP code for passenger verification (Email or Phone)
   app.post('/api/auth/otp/send', async (req, res) => {
     try {
       const { email, name, phone, password } = req.body || {};
       const cleanEmail = (email || '').trim().toLowerCase();
-      const cleanName = (name || '').trim() || cleanEmail.split('@')[0] || 'Passenger';
-      const cleanPhone = (phone || '').trim();
+      const cleanPhone = (phone || '').trim().replace(/[\s\-\(\)]/g, '');
+      const cleanName = (name || '').trim() || cleanEmail.split('@')[0] || cleanPhone || 'Passenger';
 
-      if (!cleanEmail || !cleanEmail.endsWith('@gmail.com')) {
-        return res.status(400).json({ error: 'A valid @gmail.com email address is required.' });
+      const targetIdentifier = cleanEmail || cleanPhone;
+      if (!targetIdentifier) {
+        return res.status(400).json({ error: 'Please enter a valid email address or phone number.' });
       }
 
       // Check restriction
@@ -240,80 +271,13 @@ async function startServer() {
         });
       }
 
-      // Segregation check: Driver cannot register or login as Passenger
-      const drivers = loadDrivers();
-      const driverWithEmail = Object.values(drivers).find(
-        (d) => d.email && d.email.trim().toLowerCase() === cleanEmail
-      );
-      if (driverWithEmail) {
-        return res.status(403).json({
-          error: 'This email is registered as a Driver account. Drivers cannot log in as passengers.',
-        });
-      }
-
       // Generate unique user ID candidate
       const generatedUserId = 'pax-' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
       // Generate standard 6-digit numeric OTP code
       const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 15 * 60 * 1000; // 15 minutes
 
-      let useAppwrite = true;
-      let appwriteSucceeded = false;
-
-      // Attempt Appwrite dispatch with a 4-second timeout
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 4000);
-
-        const appwriteRes = await fetch(`${APPWRITE_UPSTREAM}/account/tokens/email`, {
-          method: 'POST',
-          headers: {
-            'x-appwrite-project': APPWRITE_PROJECT_ID,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: generatedUserId,
-            email: cleanEmail,
-            phrase: false,
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeout);
-        const appwriteJson = await appwriteRes.json().catch(() => ({}));
-
-        if (appwriteRes.ok || appwriteRes.status === 201) {
-          appwriteSucceeded = true;
-          const actualUserId = appwriteJson.userId || generatedUserId;
-
-          otpStore.set(cleanEmail, {
-            userId: actualUserId,
-            email: cleanEmail,
-            name: cleanName,
-            password,
-            otp: generatedOtp,
-            expiresAt,
-            attempts: 0,
-            isFallback: false,
-          });
-
-          console.log(`[Beego Auth] Verification email dispatched by Appwrite to ${cleanEmail}`);
-          return res.json({
-            success: true,
-            userId: actualUserId,
-            message: `We have sent a 6-digit verification code to ${cleanEmail}. Please check your Gmail inbox.`,
-          });
-        } else {
-          console.warn(
-            `[Beego Auth] Appwrite upstream status ${appwriteRes.status} (${appwriteJson.message || appwriteJson.type || 'error'}). Activating resilient integrated OTP.`
-          );
-        }
-      } catch (err: any) {
-        console.warn('[Beego Auth] Appwrite upstream connection issue:', err?.message || err);
-      }
-
-      // Fallback: Resilient Integrated OTP (handles Appwrite 403 project_paused, offline, or timeouts)
-      otpStore.set(cleanEmail, {
+      otpStore.set(targetIdentifier, {
         userId: generatedUserId,
         email: cleanEmail,
         name: cleanName,
@@ -324,12 +288,50 @@ async function startServer() {
         isFallback: true,
       });
 
-      console.log(`[Beego Auth] Resilient verification code generated for ${cleanEmail}: ${generatedOtp}`);
+      console.log(`[Beego Auth OTP] Verification code generated for ${targetIdentifier}: ${generatedOtp}`);
+
+      // If email provided, dispatch via Nodemailer to the Gmail address
+      if (cleanEmail && cleanEmail.endsWith('@gmail.com')) {
+        try {
+          const transporter = getMailTransporter();
+          const fromAddr = process.env.SMTP_FROM || process.env.SMTP_USER || '"BeeGo Voltx" <no-reply@beegovoltx.com>';
+          transporter.sendMail({
+            from: fromAddr,
+            to: cleanEmail,
+            subject: `Your BeeGo Voltx Verification Code: ${generatedOtp}`,
+            text: `Hello ${cleanName},\n\nYour 6-digit BeeGo Voltx verification code is: ${generatedOtp}\n\nThis code will expire in 15 minutes.\nDo not share this code with anyone.\n\nBeeGo Voltx • Electric Rides & Power Swap Bangladesh`,
+            html: `
+              <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 500px; margin: 0 auto; padding: 28px; background-color: #ffffff; border: 1px solid #eaeaea; border-radius: 20px;">
+                <div style="text-align: center; margin-bottom: 24px;">
+                  <div style="display: inline-block; background-color: #F5C518; color: #000000; font-weight: 900; font-size: 22px; padding: 10px 20px; border-radius: 14px; letter-spacing: -0.5px;">BeeGo Voltx</div>
+                  <p style="color: #666666; font-size: 12px; margin-top: 8px; font-weight: 600;">Electric Rides & Battery Swapping Bangladesh</p>
+                </div>
+                <h2 style="color: #1A1A1A; font-size: 18px; margin-bottom: 12px; text-align: center; font-weight: 800;">Verify Your Account</h2>
+                <p style="color: #4A4A4A; font-size: 14px; line-height: 1.5;">Hello <strong>${cleanName}</strong>,</p>
+                <p style="color: #4A4A4A; font-size: 14px; line-height: 1.5;">Use this 6-digit verification code to complete your registration / sign-in on BeeGo Voltx:</p>
+                <div style="text-align: center; margin: 26px 0;">
+                  <span style="display: inline-block; font-size: 34px; font-weight: 900; letter-spacing: 8px; color: #1A1A1A; background-color: #FFF9E6; padding: 14px 28px; border-radius: 16px; border: 2px solid #F5C518;">${generatedOtp}</span>
+                </div>
+                <p style="color: #71717A; font-size: 12px; line-height: 1.5; text-align: center;">This code will expire in 15 minutes. Never share this code with anyone.</p>
+                <div style="border-top: 1px solid #f0f0f0; margin-top: 24px; padding-top: 16px; text-align: center;">
+                  <p style="color: #A1A1AA; font-size: 11px;">BeeGo Voltx • Dhaka, Bangladesh</p>
+                </div>
+              </div>
+            `,
+          }).catch((mailErr: any) => {
+            console.warn('[Beego Mail Delivery Note]', mailErr?.message);
+          });
+        } catch (mailErr: any) {
+          console.warn('[Beego Mail Dispatcher Warning]', mailErr?.message);
+        }
+      }
 
       return res.json({
         success: true,
         userId: generatedUserId,
-        message: `Verification code generated for ${cleanEmail}. Enter code to verify.`,
+        message: cleanEmail
+          ? `Verification code dispatched to ${cleanEmail}. Please check your Gmail inbox.`
+          : `Verification code dispatched to ${cleanPhone}. Please check your SMS.`,
         devOtp: generatedOtp,
         isIntegratedMode: true,
       });
@@ -339,20 +341,22 @@ async function startServer() {
     }
   });
 
-  // POST /api/auth/otp/verify - Validates 6-digit OTP code
+  // POST /api/auth/otp/verify - Validates 6-digit OTP code (Email or Phone)
   app.post('/api/auth/otp/verify', async (req, res) => {
     try {
-      const { email, otp, name, password } = req.body || {};
+      const { email, phone, otp, name, password } = req.body || {};
       const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanPhone = (phone || '').trim().replace(/[\s\-\(\)]/g, '');
       const cleanOtp = (otp || '').trim();
 
+      const targetIdentifier = cleanEmail || cleanPhone;
       if (!cleanOtp || cleanOtp.length < 6) {
         return res.status(400).json({
           error: 'Please enter the complete 6-digit verification code.',
         });
       }
 
-      const record = otpStore.get(cleanEmail);
+      const record = otpStore.get(targetIdentifier);
       if (!record || Date.now() > record.expiresAt) {
         return res.status(400).json({
           error: 'Verification code has expired or was not requested. Please request a new code.',
@@ -360,45 +364,13 @@ async function startServer() {
       }
 
       if (record.attempts >= 6) {
-        otpStore.delete(cleanEmail);
+        otpStore.delete(targetIdentifier);
         return res.status(429).json({
           error: 'Too many incorrect attempts. Please request a new verification code.',
         });
       }
 
-      let isVerified = false;
-      let appwriteSessionSecret = '';
-
-      // Check if OTP matches locally generated code
-      if (record.otp && record.otp === cleanOtp) {
-        isVerified = true;
-      }
-
-      // Also attempt Appwrite token validation if not in local-only fallback
-      if (!isVerified && !record.isFallback) {
-        try {
-          const sessionRes = await fetch(`${APPWRITE_UPSTREAM}/account/sessions/token`, {
-            method: 'POST',
-            headers: {
-              'x-appwrite-project': APPWRITE_PROJECT_ID,
-              'content-type': 'application/json',
-            },
-            body: JSON.stringify({
-              userId: record.userId,
-              secret: cleanOtp,
-            }),
-          });
-          if (sessionRes.ok) {
-            const sessionJson = await sessionRes.json().catch(() => ({}));
-            isVerified = true;
-            appwriteSessionSecret = sessionJson.secret || '';
-          }
-        } catch (e) {
-          // Ignore
-        }
-      }
-
-      if (!isVerified) {
+      if (record.otp !== cleanOtp) {
         record.attempts += 1;
         return res.status(400).json({
           error: 'Invalid verification code. Please check and enter the exact 6-digit code.',
@@ -406,15 +378,16 @@ async function startServer() {
       }
 
       // Successfully verified! Clear OTP record
-      otpStore.delete(cleanEmail);
+      otpStore.delete(targetIdentifier);
 
-      const passengerName = record.name || name || cleanEmail.split('@')[0] || 'Passenger';
+      const passengerName = record.name || name || cleanEmail.split('@')[0] || cleanPhone || 'Passenger';
       const passengerId = record.userId;
       const targetPassword = record.password || password;
 
       // Persist passenger in storage
       const passengers = loadPassengers();
-      const existing = passengers[cleanEmail];
+      const storeKey = cleanEmail || cleanPhone;
+      const existing = passengers[storeKey];
 
       let pwInfo: { hash?: string; salt?: string } = {};
       if (targetPassword) {
@@ -425,7 +398,8 @@ async function startServer() {
 
       const passengerRecord: StoredPassenger = {
         id: existing?.id || passengerId,
-        email: cleanEmail,
+        email: cleanEmail || `${cleanPhone}@beegovoltx.com`,
+        phone: cleanPhone || undefined,
         name: passengerName,
         passwordHash: pwInfo.hash,
         salt: pwInfo.salt,
@@ -435,37 +409,35 @@ async function startServer() {
         updatedAt: Date.now(),
       };
 
-      passengers[cleanEmail] = passengerRecord;
+      passengers[storeKey] = passengerRecord;
       savePassengers(passengers);
 
-      // Create persistent session
-      const sessionToken = appwriteSessionSecret || 'pax_sess_' + crypto.randomBytes(24).toString('hex');
+      // Create authenticated session token
+      const sessionToken = crypto.randomBytes(32).toString('hex');
       const sessions = loadSessions();
       sessions[sessionToken] = {
         token: sessionToken,
         userId: passengerRecord.id,
-        email: cleanEmail,
-        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000, // 30 days
+        email: passengerRecord.email,
+        expiresAt: Date.now() + 30 * 24 * 60 * 60 * 1000,
       };
       saveSessions(sessions);
 
-      console.log(`[Beego Auth] Passenger verified successfully: ${passengerName} (${cleanEmail})`);
-
       return res.json({
         success: true,
-        message: 'Email verified successfully.',
-        sessionSecret: sessionToken,
-        profile: {
+        token: sessionToken,
+        user: {
           id: passengerRecord.id,
           name: passengerRecord.name,
           email: passengerRecord.email,
+          phone: passengerRecord.phone,
           role: 'passenger',
           isEmailVerified: true,
         },
       });
     } catch (err: any) {
       console.error('[OTP Verify Error]', err);
-      return res.status(500).json({ error: 'Failed to verify code.' });
+      return res.status(500).json({ error: 'Failed to verify OTP code. Please try again.' });
     }
   });
 

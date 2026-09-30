@@ -70,19 +70,8 @@ export const RiderAppShell: React.FC<RiderAppShellProps> = ({
           )}
         </div>
 
-        {/* Right: Quick Switch to Passenger & Profile Avatar */}
+        {/* Right: Driver Profile Avatar */}
         <div className="flex items-center gap-2">
-          {/* Switch to Passenger Mode */}
-          <button
-            type="button"
-            onClick={onSwitchToPassenger}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 hover:bg-[#F5C518] text-[11px] font-bold text-[#E6A800] hover:text-black transition-all cursor-pointer active:scale-95"
-            title="Switch to Passenger Mode"
-          >
-            <User className="w-3.5 h-3.5" />
-            <span>Passenger</span>
-          </button>
-
           {/* Circular Driver Profile Avatar */}
           <button
             type="button"

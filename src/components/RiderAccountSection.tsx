@@ -485,26 +485,6 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
         </div>
       </div>
 
-      {/* 3. SWITCH TO PASSENGER PROMO */}
-      <div className="mt-3 p-3.5 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center">
-            <User className="w-4 h-4" />
-          </div>
-          <div>
-            <span className="text-xs font-black text-[#1A1A1A] block">Need a Ride Yourself?</span>
-            <span className="text-[10px] text-amber-800 block font-medium">Switch to Passenger mode instantly</span>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onSwitchToPassenger}
-          className="px-3 py-1.5 rounded-xl bg-white border border-zinc-200 text-xs font-bold text-[#1A1A1A] hover:bg-zinc-50 transition-colors cursor-pointer active:scale-95"
-        >
-          Switch
-        </button>
-      </div>
-
       {/* 4. DRIVER SPECIFIC OPTIONS (Documents, Vehicle, Payout, Safety, Policies) */}
       <div className="mt-4 flex flex-col gap-1 bg-white rounded-3xl p-2 border border-zinc-200/90 shadow-sm divide-y divide-zinc-100">
         {/* Documents */}

@@ -112,17 +112,6 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
 
         {/* Right: Circular Profile Avatar (Tapping opens Account Page) */}
         <div className="flex items-center gap-2">
-          {/* Switch to Rider Mode */}
-          <button
-            type="button"
-            onClick={props.onSwitchToRider}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 hover:bg-[#F5C518] text-[11px] font-bold text-[#E6A800] hover:text-black transition-all cursor-pointer active:scale-95"
-            title="Switch to Rider Mode"
-          >
-            <Bike className="w-3.5 h-3.5" />
-            <span>Driver</span>
-          </button>
-
           {/* Circular Profile Avatar */}
           <button
             type="button"
@@ -206,11 +195,9 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
               <PassengerAccountSection
                 passengerId={props.passengerId}
                 passengerProfile={props.passengerProfile}
-                onSwitchToRider={props.onSwitchToRider}
                 onClose={() => setActiveTab('home')}
                 onSignOut={props.onBackToRoles}
                 onOpenOffers={() => setActiveTab('offers')}
-                onOpenAuth={props.onOpenAuthModal}
               />
             )}
           </div>

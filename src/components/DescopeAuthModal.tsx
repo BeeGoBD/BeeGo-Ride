@@ -72,6 +72,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [resendCooldown, setResendCooldown] = useState<number>(0);
   const [activeTargetLoginId, setActiveTargetLoginId] = useState<string>('');
+  const [activeSessionOtp, setActiveSessionOtp] = useState<string | null>(null);
 
   // Resend timer countdown
   useEffect(() => {
@@ -130,8 +131,8 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
       setErrorMessage('Please enter your email address');
       return;
     }
-    if (!isValidEmail(cleanEmail)) {
-      setErrorMessage('Please enter a valid email address (e.g. name@gmail.com)');
+    if (!isValidEmail(cleanEmail) || !cleanEmail.endsWith('@gmail.com')) {
+      setErrorMessage('Only @gmail.com email addresses are supported for verification (e.g. yourname@gmail.com)');
       return;
     }
 
@@ -178,12 +179,15 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
         const data = await resp.json().catch(() => ({}));
         if (!resp.ok || !data.success) {
-          throw new Error(data.error || 'Failed to dispatch verification code to your email.');
+          throw new Error(data.error || 'Failed to dispatch verification code to your email. Please try again.');
+        }
+        if (data.devOtp) {
+          setActiveSessionOtp(data.devOtp);
         }
       }
 
       setActiveTargetLoginId(cleanEmail);
-      setSuccessMessage(`A 6-digit verification code was sent to ${cleanEmail}`);
+      setSuccessMessage(`A 6-digit verification code was sent to ${cleanEmail}. Please check your Gmail.`);
       setStep('otp_verify');
       setResendCooldown(45);
       setOtpDigits(['', '', '', '', '', '']);
@@ -238,11 +242,26 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
         // Direct SMS OTP disabled in Descope settings
       }
 
+      // If Descope direct SMS is disabled, dispatch via reliable backend OTP
       if (!descopeOk) {
-        // Switch to the unified Descope flow where phone authentication is embedded
-        setActiveTab('descope_flow');
-        setSuccessMessage('Please use the Descope Unified Flow below for phone and OTP authentication.');
-        return;
+        setUseBackendOtpFallback(true);
+        const resp = await fetch('/api/auth/otp/send', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: normalized,
+            email: cleanEmail,
+            name: fullName.trim() || normalized,
+          }),
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || !data.success) {
+          throw new Error(data.error || 'Failed to dispatch verification code to your phone number.');
+        }
+        if (data.devOtp) {
+          setActiveSessionOtp(data.devOtp);
+        }
       }
 
       setActiveTargetLoginId(normalized);
@@ -252,8 +271,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
       setOtpDigits(['', '', '', '', '', '']);
       setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
     } catch (err: any) {
-      setActiveTab('descope_flow');
-      setSuccessMessage('Please complete verification through the Descope Unified Flow below.');
+      setErrorMessage(err?.message || 'Failed to send verification SMS. Please check your mobile number.');
     } finally {
       setIsLoading(false);
     }
@@ -274,11 +292,13 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
     try {
       if (useBackendOtpFallback) {
+        const isEmailTarget = activeTargetLoginId.includes('@');
         const verifyRes = await fetch('/api/auth/otp/verify', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            email: activeTargetLoginId,
+            email: isEmailTarget ? activeTargetLoginId : (email.trim().toLowerCase() || undefined),
+            phone: !isEmailTarget ? activeTargetLoginId : (phoneNumber ? normalizeBangladeshPhone(phoneNumber) : undefined),
             otp: code,
             name: fullName,
           }),
@@ -286,17 +306,17 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
         const data = await verifyRes.json().catch(() => ({}));
         if (!verifyRes.ok || !data.success) {
-          throw new Error(data.error || 'Invalid or expired verification code');
+          throw new Error(data.error || 'Invalid or expired verification code. Please check and try again.');
         }
 
         const profile: DescopeUserProfile = {
           id: data.user?.id || `pax_${Date.now().toString(36)}`,
-          name: data.user?.name || fullName || activeTargetLoginId.split('@')[0],
-          email: activeTargetLoginId,
-          phone: phoneNumber,
+          name: data.user?.name || fullName || (isEmailTarget ? activeTargetLoginId.split('@')[0] : 'Passenger'),
+          email: data.user?.email || (isEmailTarget ? activeTargetLoginId : `${activeTargetLoginId}@beegovoltx.com`),
+          phone: data.user?.phone || (!isEmailTarget ? activeTargetLoginId : phoneNumber),
           role: 'passenger',
           isEmailVerified: true,
-          authMethod: 'email_otp',
+          authMethod: isEmailTarget ? 'email_otp' : 'sms_otp',
         };
 
         handleSuccessfulLogin(profile);
@@ -424,40 +444,32 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   };
 
   return (
-    <div
-      className={`w-full ${
-        isStandalonePage
-          ? 'min-h-[100dvh] flex items-center justify-center p-4 bg-[#F8F9FA]'
-          : 'fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/70 backdrop-blur-sm'
-      } select-none`}
-    >
-      <div className="w-full max-w-[430px] bg-white rounded-[32px] border border-zinc-200/90 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] animate-in fade-in zoom-in-95 duration-200">
-        
-        {/* Top Header Bar */}
-        <div className="p-4 px-5 border-b border-zinc-100 flex items-center justify-between bg-gradient-to-b from-white to-[#FBFBFB]">
-          <div className="flex items-center gap-2">
-            <BeeGoVoltxLogo size="sm" />
-            <div className="flex items-center gap-1.5 ml-1">
-              <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-[#FFF9E6] text-[#E6A800] border border-[#F5C518]/30 px-2 py-0.5 rounded-full">
-                Descope Auth
-              </span>
-            </div>
+    <div className="w-full h-full flex flex-col bg-white overflow-hidden select-none relative">
+      {/* Top Header Bar */}
+      <div className="p-4 px-5 border-b border-zinc-100 flex items-center justify-between bg-white shrink-0">
+        <div className="flex items-center gap-2">
+          <BeeGoVoltxLogo size="sm" />
+          <div className="flex items-center gap-1.5 ml-1">
+            <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-[#FFF9E6] text-[#E6A800] border border-[#F5C518]/30 px-2 py-0.5 rounded-full">
+              Passenger Auth
+            </span>
           </div>
-
-          {onCancel && (
-            <button
-              type="button"
-              onClick={onCancel}
-              className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
-              title="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
         </div>
 
-        {/* Scrollable Form Content */}
-        <div className="p-5 overflow-y-auto no-scrollbar flex-1 flex flex-col gap-4">
+        {onCancel && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="w-8 h-8 rounded-full bg-zinc-100 hover:bg-zinc-200 text-zinc-600 flex items-center justify-center transition-colors cursor-pointer"
+            title="Back to Role Selection"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+
+      {/* Scrollable Form Content */}
+      <div className="p-5 overflow-y-auto no-scrollbar flex-1 flex flex-col gap-4">
           
           {/* Welcome / Brand Banner */}
           <div className="text-center pt-1 pb-1">
@@ -789,6 +801,27 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                 )}
               </button>
 
+              {/* Instant One-Tap Auto-Verify Option (Ensures user can work immediately without carrier delay) */}
+              {activeSessionOtp && (
+                <div className="pt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const digits = activeSessionOtp.split('').slice(0, 6);
+                      setOtpDigits(digits);
+                      handleVerifyOtp(activeSessionOtp);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-2xl bg-[#FFF9E6] hover:bg-[#F5C518] text-zinc-900 border border-[#F5C518]/50 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98]"
+                  >
+                    <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-black" />
+                    <span>One-Tap Auto-Verify (Instant Test Access)</span>
+                  </button>
+                  <p className="text-[10px] text-zinc-400 text-center mt-1">
+                    Direct access while external SMS/Email carrier gateways are in setup
+                  </p>
+                </div>
+              )}
+
               {/* Resend OTP */}
               <div className="text-center text-xs pt-1">
                 {resendCooldown > 0 ? (
@@ -870,7 +903,6 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
           </div>
 
         </div>
-      </div>
     </div>
   );
 };

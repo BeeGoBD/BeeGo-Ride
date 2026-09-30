@@ -60,7 +60,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
             How would you like to continue?
           </h1>
           <p className="text-xs text-zinc-500 mt-1.5 leading-relaxed">
-            Choose your role to enter the appropriate dashboard. You can switch between roles at any time.
+            Choose between Passenger and Driver to register or log in. Verified account required to enter.
           </p>
         </div>
 

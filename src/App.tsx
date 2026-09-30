@@ -41,20 +41,35 @@ export default function App() {
   // Intro splash: 2-second clean B logo & BeeGo text intro, then immediately starts the app
   const [introState, setIntroState] = useState<AppIntroState>('splash');
 
-  // Role selection state: default to 'passenger' so the main dashboard with bottom navigation is shown immediately in first eye
+  // STRICT NO-GUEST POLICY:
+  // A customer must choose between passenger and driver every time they visit unless already authenticated.
+  // Refreshing without an active logged-in profile will show the role selection screen, never auto-entering the dashboard.
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const paramRole = params.get('role');
-      if (paramRole === 'passenger' || paramRole === 'rider' || paramRole === 'admin') {
-        return paramRole as UserRole;
-      }
       const storedRole = localStorage.getItem('beego_user_role');
-      if (storedRole === 'passenger' || storedRole === 'rider' || storedRole === 'admin') {
-        return storedRole as UserRole;
+      const candidateRole =
+        paramRole === 'passenger' || paramRole === 'rider' || paramRole === 'admin'
+          ? (paramRole as UserRole)
+          : storedRole === 'passenger' || storedRole === 'rider' || storedRole === 'admin'
+          ? (storedRole as UserRole)
+          : null;
+
+      // Only allow entry if genuinely authenticated with a verified user profile
+      if (candidateRole === 'passenger') {
+        const storedPassenger = getStoredDescopeUser();
+        if (storedPassenger) return 'passenger';
+      } else if (candidateRole === 'rider') {
+        const activeDriver = getCurrentDriver();
+        if (activeDriver && activeDriver.verificationStatus !== 'rejected') return 'rider';
+      } else if (candidateRole === 'admin') {
+        const adminTok = getAdminToken();
+        if (adminTok) return 'admin';
       }
     }
-    return 'passenger';
+    // No guest access - always show role selection first!
+    return null;
   });
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
@@ -213,42 +228,30 @@ export default function App() {
   };
 
   const handleBackToRoles = () => {
+    try {
+      logoutPassenger();
+    } catch (e) {}
+    setPassengerProfile(null);
+    setDriverProfile(null);
     setRole(null);
     setErrorMessage(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('beego_user_role');
+      localStorage.removeItem('beego_current_driver');
+      sessionStorage.removeItem('geoapify_guest_pax_id');
       const url = new URL(window.location.href);
       url.searchParams.delete('role');
       window.history.replaceState({}, '', url.toString());
     }
   };
 
+  // Drivers/passengers must log out to change roles
   const handleSwitchToPassenger = () => {
-    setPendingRoleForAuth('passenger');
-    if (!passengerProfile) {
-      setPassengerAuthModalMode('signup');
-      return;
-    }
-    setRole('passenger');
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('beego_user_role', 'passenger');
-    }
-    setErrorMessage(null);
+    handleBackToRoles();
   };
 
   const handleSwitchToRider = () => {
-    setPendingRoleForAuth('rider');
-    const activeDriver = getCurrentDriver();
-    if (!activeDriver) {
-      setDriverAuthModalMode('register');
-      return;
-    }
-    setDriverProfile(activeDriver);
-    setRole('rider');
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('beego_user_role', 'rider');
-    }
-    setErrorMessage(null);
+    handleBackToRoles();
   };
 
   const handleReplayIntro = () => {
@@ -387,8 +390,47 @@ export default function App() {
     );
   }
 
-  // 3. ROLE SELECTION: "Continue as Passenger" or "Continue as Rider"
-  if (role === null) {
+  // 3. ROLE SELECTION, PASSENGER AUTH, OR DRIVER AUTH (No hovering overlay)
+  if (passengerAuthModalMode) {
+    content = (
+      <DescopeAuthModal
+        initialMode={passengerAuthModalMode}
+        intendedRole={pendingRoleForAuth}
+        onAuthenticated={(profile, authedRole) => {
+          setPassengerProfile(profile);
+          setPassengerAuthModalMode(null);
+          const targetRole = authedRole || pendingRoleForAuth || 'passenger';
+          setRole(targetRole);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('beego_user_role', targetRole);
+            const url = new URL(window.location.href);
+            url.pathname = '/';
+            url.searchParams.delete('login');
+            url.searchParams.delete('auth');
+            url.searchParams.delete('register');
+            window.history.pushState({}, '', url.toString());
+            setCurrentPath('/');
+          }
+        }}
+        onCancel={() => setPassengerAuthModalMode(null)}
+      />
+    );
+  } else if (driverAuthModalMode) {
+    content = (
+      <DriverAuthModal
+        initialMode={driverAuthModalMode}
+        onAuthenticated={(driver) => {
+          setDriverProfile(driver);
+          setDriverAuthModalMode(null);
+          setRole('rider');
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('beego_user_role', 'rider');
+          }
+        }}
+        onCancel={() => setDriverAuthModalMode(null)}
+      />
+    );
+  } else if (role === null) {
     content = (
       <RoleSelectDashboard
         onSelectRole={handleSelectRole}
@@ -488,47 +530,6 @@ export default function App() {
     <div className="w-full h-[100dvh] max-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:p-2 sm:py-3 overflow-hidden font-sans text-[#1A1A1A]">
       <div className="w-full max-w-[430px] h-full sm:h-full sm:max-h-[880px] sm:rounded-[32px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
         {content}
-
-        {/* Passenger Login / Signup Modal with Descope */}
-        {passengerAuthModalMode && (
-          <DescopeAuthModal
-            initialMode={passengerAuthModalMode}
-            intendedRole={pendingRoleForAuth}
-            onAuthenticated={(profile, authedRole) => {
-              setPassengerProfile(profile);
-              setPassengerAuthModalMode(null);
-              const targetRole = authedRole || pendingRoleForAuth || 'passenger';
-              setRole(targetRole);
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('beego_user_role', targetRole);
-                const url = new URL(window.location.href);
-                url.pathname = '/';
-                url.searchParams.delete('login');
-                url.searchParams.delete('auth');
-                url.searchParams.delete('register');
-                window.history.pushState({}, '', url.toString());
-                setCurrentPath('/');
-              }
-            }}
-            onCancel={() => setPassengerAuthModalMode(null)}
-          />
-        )}
-
-        {/* Driver Login / Register Modal */}
-        {driverAuthModalMode && (
-          <DriverAuthModal
-            initialMode={driverAuthModalMode}
-            onAuthenticated={(driver) => {
-              setDriverProfile(driver);
-              setDriverAuthModalMode(null);
-              setRole('rider');
-              if (typeof window !== 'undefined') {
-                localStorage.setItem('beego_user_role', 'rider');
-              }
-            }}
-            onCancel={() => setDriverAuthModalMode(null)}
-          />
-        )}
 
         {/* Secret Admin Security Gate (Triggered by 10 taps on BeeGo Logo) */}
         <AdminSecretGateModal
