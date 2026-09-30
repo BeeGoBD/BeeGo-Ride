@@ -5,6 +5,7 @@
     "": {
       "name": "react-example",
       "dependencies": {
+        "@descope/react-sdk": "^3.3.10",
         "@google/genai": "^2.4.0",
         "@tailwindcss/vite": "^4.3.3",
         "@types/leaflet": "^1.9.22",
@@ -35,6 +36,38 @@
     },
   },
   "packages": {
+    "@descope/access-key-management-widget": ["@descope/access-key-management-widget@0.10.8", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-woc5MriQZLMpraWWDWBVKeyiWAqntRm2Ih/AwMi4TuxEYrXLOMbeIRwGTaP0K/BOzqMGdsT9lv9fuLQ1UD06MA=="],
+
+    "@descope/applications-portal-widget": ["@descope/applications-portal-widget@0.9.8", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-CRedniZwc9sPSmhUQi495Molc5rZp6I7fxLvi4VpxqirqYnWHN2W5TNWnKYPz620Xgko157rnufc9m6oNvpxHQ=="],
+
+    "@descope/audit-management-widget": ["@descope/audit-management-widget@0.9.8", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-U7WqALKRcRzF031v0tqSRoeX1BmEuU+Xn7+Z3tZ2MZr/bWv4ZmWh+7SL8kYt8fP3AaSM+lccwCvKCZaBCV2Dvg=="],
+
+    "@descope/core-js-sdk": ["@descope/core-js-sdk@2.74.0", "", { "dependencies": { "jwt-decode": "4.0.0", "tslib": "2.8.1" } }, "sha512-L1G8ZiLMAsFmfTOxWvcLdarHlDFZOgENx+o1lRrfl3yPyKqc23jZ4Dt76UVQ0rIzh3C4wfvaGk7lm66Oh+Lfuw=="],
+
+    "@descope/escape-markdown": ["@descope/escape-markdown@0.1.6", "", {}, "sha512-3ENrye8fyyAp88w8OoKGsEl/kH0GgcrPiDRoOajhCODOJnoJ8P/4/giBEjWZV/FKllW4Z5mSXGACEmlINOZLCA=="],
+
+    "@descope/outbound-applications-widget": ["@descope/outbound-applications-widget@0.7.6", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-component": "4.4.5", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-iTMUEr9by3ruddSHdQELJLq2ZwSXX/aiYegoG6m/j2+xrJZOUDNpK7W71a/j6VnQKWX2EDfrmztakk+NdphX6w=="],
+
+    "@descope/react-sdk": ["@descope/react-sdk@3.3.10", "", { "dependencies": { "@descope/access-key-management-widget": "0.10.8", "@descope/applications-portal-widget": "0.9.8", "@descope/audit-management-widget": "0.9.8", "@descope/core-js-sdk": "2.74.0", "@descope/outbound-applications-widget": "0.7.6", "@descope/role-management-widget": "0.10.8", "@descope/sdk-helpers": "0.10.1", "@descope/tenant-profile-widget": "0.11.0", "@descope/user-management-widget": "0.20.6", "@descope/user-profile-widget": "0.19.6", "@descope/web-component": "4.4.5", "@descope/web-js-sdk": "1.54.0" }, "peerDependencies": { "@types/react": ">=16", "preact": ">=10.11.0", "react": ">=16" }, "optionalPeers": ["preact"] }, "sha512-5eJFo+H1sCdRBfCGDS/IEyA8N6mbRhRkQ6AUOlJC3kLy6xQWXT6Zl0fztXMJCDtXFNfRODarTgQnDp/h6f3I7A=="],
+
+    "@descope/role-management-widget": ["@descope/role-management-widget@0.10.8", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-Ar5Y3yYYNQ3eTYSppQgusTzQTpekoQdba7WtUySMTxwabUFzX6f/naSfN4gU27yFBSq5yKojbCydSPk+47cAFg=="],
+
+    "@descope/sdk-component-drivers": ["@descope/sdk-component-drivers@0.18.0", "", { "dependencies": { "@descope/sdk-helpers": "0.10.1", "tslib": "2.8.1" } }, "sha512-v97wkQwzaqegaEqNhs65wxay0RO8PW+e6zvlzPPX1639dsGFWJXXX89yynOSgO0ztb0BGWjqQbdZKGVS9oP+uw=="],
+
+    "@descope/sdk-helpers": ["@descope/sdk-helpers@0.10.1", "", { "dependencies": { "tslib": "2.8.1" } }, "sha512-Avr3t6UbxX4VtKiT8ji3Q9VvQD4fZoqYLn40SIRR0TgPELCRFMPp+N8VBnVFCcCgXXHRpaLRUstW/XQJrs7Xzg=="],
+
+    "@descope/sdk-mixins": ["@descope/sdk-mixins@0.27.2", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "tslib": "2.8.1" }, "peerDependencies": { "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0" } }, "sha512-BETQXL96PYeDusp2YakbnNuQQQ23oWxJTkWVPoPYA+eB0uyzBS6ecZQNahJs8w0i46bEdUJk6ccsBtMm+sFALg=="],
+
+    "@descope/tenant-profile-widget": ["@descope/tenant-profile-widget@0.11.0", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-component": "4.4.5", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" }, "optionalDependencies": { "@descope/core-js-sdk": "2.74.0" } }, "sha512-a2vC4jI19niW4p9ZXZAtpcwxOPJG1z9XvbOYluJDkIld4OhYgdXesZdrchmV1Tne+tVgZid+d+YGXrrdveMAzA=="],
+
+    "@descope/user-management-widget": ["@descope/user-management-widget@0.20.6", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-component": "4.4.5", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "libphonenumber-js": "1.11.17", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" } }, "sha512-hoPhKNwO+TRAcxvispcZzyy63U+jum6CH1cS/0vEBeifaD1OgNYtE6vnrTHjHoHwOqi/aU4N3FzZ/pOzAGPQcg=="],
+
+    "@descope/user-profile-widget": ["@descope/user-profile-widget@0.19.6", "", { "dependencies": { "@descope/sdk-component-drivers": "0.18.0", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-component": "4.4.5", "@descope/web-js-sdk": "1.54.0", "@reduxjs/toolkit": "^2.0.1", "immer": "^10.0.3", "redux": "5.0.1", "redux-thunk": "3.1.0", "reselect": "5.1.1", "tslib": "2.8.1" }, "optionalDependencies": { "@descope/core-js-sdk": "2.74.0" } }, "sha512-wsQ0CBxoROiXTrM+q2rlODdvuhYA7y8vXRmN862omem5r0zRxzYDz+qfqPwGGPKCGSd1z/g5axPx/I/bw/q11A=="],
+
+    "@descope/web-component": ["@descope/web-component@4.4.5", "", { "dependencies": { "@descope/escape-markdown": "0.1.6", "@descope/sdk-helpers": "0.10.1", "@descope/sdk-mixins": "0.27.2", "@descope/web-js-sdk": "1.54.0", "@fingerprintjs/fingerprintjs-pro": "3.11.6", "tslib": "2.8.1" } }, "sha512-61uREkMd0GT7q52Y9Lu8RQbM8hNRbYLSl3LlwitbUbXh3TJ9ZjcIFIZ0JU//3LTiuKiF1s7y2DarcHwrgDJYrg=="],
+
+    "@descope/web-js-sdk": ["@descope/web-js-sdk@1.54.0", "", { "dependencies": { "@descope/core-js-sdk": "2.74.0", "@fingerprintjs/fingerprintjs-pro": "3.11.6", "js-cookie": "3.0.8", "jwt-decode": "4.0.0", "tslib": "2.8.1" } }, "sha512-gGGTIoT6voj4qJkqsVObY1DPyldxnsHRXpZWMu6DWjXBqwc7hNFvs1Uq9g9BG/O0v1KbhT61nHMuA9/yD4Hf4A=="],
+
     "@esbuild/aix-ppc64": ["@esbuild/aix-ppc64@0.25.12", "", { "os": "aix", "cpu": "ppc64" }, "sha512-Hhmwd6CInZ3dwpuGTF8fJG6yoWmsToE+vYgD4nytZVxcu1ulHpUQRAB1UJ8+N1Am3Mz4+xOByoQoSZf4D+CpkA=="],
 
     "@esbuild/android-arm": ["@esbuild/android-arm@0.25.12", "", { "os": "android", "cpu": "arm" }, "sha512-VJ+sKvNA/GE7Ccacc9Cha7bpS8nyzVv0jdVgwNDaR4gDMC/2TTRc33Ip8qrNYUcpkOHUT5OZ0bUcNNVZQ9RLlg=="],
@@ -87,6 +120,8 @@
 
     "@esbuild/win32-x64": ["@esbuild/win32-x64@0.25.12", "", { "os": "win32", "cpu": "x64" }, "sha512-alJC0uCZpTFrSL0CCDjcgleBXPnCrEAhTBILpeAp7M/OFgoqtAetfBzX0xM00MUsVVPpVjlPuMbREqnZCXaTnA=="],
 
+    "@fingerprintjs/fingerprintjs-pro": ["@fingerprintjs/fingerprintjs-pro@3.11.6", "", { "dependencies": { "tslib": "^2.4.1" } }, "sha512-ohN4lorSzV0fzs8fELWuO3bvMMfzF5qyQSOWBvqwGaq6yPP+XSRJOeFdFFiwAqFWYJDEoDOlQluGfa0Rfk7mAQ=="],
+
     "@google/genai": ["@google/genai@2.23.0", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.5.4", "ws": "^8.18.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-NFMzktoZ7jJg9AA3vUbWZocnkQP6DSGzL21ORwdVcBWkHli3k7v6B9zy07M4bTiKDAyIWfUh2J/oLYxCu0hNpQ=="],
 
     "@jridgewell/gen-mapping": ["@jridgewell/gen-mapping@0.3.13", "", { "dependencies": { "@jridgewell/sourcemap-codec": "^1.5.0", "@jridgewell/trace-mapping": "^0.3.24" } }, "sha512-2kkt/7niJ6MgEPxF0bYdQ6etZaA+fQvDcLKckhy1yIQOzaoKjBBjSj63/aLVjYE3qhRt5dvM+uUyfCg6UKCBbA=="],
@@ -119,6 +154,8 @@
 
     "@protobufjs/utf8": ["@protobufjs/utf8@1.1.2", "", {}, "sha512-b1UQwcEZ4yCnMCD8DAL1VlbvBJE9/IX4FTIp7BG1xYpf29SLazLSrqUkj4w7Y5y7cCVP6E5tcqqcI0xemPkHug=="],
 
+    "@reduxjs/toolkit": ["@reduxjs/toolkit@2.13.0", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "@standard-schema/utils": "^0.3.0", "immer": "^11.0.0", "redux": "^5.0.1", "redux-thunk": "^3.1.0", "reselect": "^5.1.0" }, "peerDependencies": { "react": "^16.9.0 || ^17.0.0 || ^18 || ^19", "react-redux": "^7.2.1 || ^8.1.3 || ^9.0.0" }, "optionalPeers": ["react", "react-redux"] }, "sha512-f6jwVRfwW30+tnllz4YcsHHpPYYOE7abcHkyUCovD+P7DyhdAI5prz2Fh/8TLhakjpN+7aIEion1s5L/tvlYlA=="],
+
     "@rolldown/binding-android-arm-eabi": ["@rolldown/binding-android-arm-eabi@1.2.9", "", { "os": "android", "cpu": "arm" }, "sha512-tNISae1QEf/vkb3xkRcjV5SEdzPE97We5IVaa2Z8jSszQPZ8U60B/YCYpw4QI7VidYsBtKavczXf+DyDs9WGxw=="],
 
     "@rolldown/binding-android-arm64": ["@rolldown/binding-android-arm64@1.2.9", "", { "os": "android", "cpu": "arm64" }, "sha512-YC8YsI30o606GTZi0VyzYlsDKFP8W61i/QzayHDkLbNEz/IShqAmTa+hsJRj13xTHA0H+6fk4b2UmGn+Q/cMlg=="],
@@ -150,6 +187,10 @@
     "@rolldown/binding-win32-x64-msvc": ["@rolldown/binding-win32-x64-msvc@1.2.9", "", { "os": "win32", "cpu": "x64" }, "sha512-Ip2mXoU0hM0boq3Rf+ekuT653OROSo6aSYcPT1VHE4q52KvyxgFkQgrgb/IEsxOuvQ2fZZbs8khJAyCEPM24/g=="],
 
     "@rolldown/pluginutils": ["@rolldown/pluginutils@1.0.1", "", {}, "sha512-2j9bGt5Jh8hj+vPtgzPtl72j0yRxHAyumoo6TNfAjsLB04UtpSvPbPcDcBMxz7n+9CYB0c1GxQFxYRg2jimqGw=="],
+
+    "@standard-schema/spec": ["@standard-schema/spec@1.1.0", "", {}, "sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w=="],
+
+    "@standard-schema/utils": ["@standard-schema/utils@0.3.0", "", {}, "sha512-e7Mew686owMaPJVNNLs55PUvgz371nKgwsc4vxE49zsODpJEnxgxRo2y/OKrqueavXgZNMDVj3DdHFlaSAeU8g=="],
 
     "@tailwindcss/node": ["@tailwindcss/node@4.3.3", "", { "dependencies": { "@jridgewell/remapping": "^2.3.5", "enhanced-resolve": "^5.24.1", "jiti": "^2.7.0", "lightningcss": "1.32.0", "magic-string": "^0.30.21", "source-map-js": "^1.2.1", "tailwindcss": "4.3.3" } }, "sha512-/T8IKEsf9VTU6tLjgC7+sv2mOPtQxzE2jMw7u4Tt40Tx+QSZxpzh95/H6cMKoja9XuW7iMdLJYBB0o9G1CaAgg=="],
 
@@ -385,11 +426,15 @@
 
     "iconv-lite": ["iconv-lite@0.4.24", "", { "dependencies": { "safer-buffer": ">= 2.1.2 < 3" } }, "sha512-v3MXnZAcvnywkTUEZomIActle7RXXeedOR31wwl7VlyoXO4Qi9arvSenNQWne1TcRwhCL1HwLI21bEqdpj8/rA=="],
 
+    "immer": ["immer@10.2.0", "", {}, "sha512-d/+XTN3zfODyjr89gM3mPq1WNX2B8pYsu7eORitdwyA2sBubnTl3laYlBk4sXY5FUa5qTZGBDPJICVbvqzjlbw=="],
+
     "inherits": ["inherits@2.0.4", "", {}, "sha512-k/vGaX4/Yla3WzyMCvTQOXYeIHvqOKtnqBduzTHpzpQZzAskKMhZ2K+EnBiSM9zGSoIFeMpXKxa4dYeZIQqewQ=="],
 
     "ipaddr.js": ["ipaddr.js@1.9.1", "", {}, "sha512-0KI/607xoxSToH7GjN1FfSbLoU0+btTicjsQSWQlh/hZykN8KpmMf7uYwPW3R+akZ6R/w18ZlXSHBYXiYUPO3g=="],
 
     "jiti": ["jiti@2.7.0", "", { "bin": { "jiti": "lib/jiti-cli.mjs" } }, "sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ=="],
+
+    "js-cookie": ["js-cookie@3.0.8", "", {}, "sha512-yeJd4aNAdYZQjaon2bpD/Gb0B/omw7HQOsynXXcOiWVCacbBcPlgn8S/d1X6blFSaHao7ozqtW7NZW19xpCtIw=="],
 
     "json-bigint": ["json-bigint@1.0.0", "", { "dependencies": { "bignumber.js": "^9.0.0" } }, "sha512-SiPv/8VpZuWbvLSMtTDU8hEfrZWg/mH/nV/b4o0CYbSxu1UIQPLdwKOCIyLQX+VIPO5vrLX3i8qtqFyhdPSUSQ=="],
 
@@ -397,7 +442,11 @@
 
     "jws": ["jws@4.0.1", "", { "dependencies": { "jwa": "^2.0.1", "safe-buffer": "^5.0.1" } }, "sha512-EKI/M/yqPncGUUh44xz0PxSidXFr/+r0pA70+gIYhjv+et7yxM+s29Y+VGDkovRofQem0fs7Uvf4+YmAdyRduA=="],
 
+    "jwt-decode": ["jwt-decode@4.0.0", "", {}, "sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA=="],
+
     "leaflet": ["leaflet@1.9.4", "", {}, "sha512-nxS1ynzJOmOlHp+iL3FyWqK89GtNL8U8rvlMOsQdTTssxZwCXh8N2NB3GDQOL+YR3XnWyZAxwQixURb+FA74PA=="],
+
+    "libphonenumber-js": ["libphonenumber-js@1.11.17", "", {}, "sha512-Jr6v8thd5qRlOlc6CslSTzGzzQW03uiscab7KHQZX1Dfo4R6n6FDhZ0Hri6/X7edLIDv9gl4VMZXhxTjLnl0VQ=="],
 
     "lightningcss": ["lightningcss@1.33.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.33.0", "lightningcss-darwin-arm64": "1.33.0", "lightningcss-darwin-x64": "1.33.0", "lightningcss-freebsd-x64": "1.33.0", "lightningcss-linux-arm-gnueabihf": "1.33.0", "lightningcss-linux-arm64-gnu": "1.33.0", "lightningcss-linux-arm64-musl": "1.33.0", "lightningcss-linux-x64-gnu": "1.33.0", "lightningcss-linux-x64-musl": "1.33.0", "lightningcss-win32-arm64-msvc": "1.33.0", "lightningcss-win32-x64-msvc": "1.33.0" } }, "sha512-WkUDrojuJs0xkgGf2udWxa3yGBRxPtxUkB79i6aCZLRgc7PM8fZe9TosfPDcvEpQZbuFASnHYmRLBLUbmLOIIA=="],
 
@@ -495,6 +544,12 @@
 
     "react-dom": ["react-dom@19.3.0", "", { "dependencies": { "scheduler": "^0.28.0" }, "peerDependencies": { "react": "^19.3.0" } }, "sha512-JDk8dgif51OjFoDE70+OT9ICyYr+69HlmihNwp1+Nsfbna3t5sIiCa9ZJktDmQ4/1b/rn26hIAR2uYXDMr5r0Q=="],
 
+    "redux": ["redux@5.0.1", "", {}, "sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w=="],
+
+    "redux-thunk": ["redux-thunk@3.1.0", "", { "peerDependencies": { "redux": "^5.0.0" } }, "sha512-NW2r5T6ksUKXCabzhL9z+h206HQw/NJkcLm1GPImRQ8IzfXwRGqjVhKJGauHirT0DAuyy6hjdnMZaRoAcy0Klw=="],
+
+    "reselect": ["reselect@5.1.1", "", {}, "sha512-K/BG6eIky/SBpzfHZv/dd+9JBFiS4SWV7FIujVyJRux6e45+73RaUHXLmIR1f7WOMaQ0U1km6qwklRQxpJJY0w=="],
+
     "retry": ["retry@0.13.1", "", {}, "sha512-XQBQ3I8W1Cge0Seh+6gjj03LbmRFWuoszgK9ooCpwYIrhhoO80pfq4cUkU5DkknwfOfFteRwlZ56PYOGYyFWdg=="],
 
     "rolldown": ["rolldown@1.2.9", "", { "dependencies": { "@oxc-project/types": "=0.150.0", "@rolldown/pluginutils": "^1.0.0" }, "optionalDependencies": { "@rolldown/binding-android-arm-eabi": "1.2.9", "@rolldown/binding-android-arm64": "1.2.9", "@rolldown/binding-darwin-arm64": "1.2.9", "@rolldown/binding-darwin-x64": "1.2.9", "@rolldown/binding-freebsd-x64": "1.2.9", "@rolldown/binding-linux-arm-gnueabihf": "1.2.9", "@rolldown/binding-linux-arm64-gnu": "1.2.9", "@rolldown/binding-linux-arm64-musl": "1.2.9", "@rolldown/binding-linux-ppc64-gnu": "1.2.9", "@rolldown/binding-linux-s390x-gnu": "1.2.9", "@rolldown/binding-linux-x64-gnu": "1.2.9", "@rolldown/binding-linux-x64-musl": "1.2.9", "@rolldown/binding-openharmony-arm64": "1.2.9", "@rolldown/binding-win32-arm64-msvc": "1.2.9", "@rolldown/binding-win32-x64-msvc": "1.2.9" }, "bin": { "rolldown": "./bin/cli.mjs" } }, "sha512-hx/Pv0N1haXRb11qkfnK5MXB/iqr7i0yjWQqmO9uHqZpBgQSqzc8UsSnEpalsh+j1I8qQ2CkXAkJC8Br3dKSlg=="],
@@ -554,6 +609,8 @@
     "web-streams-polyfill": ["web-streams-polyfill@3.3.3", "", {}, "sha512-d2JWLCivmZYTSIoge9MsgFCZrt571BikcWGYkjC1khllbTeDlGqZ2D8vD8E/lJa8WGWbb7Plm8/XJYV7IJHZZw=="],
 
     "ws": ["ws@8.21.3", "", { "peerDependencies": { "bufferutil": "^4.0.1", "utf-8-validate": ">=5.0.2" }, "optionalPeers": ["bufferutil", "utf-8-validate"] }, "sha512-201TZ/kPWxoPr/OKWjquZR1SWKXcvxdH+e1xrx89b3YbmzLMFCLfnaG1HFIgWzJOEWZ7MvpK++odZufgYR50Rw=="],
+
+    "@reduxjs/toolkit/immer": ["immer@11.1.18", "", {}, "sha512-EQyQtLiYW029lyoczMl/Hh4Xu7cDecSc58JRYpHyL4tIAu3eqd1yJzQX04d2BZHDkzFFvm6qJEJWOtfDSWAXbQ=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 

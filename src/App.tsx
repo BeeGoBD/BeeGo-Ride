@@ -15,7 +15,8 @@ import { RoleSelectDashboard } from './components/RoleSelectDashboard';
 import { PassengerAppShell } from './components/PassengerAppShell';
 import { RiderAppShell } from './components/RiderAppShell';
 import { UberLiveTracking } from './components/UberLiveTracking';
-import { PassengerAuthModal } from './components/PassengerAuthModal';
+import { DescopeAuthModal } from './components/DescopeAuthModal';
+import { DescopeAuthScreen } from './components/DescopeAuthScreen';
 import { DriverAuthModal } from './components/DriverAuthModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminSecretGateModal } from './components/AdminSecretGateModal';
@@ -26,6 +27,12 @@ import {
   PassengerProfile,
 } from './services/passengerAuth';
 import { getCurrentDriver, DriverProfile } from './services/driverAuth';
+import {
+  getStoredDescopeUser,
+  extractDescopeProfile,
+  DescopeUserProfile,
+} from './services/descopeService';
+import { useSession, useUser } from '@descope/react-sdk';
 import './lib/appwrite';
 
 type AppIntroState = 'splash' | 'onboarding' | 'ready';
@@ -76,23 +83,54 @@ export default function App() {
     return generateRiderId();
   });
 
-  const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(null);
+  const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(() => getStoredDescopeUser());
   const [passengerAuthModalMode, setPassengerAuthModalMode] = useState<'signup' | 'login' | null>(null);
+
+  // Descope React SDK Hooks
+  const { isAuthenticated } = useSession();
+  const { user: descopeUser } = useUser();
+
+  const [currentPath, setCurrentPath] = useState(() =>
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Sync Descope user profile into passengerProfile
+  useEffect(() => {
+    if (descopeUser) {
+      const profile = extractDescopeProfile(descopeUser);
+      setPassengerProfile(profile);
+    } else {
+      const stored = getStoredDescopeUser();
+      if (stored) {
+        setPassengerProfile(stored);
+      }
+    }
+  }, [descopeUser, isAuthenticated]);
 
   // Driver profile & auth modal state
   const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => getCurrentDriver());
   const [driverAuthModalMode, setDriverAuthModalMode] = useState<'register' | 'login' | null>(null);
 
-  // Check for existing active passenger session
+  // Check for existing active passenger session fallback
   useEffect(() => {
-    getCurrentPassenger()
-      .then((profile) => {
-        if (profile) {
-          setPassengerProfile(profile);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    if (!passengerProfile) {
+      getCurrentPassenger()
+        .then((profile) => {
+          if (profile) {
+            setPassengerProfile(profile);
+          }
+        })
+        .catch(() => {});
+    }
+  }, [passengerProfile]);
 
   const [stage, setStage] = useState<RideStage>('request');
   const [apiKey, setApiKey] = useState<string>(() => getGeoapifyApiKey());
@@ -221,6 +259,14 @@ export default function App() {
 
   // Passenger clicks "Request for Ride"
   const handleRequestRide = async () => {
+    // Requirement 9: Protect ride booking action - require login
+    if (!passengerProfile && !isAuthenticated) {
+      setPendingRoleForAuth('passenger');
+      setPassengerAuthModalMode('login');
+      setErrorMessage('Please sign in or create an account with Descope to request an electric ride.');
+      return;
+    }
+
     if (!pickup || !dropoff) {
       setErrorMessage('Please select both pickup and drop-off spots.');
       return;
@@ -275,6 +321,44 @@ export default function App() {
         onFinish={() => {
           sessionStorage.setItem('beego_intro_completed', 'true');
           setIntroState('ready');
+        }}
+      />
+    );
+  }
+
+  // Check standalone auth route (e.g. /login, /register, /auth)
+  const isAuthRoute =
+    currentPath === '/login' ||
+    currentPath === '/register' ||
+    currentPath === '/auth' ||
+    (typeof window !== 'undefined' &&
+      (new URLSearchParams(window.location.search).has('login') ||
+        new URLSearchParams(window.location.search).has('auth')));
+
+  if (isAuthRoute) {
+    return (
+      <DescopeAuthScreen
+        intendedRole={pendingRoleForAuth}
+        onAuthenticated={(profile, authedRole) => {
+          setPassengerProfile(profile);
+          const targetRole = authedRole || pendingRoleForAuth || 'passenger';
+          setRole(targetRole);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('beego_user_role', targetRole);
+            const url = new URL(window.location.href);
+            url.pathname = '/';
+            url.searchParams.delete('login');
+            url.searchParams.delete('auth');
+            url.searchParams.delete('register');
+            window.history.pushState({}, '', url.toString());
+            setCurrentPath('/');
+          }
+        }}
+        onClose={() => {
+          if (typeof window !== 'undefined') {
+            window.history.pushState({}, '', '/');
+            setCurrentPath('/');
+          }
         }}
       />
     );
@@ -405,9 +489,9 @@ export default function App() {
       <div className="w-full max-w-[430px] h-full sm:h-full sm:max-h-[880px] sm:rounded-[32px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
         {content}
 
-        {/* Passenger Login / Signup Modal */}
+        {/* Passenger Login / Signup Modal with Descope */}
         {passengerAuthModalMode && (
-          <PassengerAuthModal
+          <DescopeAuthModal
             initialMode={passengerAuthModalMode}
             intendedRole={pendingRoleForAuth}
             onAuthenticated={(profile, authedRole) => {
@@ -417,6 +501,13 @@ export default function App() {
               setRole(targetRole);
               if (typeof window !== 'undefined') {
                 localStorage.setItem('beego_user_role', targetRole);
+                const url = new URL(window.location.href);
+                url.pathname = '/';
+                url.searchParams.delete('login');
+                url.searchParams.delete('auth');
+                url.searchParams.delete('register');
+                window.history.pushState({}, '', url.toString());
+                setCurrentPath('/');
               }
             }}
             onCancel={() => setPassengerAuthModalMode(null)}

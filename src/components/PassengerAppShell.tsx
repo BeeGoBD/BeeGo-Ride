@@ -210,6 +210,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
                 onClose={() => setActiveTab('home')}
                 onSignOut={props.onBackToRoles}
                 onOpenOffers={() => setActiveTab('offers')}
+                onOpenAuth={props.onOpenAuthModal}
               />
             )}
           </div>

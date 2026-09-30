@@ -27,6 +27,8 @@ import {
   Clock,
 } from 'lucide-react';
 import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
+import { clearStoredDescopeUser } from '../services/descopeService';
+import { useDescope } from '@descope/react-sdk';
 
 interface PassengerAccountSectionProps {
   passengerId: string;
@@ -35,6 +37,7 @@ interface PassengerAccountSectionProps {
   onClose?: () => void;
   onSignOut: () => void;
   onOpenOffers?: () => void;
+  onOpenAuth?: () => void;
 }
 
 export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = ({
@@ -44,12 +47,15 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
   onClose,
   onSignOut,
   onOpenOffers,
+  onOpenAuth,
 }) => {
+  const sdk = useDescope();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [activeNotice, setActiveNotice] = useState<string | null>(null);
 
-  const displayName = passengerProfile?.name || 'BeeGo Passenger';
-  const displayEmail = passengerProfile?.email || 'guest@beegovoltx.com';
+  const isGuest = !passengerProfile || !passengerProfile.email;
+  const displayName = passengerProfile?.name || 'BeeGo Guest Passenger';
+  const displayEmail = passengerProfile?.email || 'Tap to sign in with Descope';
 
   const initials =
     displayName
@@ -102,17 +108,44 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <h2 className="text-base font-black text-[#1A1A1A] truncate">{displayName}</h2>
-            <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="Active" />
+            <span className={`w-2 h-2 rounded-full shrink-0 ${isGuest ? 'bg-amber-400' : 'bg-emerald-500'}`} title="Status" />
           </div>
           <p className="text-xs text-zinc-500 truncate mt-0.5">{displayEmail}</p>
           <div className="flex items-center gap-1.5 mt-1">
-            <span className="text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full border border-emerald-200">
-              Verified Passenger
+            <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border ${
+              isGuest
+                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+            }`}>
+              {isGuest ? 'Guest User' : 'Verified with Descope'}
             </span>
             <span className="text-[10px] text-zinc-400 font-mono">• {passengerId}</span>
           </div>
         </div>
       </div>
+
+      {/* Guest Sign-in Banner with Descope */}
+      {isGuest && onOpenAuth && (
+        <div className="p-4 rounded-3xl bg-gradient-to-r from-amber-500 via-[#F5C518] to-amber-400 text-black shadow-md flex items-center justify-between border border-amber-300">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-black text-[#F5C518] flex items-center justify-center shrink-0 shadow-xs">
+              <ShieldCheck className="w-5 h-5 stroke-[2.2]" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-black">Sign In / Register</h3>
+              <p className="text-[11px] text-zinc-800 font-medium mt-0.5">Use Email OTP, SMS or Google</p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onOpenAuth}
+            className="px-3.5 py-1.5 rounded-xl bg-black hover:bg-zinc-800 text-[#F5C518] font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 shrink-0"
+          >
+            Sign In
+          </button>
+        </div>
+      )}
 
       {/* 2. PASSENGER QUICK STATS ROW */}
       <div className="grid grid-cols-3 gap-2">
@@ -274,6 +307,10 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
               <button
                 type="button"
                 onClick={async () => {
+                  try {
+                    await sdk.logout();
+                  } catch (e) {}
+                  clearStoredDescopeUser();
                   await logoutPassenger();
                   setShowSignOutConfirm(false);
                   onSignOut();
