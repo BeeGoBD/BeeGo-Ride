@@ -159,7 +159,8 @@ export function requestNewRide(
   pickup: LocationPoint,
   dropoff: LocationPoint,
   routeData: RouteData,
-  paymentMethod: PaymentMethod = 'cash'
+  paymentMethod: PaymentMethod = 'cash',
+  passengerPhone?: string
 ): RideRequest {
   const distanceKm = Math.max(0.1, Number((routeData.distanceMeters / 1000).toFixed(1)));
   const durationMinutes = Math.max(1, Math.round(routeData.timeSeconds / 60));
@@ -168,6 +169,7 @@ export function requestNewRide(
   const newRide: RideRequest = {
     id: generateRideId(),
     passengerId,
+    passengerPhone,
     vehicleType: 'bike',
     paymentMethod,
     pickup,

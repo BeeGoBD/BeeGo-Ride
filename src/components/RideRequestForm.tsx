@@ -1050,28 +1050,18 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 </div>
               </div>
 
-              {/* PAYMENT METHOD SELECTOR */}
-              <div>
-                <PaymentMethodSelector
-                  selectedMethod={selectedPaymentMethod}
-                  onSelectMethod={(method) => {
-                    setSelectedPaymentMethod(method);
-                    setErrorMessage(null);
-                  }}
-                />
-              </div>
-
-              {/* MANDATORY CONTACT PHONE NUMBER FOR RIDER COORDINATION */}
-              <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col gap-1.5">
-                <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
+              {/* PASSENGER CONTACT DETAILS: PHONE NUMBER (Replaces Cash Selector) */}
+              <div className="p-3.5 rounded-2xl bg-zinc-50 border border-zinc-200/90 flex flex-col gap-2">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-800">
                   <span className="flex items-center gap-1.5">
                     <Phone className="w-3.5 h-3.5 text-[#E6A800]" />
-                    <span>Contact Phone Number <span className="text-rose-500">*</span></span>
+                    <span>Passenger Contact Details <span className="text-rose-500">*</span></span>
                   </span>
-                  <span className="text-[10px] text-zinc-400 font-medium">Captain calls for pickup</span>
+                  <span className="text-[10px] text-zinc-400 font-medium">Shared with Captain</span>
                 </div>
+
                 <div className="relative flex items-center">
-                  <div className="absolute left-3 flex items-center gap-1 text-zinc-500 font-mono text-xs font-bold">
+                  <div className="absolute left-3 flex items-center gap-1 text-zinc-600 font-mono text-xs font-bold">
                     <span>🇧🇩</span>
                     <span>+880</span>
                   </div>
@@ -1084,9 +1074,12 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     }}
                     placeholder="1712345678"
                     required
-                    className="w-full pl-20 pr-3 py-2 rounded-xl bg-white border border-zinc-200 focus:border-[#F5C518] focus:outline-none text-xs font-mono font-medium text-black transition-colors"
+                    className="w-full pl-20 pr-3 py-2.5 rounded-xl bg-white border border-zinc-200 focus:border-[#F5C518] focus:outline-none text-xs font-mono font-bold text-black transition-colors shadow-2xs"
                   />
                 </div>
+                <p className="text-[10px] text-zinc-500 font-medium">
+                  Your captain will call this number to coordinate arrival and pickup.
+                </p>
               </div>
 
               {/* REQUEST ACTION BUTTON */}

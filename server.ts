@@ -721,6 +721,31 @@ async function startServer() {
     }
   });
 
+  // Support callbacks memory store
+  const supportCallbacks: any[] = [];
+  app.post('/api/support/callback', (req, res) => {
+    try {
+      const { name, phone, email, forgotEmail } = req.body || {};
+      const item = {
+        id: 'cb_' + Date.now().toString(36),
+        name: (name || '').trim(),
+        phone: (phone || '').trim(),
+        email: (email || '').trim(),
+        forgotEmail: Boolean(forgotEmail),
+        createdAt: Date.now(),
+      };
+      supportCallbacks.push(item);
+      console.log(`[Support Callback] Received callback request from ${item.name} (${item.phone}), email: ${item.email || 'Forgotten'}`);
+      return res.json({
+        success: true,
+        message: 'Callback request registered successfully. Our team will contact you shortly.',
+      });
+    } catch (err: any) {
+      console.error('[Support Callback Error]', err);
+      return res.status(500).json({ error: 'Failed to register callback request.' });
+    }
+  });
+
   // GET /api/auth/me - Check current active session
   app.get('/api/auth/me', (req, res) => {
     try {

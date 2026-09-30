@@ -21,6 +21,7 @@ import {
   Layers,
   ChevronRight,
   Power,
+  Phone,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, DriverProfile, DriverVerificationStatus } from '../types';
 import {
@@ -521,6 +522,28 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Passenger Contact Phone Details (Client Phone) */}
+            {activeRide.passengerPhone && (
+              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold">
+                    <Phone className="w-3 h-3" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-zinc-500 font-bold block">Client Phone</span>
+                    <span className="font-mono font-black text-black">{activeRide.passengerPhone}</span>
+                  </div>
+                </div>
+                <a
+                  href={`tel:${activeRide.passengerPhone}`}
+                  className="px-3 py-1.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 active:scale-95"
+                >
+                  <Phone className="w-3 h-3 fill-black" />
+                  <span>Call Client</span>
+                </a>
+              </div>
+            )}
 
             {/* Action Buttons: Accept / Reject */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">

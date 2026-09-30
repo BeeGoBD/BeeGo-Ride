@@ -287,7 +287,9 @@ export default function App() {
     try {
       const route = await calculateRoute(pickup, dropoff, keyToUse);
       setRouteData(route);
-      requestNewRide(passengerId, pickup, dropoff, route);
+      const user = getStoredDescopeUser();
+      const phoneToUse = user?.phone || (passengerProfile as any)?.phone;
+      requestNewRide(passengerId, pickup, dropoff, route, 'cash', phoneToUse);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to calculate navigation route using Geoapify.');
     } finally {

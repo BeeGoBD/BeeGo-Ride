@@ -256,6 +256,96 @@ export async function resetPassengerPassword(email: string, newPassword: string)
 }
 
 /**
+ * Logs in with email and password
+ */
+export async function loginWithPassword(
+  email: string,
+  password: string
+): Promise<DescopeUserProfile> {
+  const cleanEmail = email.trim().toLowerCase();
+
+  // 1. Try server backend authentication
+  try {
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: cleanEmail, password }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success && data.profile) {
+      const profile: DescopeUserProfile = {
+        id: data.profile.id || `pax_${Date.now().toString(36)}`,
+        name: data.profile.name || cleanEmail.split('@')[0],
+        email: cleanEmail,
+        phone: data.profile.phone || '',
+        role: 'passenger',
+        isEmailVerified: true,
+        authMethod: 'password',
+      };
+      saveStoredDescopeUser(profile);
+      return profile;
+    } else if (res.status === 401 || res.status === 403 || data.error) {
+      throw new Error(data.error || 'Incorrect email or password.');
+    }
+  } catch (e: any) {
+    if (e.message && e.message !== 'Failed to fetch') {
+      throw e;
+    }
+  }
+
+  // 2. Client fallback verification
+  try {
+    const stored = localStorage.getItem('beego_local_passwords');
+    const passwords = stored ? JSON.parse(stored) : {};
+    if (passwords[cleanEmail] && passwords[cleanEmail] === password) {
+      const profile: DescopeUserProfile = {
+        id: `pax_${Date.now().toString(36)}`,
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        role: 'passenger',
+        isEmailVerified: true,
+        authMethod: 'password',
+      };
+      saveStoredDescopeUser(profile);
+      return profile;
+    }
+  } catch (err) {}
+
+  throw new Error('Invalid email or password. Please try again or sign in with OTP.');
+}
+
+/**
+ * Submits a callback request for users who lost access to their email
+ */
+export async function requestSupportCallback(payload: {
+  name: string;
+  phone: string;
+  email?: string;
+  forgotEmail?: boolean;
+}): Promise<boolean> {
+  try {
+    const res = await fetch('/api/support/callback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) return true;
+  } catch (e) {}
+
+  // Local record fallback
+  try {
+    const raw = localStorage.getItem('beego_support_callbacks') || '[]';
+    const list = JSON.parse(raw);
+    list.push({ ...payload, timestamp: Date.now() });
+    localStorage.setItem('beego_support_callbacks', JSON.stringify(list));
+    return true;
+  } catch (e) {
+    return true;
+  }
+}
+
+/**
  * Extracts Descope user details from Descope JWT or SDK User object
  */
 export function extractDescopeProfile(
