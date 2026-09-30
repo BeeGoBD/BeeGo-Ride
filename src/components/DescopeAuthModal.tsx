@@ -139,51 +139,24 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
     setIsLoading(true);
     try {
       const cleanPhone = phoneNumber ? normalizeBangladeshPhone(phoneNumber) : undefined;
-      let descopeOk = false;
 
-      // 1. Try Descope SDK OTP
-      try {
-        let res;
-        if (fullName.trim() || cleanPhone) {
-          res = await sdk.otp.signUp.email(cleanEmail, {
-            name: fullName.trim() || undefined,
-            email: cleanEmail,
-            phone: cleanPhone,
-          }).catch(async () => {
-            return await sdk.otp.signUpOrIn.email(cleanEmail);
-          });
-        } else {
-          res = await sdk.otp.signUpOrIn.email(cleanEmail);
-        }
+      // Dispatch via Descope Cloud Relay (single authoritative dispatch to prevent E033005 rate limiting)
+      const resp = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          name: fullName.trim() || cleanEmail.split('@')[0],
+          phone: cleanPhone,
+        }),
+      });
 
-        if (res && res.ok) {
-          descopeOk = true;
-          setUseBackendOtpFallback(false);
-        }
-      } catch (descopeErr: any) {
-        // Direct SDK OTP is disabled in Descope settings, will use backend OTP delivery
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Failed to dispatch verification code to your email. Please try again.');
       }
-
-      // 2. Fallback to resilient server OTP if Descope direct SDK OTP is disabled
-      if (!descopeOk) {
-        setUseBackendOtpFallback(true);
-        const resp = await fetch('/api/auth/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            name: fullName.trim() || cleanEmail.split('@')[0],
-            phone: cleanPhone,
-          }),
-        });
-
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || !data.success) {
-          throw new Error(data.error || 'Failed to dispatch verification code to your email. Please try again.');
-        }
-        if (data.devOtp) {
-          setActiveSessionOtp(data.devOtp);
-        }
+      if (data.devOtp) {
+        setActiveSessionOtp(data.devOtp);
       }
 
       setActiveTargetLoginId(cleanEmail);
@@ -218,50 +191,24 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
     setIsLoading(true);
     try {
       const cleanEmail = email.trim() ? email.trim().toLowerCase() : undefined;
-      let descopeOk = false;
 
-      try {
-        let res;
-        if (fullName.trim() || cleanEmail) {
-          res = await sdk.otp.signUp.sms(normalized, {
-            name: fullName.trim() || undefined,
-            phone: normalized,
-            email: cleanEmail,
-          }).catch(async () => {
-            return await sdk.otp.signUpOrIn.sms(normalized);
-          });
-        } else {
-          res = await sdk.otp.signUpOrIn.sms(normalized);
-        }
+      // Dispatch via Descope Cloud Relay (single authoritative dispatch to prevent E033005 rate limiting)
+      const resp = await fetch('/api/auth/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone: normalized,
+          email: cleanEmail,
+          name: fullName.trim() || normalized,
+        }),
+      });
 
-        if (res && res.ok) {
-          descopeOk = true;
-          setUseBackendOtpFallback(false);
-        }
-      } catch (descopeErr: any) {
-        // Direct SMS OTP disabled in Descope settings
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok || !data.success) {
+        throw new Error(data.error || 'Failed to dispatch verification code to your phone number.');
       }
-
-      // If Descope direct SMS is disabled, dispatch via reliable backend OTP
-      if (!descopeOk) {
-        setUseBackendOtpFallback(true);
-        const resp = await fetch('/api/auth/otp/send', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            phone: normalized,
-            email: cleanEmail,
-            name: fullName.trim() || normalized,
-          }),
-        });
-
-        const data = await resp.json().catch(() => ({}));
-        if (!resp.ok || !data.success) {
-          throw new Error(data.error || 'Failed to dispatch verification code to your phone number.');
-        }
-        if (data.devOtp) {
-          setActiveSessionOtp(data.devOtp);
-        }
+      if (data.devOtp) {
+        setActiveSessionOtp(data.devOtp);
       }
 
       setActiveTargetLoginId(normalized);
