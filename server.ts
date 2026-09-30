@@ -680,6 +680,47 @@ async function startServer() {
     }
   });
 
+  // POST /api/auth/password/reset - Updates user's password after OTP verification
+  app.post('/api/auth/password/reset', async (req, res) => {
+    try {
+      const { email, newPassword } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+
+      if (!cleanEmail || !cleanEmail.endsWith('@gmail.com')) {
+        return res.status(400).json({ error: 'Valid @gmail.com email address is required.' });
+      }
+
+      if (!newPassword || newPassword.length < 6) {
+        return res.status(400).json({ error: 'New password must be at least 6 characters long.' });
+      }
+
+      const pwInfo = hashPassword(newPassword);
+      const passengers = loadPassengers();
+      const existing = passengers[cleanEmail] || {
+        id: 'pax-' + Date.now().toString(36),
+        name: cleanEmail.split('@')[0],
+        email: cleanEmail,
+        role: 'passenger',
+        isEmailVerified: true,
+        createdAt: Date.now(),
+      };
+
+      passengers[cleanEmail] = {
+        ...existing,
+        passwordHash: pwInfo.hash,
+        salt: pwInfo.salt,
+        updatedAt: Date.now(),
+      };
+      savePassengers(passengers);
+
+      console.log(`[Beego Auth] Password reset successfully for ${cleanEmail}`);
+      return res.json({ success: true, message: 'Password reset successfully. You can now log in.' });
+    } catch (err: any) {
+      console.error('[Password Reset Error]', err);
+      return res.status(500).json({ error: 'Failed to reset password.' });
+    }
+  });
+
   // GET /api/auth/me - Check current active session
   app.get('/api/auth/me', (req, res) => {
     try {

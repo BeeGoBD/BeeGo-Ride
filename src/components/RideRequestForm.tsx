@@ -23,6 +23,7 @@ import {
   Sparkles,
   Zap,
   Eye,
+  Phone,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
@@ -31,6 +32,12 @@ import { searchBangladeshDistricts, isLocationInBangladesh } from '../data/bangl
 import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
+import {
+  getStoredDescopeUser,
+  saveStoredDescopeUser,
+  normalizeBangladeshPhone,
+  isValidBangladeshPhone,
+} from '../services/descopeService';
 
 interface RideRequestFormProps {
   apiKey: string;
@@ -88,6 +95,12 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const [isLocating, setIsLocating] = useState(false);
   const [isPickupLiveGps, setIsPickupLiveGps] = useState(true);
   const autoLocatedRef = useRef(false);
+
+  // Mandatory Contact Phone Number for Captain Dispatch
+  const [contactPhone, setContactPhone] = useState<string>(() => {
+    const user = getStoredDescopeUser();
+    return user?.phone ? user.phone.replace(/^\+880/, '0') : '';
+  });
 
   // Live Auto-Route calculation whenever pickup or dropoff change
   const [autoRouteData, setAutoRouteData] = useState<RouteData | null>(null);
@@ -1048,6 +1061,34 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 />
               </div>
 
+              {/* MANDATORY CONTACT PHONE NUMBER FOR RIDER COORDINATION */}
+              <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col gap-1.5">
+                <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
+                  <span className="flex items-center gap-1.5">
+                    <Phone className="w-3.5 h-3.5 text-[#E6A800]" />
+                    <span>Contact Phone Number <span className="text-rose-500">*</span></span>
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-medium">Captain calls for pickup</span>
+                </div>
+                <div className="relative flex items-center">
+                  <div className="absolute left-3 flex items-center gap-1 text-zinc-500 font-mono text-xs font-bold">
+                    <span>🇧🇩</span>
+                    <span>+880</span>
+                  </div>
+                  <input
+                    type="tel"
+                    value={contactPhone}
+                    onChange={(e) => {
+                      setContactPhone(e.target.value);
+                      setErrorMessage(null);
+                    }}
+                    placeholder="1712345678"
+                    required
+                    className="w-full pl-20 pr-3 py-2 rounded-xl bg-white border border-zinc-200 focus:border-[#F5C518] focus:outline-none text-xs font-mono font-medium text-black transition-colors"
+                  />
+                </div>
+              </div>
+
               {/* REQUEST ACTION BUTTON */}
               <button
                 id="request-ride-button"
@@ -1056,6 +1097,21 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                   if (!pickup || !dropoff) {
                     setErrorMessage('Please select both pickup and destination spots on the map.');
                     return;
+                  }
+                  const cleanPhone = contactPhone.trim();
+                  if (!cleanPhone) {
+                    setErrorMessage('Please enter your phone number so your captain can call you upon arrival.');
+                    return;
+                  }
+                  const normalizedPhone = normalizeBangladeshPhone(cleanPhone);
+                  if (!isValidBangladeshPhone(normalizedPhone)) {
+                    setErrorMessage('Please enter a valid Bangladesh mobile number (e.g. 01712345678).');
+                    return;
+                  }
+                  // Sync into stored user profile
+                  const currentUser = getStoredDescopeUser();
+                  if (currentUser) {
+                    saveStoredDescopeUser({ ...currentUser, phone: normalizedPhone });
                   }
                   onRequestRide(selectedPaymentMethod);
                 }}

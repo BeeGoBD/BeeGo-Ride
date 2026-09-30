@@ -1,36 +1,34 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
+  X,
   Mail,
-  Phone,
   User,
-  ArrowRight,
-  ArrowLeft,
+  Phone,
+  ShieldCheck,
   CheckCircle2,
   AlertCircle,
+  ArrowRight,
+  ArrowLeft,
   RefreshCw,
-  X,
-  Sparkles,
-  ShieldCheck,
   Zap,
-  Lock,
-  Globe,
   Check,
+  Lock,
+  Eye,
+  EyeOff,
+  KeyRound,
 } from 'lucide-react';
-import { Descope, useDescope, useSession, useUser } from '@descope/react-sdk';
 import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
 import {
-  DESCOPE_PROJECT_ID,
   DescopeUserProfile,
+  saveStoredDescopeUser,
+  isValidEmail,
   normalizeBangladeshPhone,
   isValidBangladeshPhone,
-  isValidEmail,
-  saveStoredDescopeUser,
-  extractDescopeProfile,
+  dispatchEmailOtp,
+  verifyEmailOtp,
+  resetPassengerPassword,
 } from '../services/descopeService';
 import { UserRole } from '../types';
-
-export type DescopeAuthTab = 'email_otp' | 'phone_otp' | 'descope_flow';
-export type DescopeAuthStep = 'input' | 'otp_verify' | 'forgot_password';
 
 interface DescopeAuthModalProps {
   initialMode?: 'signup' | 'login';
@@ -45,360 +43,396 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   intendedRole = 'passenger',
   onAuthenticated,
   onCancel,
-  isStandalonePage = false,
 }) => {
-  const sdk = useDescope();
-  const { isAuthenticated } = useSession();
-  const { user: descopeUser } = useUser();
+  // Main Tab State: 'signup' | 'signin' | 'forgot'
+  const [activeTab, setActiveTab] = useState<'signup' | 'signin' | 'forgot'>(
+    initialMode === 'login' ? 'signin' : 'signup'
+  );
 
-  // Active step and tab: default to Descope 'sign-up-or-in' flow
-  const [step, setStep] = useState<DescopeAuthStep>('input');
-  const [activeTab, setActiveTab] = useState<DescopeAuthTab>('descope_flow');
-  const [useBackendOtpFallback, setUseBackendOtpFallback] = useState(false);
-
-  // Registration & Login Fields
+  // Form Fields
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
-  const [forgotLoginId, setForgotLoginId] = useState('');
 
-  // OTP inputs: 6 digits
-  const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const otpInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  // OTP State for Sign Up
+  const [signupOtpSent, setSignupOtpSent] = useState(false);
+  const [signupEmailVerified, setSignupEmailVerified] = useState(false);
+  const [signupOtpCode, setSignupOtpCode] = useState('');
+  const [signupActiveDevOtp, setSignupActiveDevOtp] = useState<string | null>(null);
+  const [isSendingSignupOtp, setIsSendingSignupOtp] = useState(false);
+  const [isVerifyingSignupOtp, setIsVerifyingSignupOtp] = useState(false);
 
-  // UI state
+  // OTP State for Sign In
+  const [signinOtpSent, setSigninOtpSent] = useState(false);
+  const [signinOtpDigits, setSigninOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [signinActiveDevOtp, setSigninActiveDevOtp] = useState<string | null>(null);
+  const [isSendingSigninOtp, setIsSendingSigninOtp] = useState(false);
+  const [isVerifyingSigninOtp, setIsVerifyingSigninOtp] = useState(false);
+  const [signinCooldown, setSigninCooldown] = useState(0);
+
+  // Forgot Password Flow State
+  // Step 1: 'request' (enter email) -> Step 2: 'verify' (enter OTP) -> Step 3: 'new_password' (set new password)
+  const [forgotStep, setForgotStep] = useState<'request' | 'verify' | 'new_password'>('request');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotOtpDigits, setForgotOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
+  const [forgotActiveDevOtp, setForgotActiveDevOtp] = useState<string | null>(null);
+  const [isSendingForgotOtp, setIsSendingForgotOtp] = useState(false);
+  const [isVerifyingForgotOtp, setIsVerifyingForgotOtp] = useState(false);
+  const [forgotCooldown, setForgotCooldown] = useState(0);
+
+  // Passwords for Forgot Password Step 3
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isResettingPassword, setIsResettingPassword] = useState(false);
+
+  // General Status
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [resendCooldown, setResendCooldown] = useState<number>(0);
-  const [activeTargetLoginId, setActiveTargetLoginId] = useState<string>('');
-  const [activeSessionOtp, setActiveSessionOtp] = useState<string | null>(null);
 
-  // Resend timer countdown
+  const signinOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
+  const forgotOtpRefs = useRef<(HTMLInputElement | null)[]>([]);
+
+  // Sign-in resend timer
   useEffect(() => {
-    if (resendCooldown <= 0) return;
+    if (signinCooldown <= 0) return;
     const timer = setInterval(() => {
-      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+      setSigninCooldown((prev) => (prev > 0 ? prev - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [resendCooldown]);
+  }, [signinCooldown]);
 
-  // If already authenticated via Descope session, auto-sync and complete
+  // Forgot Password resend timer
   useEffect(() => {
-    if (isAuthenticated && descopeUser) {
-      const profile = extractDescopeProfile(descopeUser, {
-        name: fullName || (descopeUser as any)?.name,
-        email: email || (descopeUser as any)?.email,
-        phone: phoneNumber || (descopeUser as any)?.phone,
-        method: activeTab === 'phone_otp' ? 'sms_otp' : 'email_otp',
-      });
-      saveStoredDescopeUser(profile);
-      handleSuccessfulLogin(profile);
-    }
-  }, [isAuthenticated, descopeUser]);
+    if (forgotCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setForgotCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [forgotCooldown]);
 
-  /**
-   * Finalizes successful login, saves user, redirects to home /
-   */
   const handleSuccessfulLogin = (profile: DescopeUserProfile) => {
     saveStoredDescopeUser(profile);
-    
-    // Redirect to home page / as requested in requirement 5
     if (typeof window !== 'undefined') {
       const url = new URL(window.location.href);
-      if (url.pathname !== '/' || url.searchParams.has('login') || url.searchParams.has('auth')) {
-        url.pathname = '/';
-        url.searchParams.delete('login');
-        url.searchParams.delete('auth');
-        url.searchParams.delete('register');
-        window.history.pushState({}, '', url.toString());
-      }
+      url.pathname = '/';
+      url.searchParams.delete('login');
+      url.searchParams.delete('auth');
+      url.searchParams.delete('register');
+      window.history.pushState({}, '', url.toString());
     }
-
     onAuthenticated(profile, intendedRole);
   };
 
   /**
-   * Handle Email OTP Request (Sign up or In)
+   * ==========================================
+   * 1. SIGN UP FLOW
+   * ==========================================
    */
-  const handleSendEmailOtp = async (e?: React.FormEvent) => {
+  const handleSendSignupOtp = async () => {
+    setErrorMessage(null);
+    setSuccessMessage(null);
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your email address to receive the verification code.');
+      return;
+    }
+    if (!isValidEmail(cleanEmail) || !cleanEmail.endsWith('@gmail.com')) {
+      setErrorMessage('Only @gmail.com email addresses are supported (e.g. yourname@gmail.com).');
+      return;
+    }
+
+    setIsSendingSignupOtp(true);
+    try {
+      const res = await dispatchEmailOtp(cleanEmail, fullName.trim() || undefined);
+      if (res.devOtp) {
+        setSignupActiveDevOtp(res.devOtp);
+      }
+      setSignupOtpSent(true);
+      setSuccessMessage(`Verification code sent to ${cleanEmail}. Please check your Gmail.`);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Failed to send verification code. Please try again.');
+    } finally {
+      setIsSendingSignupOtp(false);
+    }
+  };
+
+  const handleVerifySignupOtp = async (codeOverride?: string) => {
+    setErrorMessage(null);
+    const cleanEmail = email.trim().toLowerCase();
+    const code = (codeOverride || signupOtpCode).trim();
+
+    if (code.length < 6) {
+      setErrorMessage('Please enter the complete 6-digit verification code.');
+      return;
+    }
+
+    setIsVerifyingSignupOtp(true);
+    try {
+      await verifyEmailOtp(cleanEmail, code, fullName.trim() || undefined);
+      setSignupEmailVerified(true);
+      setSuccessMessage('Email verified successfully! You can now complete your registration.');
+    } catch (err: any) {
+      setErrorMessage(err.message || 'The verification code you entered is invalid. Please try again.');
+    } finally {
+      setIsVerifyingSignupOtp(false);
+    }
+  };
+
+  const handleCompleteSignup = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMessage(null);
+    setSuccessMessage(null);
+
+    const cleanName = fullName.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    const cleanPhone = phoneNumber.trim();
+
+    if (!cleanName) {
+      setErrorMessage('Please enter your Full Name.');
+      return;
+    }
+
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your Gmail address.');
+      return;
+    }
+
+    if (!signupEmailVerified) {
+      setErrorMessage('Please verify your email address by clicking "Send OTP" and entering the 6-digit code.');
+      return;
+    }
+
+    if (!cleanPhone) {
+      setErrorMessage('Please enter your phone number so your driver can contact you during rides.');
+      return;
+    }
+
+    const normalizedPhone = normalizeBangladeshPhone(cleanPhone);
+    if (!isValidBangladeshPhone(normalizedPhone)) {
+      setErrorMessage('Please enter a valid Bangladesh mobile number (e.g. 01712345678).');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const profile: DescopeUserProfile = {
+        id: `pax_${Date.now().toString(36)}`,
+        name: cleanName,
+        email: cleanEmail,
+        phone: normalizedPhone,
+        role: 'passenger',
+        isEmailVerified: true,
+        authMethod: 'email_otp',
+      };
+      handleSuccessfulLogin(profile);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Registration failed. Please try again.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  /**
+   * ==========================================
+   * 2. SIGN IN FLOW
+   * ==========================================
+   */
+  const handleSendSigninOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
     const cleanEmail = email.trim().toLowerCase();
     if (!cleanEmail) {
-      setErrorMessage('Please enter your email address');
+      setErrorMessage('Please enter your registered Gmail address.');
       return;
     }
     if (!isValidEmail(cleanEmail) || !cleanEmail.endsWith('@gmail.com')) {
-      setErrorMessage('Only @gmail.com email addresses are supported for verification (e.g. yourname@gmail.com)');
+      setErrorMessage('Only @gmail.com email addresses are supported (e.g. yourname@gmail.com).');
       return;
     }
 
-    setIsLoading(true);
+    setIsSendingSigninOtp(true);
     try {
-      const cleanPhone = phoneNumber ? normalizeBangladeshPhone(phoneNumber) : undefined;
-
-      // Dispatch via Descope Cloud Relay (single authoritative dispatch to prevent E033005 rate limiting)
-      const resp = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email: cleanEmail,
-          name: fullName.trim() || cleanEmail.split('@')[0],
-          phone: cleanPhone,
-        }),
-      });
-
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.success) {
-        throw new Error(data.error || 'Failed to dispatch verification code to your email. Please try again.');
+      const res = await dispatchEmailOtp(cleanEmail);
+      if (res.devOtp) {
+        setSigninActiveDevOtp(res.devOtp);
       }
-      if (data.devOtp) {
-        setActiveSessionOtp(data.devOtp);
-      }
-
-      setActiveTargetLoginId(cleanEmail);
-      setSuccessMessage(`A 6-digit verification code was sent to ${cleanEmail}. Please check your Gmail.`);
-      setStep('otp_verify');
-      setResendCooldown(45);
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+      setSigninOtpSent(true);
+      setSigninCooldown(45);
+      setSuccessMessage(`Verification code sent to ${cleanEmail}. Please enter the 6 digits below.`);
+      setTimeout(() => signinOtpRefs.current[0]?.focus(), 150);
     } catch (err: any) {
-      setErrorMessage(
-        err?.message || 'Failed to send verification code. Please check your connection and try again.'
-      );
+      setErrorMessage(err.message || 'Failed to dispatch verification code. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSendingSigninOtp(false);
+    }
+  };
+
+  const handleVerifySigninOtp = async (codeOverride?: string) => {
+    setErrorMessage(null);
+    const cleanEmail = email.trim().toLowerCase();
+    const code = codeOverride || signinOtpDigits.join('');
+
+    if (code.length < 6) {
+      setErrorMessage('Please enter the complete 6-digit code.');
+      return;
+    }
+
+    setIsVerifyingSigninOtp(true);
+    try {
+      const profile = await verifyEmailOtp(cleanEmail, code);
+      handleSuccessfulLogin(profile);
+    } catch (err: any) {
+      setErrorMessage(err.message || 'Invalid or expired verification code. Please try again.');
+    } finally {
+      setIsVerifyingSigninOtp(false);
+    }
+  };
+
+  const handleDigitChange = (index: number, val: string) => {
+    const cleaned = val.replace(/\D/g, '').slice(-1);
+    const next = [...signinOtpDigits];
+    next[index] = cleaned;
+    setSigninOtpDigits(next);
+    if (cleaned && index < 5) {
+      signinOtpRefs.current[index + 1]?.focus();
+    }
+    if (next.every((d) => d.length === 1)) {
+      handleVerifySigninOtp(next.join(''));
+    }
+  };
+
+  const handleDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !signinOtpDigits[index] && index > 0) {
+      signinOtpRefs.current[index - 1]?.focus();
     }
   };
 
   /**
-   * Handle Phone / SMS OTP Request (Sign up or In)
+   * ==========================================
+   * 3. FORGOT PASSWORD FLOW
+   * ==========================================
    */
-  const handleSendPhoneOtp = async (e?: React.FormEvent) => {
+
+  // Step 1: Send OTP to email for password reset
+  const handleSendForgotOtp = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const normalized = normalizeBangladeshPhone(phoneNumber);
-    if (!normalized || !isValidBangladeshPhone(normalized)) {
-      setErrorMessage('Please enter a valid Bangladesh mobile number (e.g. 01712345678)');
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      setErrorMessage('Please enter your registered Gmail address.');
+      return;
+    }
+    if (!isValidEmail(cleanEmail) || !cleanEmail.endsWith('@gmail.com')) {
+      setErrorMessage('Only @gmail.com email addresses are supported (e.g. yourname@gmail.com).');
       return;
     }
 
-    setIsLoading(true);
+    setIsSendingForgotOtp(true);
     try {
-      const cleanEmail = email.trim() ? email.trim().toLowerCase() : undefined;
-
-      // Dispatch via Descope Cloud Relay (single authoritative dispatch to prevent E033005 rate limiting)
-      const resp = await fetch('/api/auth/otp/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          phone: normalized,
-          email: cleanEmail,
-          name: fullName.trim() || normalized,
-        }),
-      });
-
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok || !data.success) {
-        throw new Error(data.error || 'Failed to dispatch verification code to your phone number.');
+      const res = await dispatchEmailOtp(cleanEmail);
+      if (res.devOtp) {
+        setForgotActiveDevOtp(res.devOtp);
       }
-      if (data.devOtp) {
-        setActiveSessionOtp(data.devOtp);
-      }
-
-      setActiveTargetLoginId(normalized);
-      setSuccessMessage(`A 6-digit SMS verification code was sent to ${normalized}`);
-      setStep('otp_verify');
-      setResendCooldown(45);
-      setOtpDigits(['', '', '', '', '', '']);
-      setTimeout(() => otpInputRefs.current[0]?.focus(), 150);
+      setForgotStep('verify');
+      setForgotCooldown(45);
+      setSuccessMessage(`Verification code sent to ${cleanEmail}. Enter the 6 digits to verify.`);
+      setTimeout(() => forgotOtpRefs.current[0]?.focus(), 150);
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Failed to send verification SMS. Please check your mobile number.');
+      setErrorMessage(err.message || 'Failed to send verification code. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsSendingForgotOtp(false);
     }
   };
 
-  /**
-   * Handle OTP Verification
-   */
-  const handleVerifyOtp = async (codeToVerify?: string) => {
-    const code = codeToVerify || otpDigits.join('');
+  // Step 2: Verify 6-digit OTP
+  const handleVerifyForgotOtp = async (codeOverride?: string) => {
+    setErrorMessage(null);
+    const cleanEmail = forgotEmail.trim().toLowerCase();
+    const code = codeOverride || forgotOtpDigits.join('');
+
     if (code.length < 6) {
-      setErrorMessage('Please enter the complete 6-digit code');
+      setErrorMessage('Please enter the complete 6-digit verification code.');
       return;
     }
 
-    setErrorMessage(null);
-    setIsLoading(true);
-
+    setIsVerifyingForgotOtp(true);
     try {
-      if (useBackendOtpFallback) {
-        const isEmailTarget = activeTargetLoginId.includes('@');
-        const verifyRes = await fetch('/api/auth/otp/verify', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: isEmailTarget ? activeTargetLoginId : (email.trim().toLowerCase() || undefined),
-            phone: !isEmailTarget ? activeTargetLoginId : (phoneNumber ? normalizeBangladeshPhone(phoneNumber) : undefined),
-            otp: code,
-            name: fullName,
-          }),
-        });
-
-        const data = await verifyRes.json().catch(() => ({}));
-        if (!verifyRes.ok || !data.success) {
-          throw new Error(data.error || 'Invalid or expired verification code. Please check and try again.');
-        }
-
-        const profile: DescopeUserProfile = {
-          id: data.user?.id || `pax_${Date.now().toString(36)}`,
-          name: data.user?.name || fullName || (isEmailTarget ? activeTargetLoginId.split('@')[0] : 'Passenger'),
-          email: data.user?.email || (isEmailTarget ? activeTargetLoginId : `${activeTargetLoginId}@beegovoltx.com`),
-          phone: data.user?.phone || (!isEmailTarget ? activeTargetLoginId : phoneNumber),
-          role: 'passenger',
-          isEmailVerified: true,
-          authMethod: isEmailTarget ? 'email_otp' : 'sms_otp',
-        };
-
-        handleSuccessfulLogin(profile);
-      } else {
-        let res;
-        if (activeTab === 'phone_otp') {
-          res = await sdk.otp.verify.sms(activeTargetLoginId, code);
-        } else {
-          res = await sdk.otp.verify.email(activeTargetLoginId, code);
-        }
-
-        if (!res.ok) {
-          throw new Error(res.error?.errorMessage || 'Invalid or expired verification code');
-        }
-
-        // Successful verification: extract and save profile
-        const profile = extractDescopeProfile(res.data, {
-          name: fullName,
-          email: activeTab === 'email_otp' ? activeTargetLoginId : email,
-          phone: activeTab === 'phone_otp' ? activeTargetLoginId : phoneNumber,
-          method: activeTab === 'phone_otp' ? 'sms_otp' : 'email_otp',
-        });
-
-        handleSuccessfulLogin(profile);
-      }
+      await verifyEmailOtp(cleanEmail, code);
+      setForgotStep('new_password');
+      setSuccessMessage('Code verified! Please enter your new password.');
     } catch (err: any) {
-      setErrorMessage(err?.message || 'The verification code you entered is invalid. Please try again.');
+      setErrorMessage(err.message || 'Invalid or expired verification code. Please try again.');
     } finally {
-      setIsLoading(false);
+      setIsVerifyingForgotOtp(false);
     }
   };
 
-  /**
-   * Handle Google Social Login via Descope
-   */
-  const handleGoogleLogin = async () => {
-    setErrorMessage(null);
-    setIsLoading(true);
-    try {
-      const redirectUri = window.location.origin;
-      const res = await sdk.oauth.start('google', redirectUri);
-      if (res && res.ok && res?.data?.url) {
-        window.location.href = res.data.url;
-        return;
-      }
-      // If direct SDK OAuth is disabled in Descope settings, switch to Descope Flow where Google OAuth is integrated!
-      setActiveTab('descope_flow');
-      setSuccessMessage('Please use the Google sign-in button inside the Descope Unified Flow below.');
-    } catch (err: any) {
-      setActiveTab('descope_flow');
-      setSuccessMessage('Please use the Google sign-in button inside the Descope Unified Flow below.');
-    } finally {
-      setIsLoading(false);
+  const handleForgotDigitChange = (index: number, val: string) => {
+    const cleaned = val.replace(/\D/g, '').slice(-1);
+    const next = [...forgotOtpDigits];
+    next[index] = cleaned;
+    setForgotOtpDigits(next);
+    if (cleaned && index < 5) {
+      forgotOtpRefs.current[index + 1]?.focus();
+    }
+    if (next.every((d) => d.length === 1)) {
+      handleVerifyForgotOtp(next.join(''));
     }
   };
 
-  /**
-   * Handle Forgot Password Request
-   */
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleForgotDigitKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Backspace' && !forgotOtpDigits[index] && index > 0) {
+      forgotOtpRefs.current[index - 1]?.focus();
+    }
+  };
+
+  // Step 3: Save new password and redirect to Sign In
+  const handleSaveNewPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
     setSuccessMessage(null);
 
-    const cleanLoginId = forgotLoginId.trim();
-    if (!cleanLoginId) {
-      setErrorMessage('Please enter your registered Email or Phone number');
+    if (newPassword.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long.');
       return;
     }
 
-    setIsLoading(true);
+    if (newPassword !== confirmPassword) {
+      setErrorMessage('Passwords do not match. Please re-enter.');
+      return;
+    }
+
+    setIsResettingPassword(true);
     try {
-      const res = await sdk.password.sendReset(cleanLoginId, window.location.origin);
-      if (!res.ok) {
-        throw new Error(res.error?.errorMessage || 'Failed to send password reset request');
-      }
-      setSuccessMessage(`Password reset link/instructions have been sent to ${cleanLoginId}`);
+      await resetPassengerPassword(forgotEmail, newPassword);
+      setEmail(forgotEmail);
+      setActiveTab('signin');
+      setSigninOtpSent(false);
+      setSuccessMessage('Password reset successfully! Please log in with your account.');
     } catch (err: any) {
-      console.error('[Descope Password Reset]', err);
-      setErrorMessage(
-        err?.message || 'Unable to reset password for this ID. Try using OTP sign-in instead.'
-      );
+      setErrorMessage(err.message || 'Failed to update password. Please try again.');
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  /**
-   * Handle 6-digit OTP input change
-   */
-  const handleOtpDigitChange = (index: number, val: string) => {
-    const cleaned = val.replace(/[^0-9]/g, '');
-    
-    // Paste support (pasting 6 digits)
-    if (cleaned.length >= 6) {
-      const pasted = cleaned.slice(0, 6).split('');
-      setOtpDigits(pasted);
-      otpInputRefs.current[5]?.focus();
-      handleVerifyOtp(cleaned.slice(0, 6));
-      return;
-    }
-
-    const next = [...otpDigits];
-    next[index] = cleaned.slice(-1);
-    setOtpDigits(next);
-
-    // Auto-advance
-    if (cleaned && index < 5) {
-      otpInputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-submit if all 6 filled
-    if (next.every((d) => d.length === 1)) {
-      handleVerifyOtp(next.join(''));
-    }
-  };
-
-  /**
-   * Handle backspace in OTP input
-   */
-  const handleOtpKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Backspace' && !otpDigits[index] && index > 0) {
-      otpInputRefs.current[index - 1]?.focus();
+      setIsResettingPassword(false);
     }
   };
 
   return (
     <div className="w-full h-full flex flex-col bg-white overflow-hidden select-none relative">
-      {/* Top Header Bar */}
+      {/* 1. TOP HEADER */}
       <div className="p-4 px-5 border-b border-zinc-100 flex items-center justify-between bg-white shrink-0">
         <div className="flex items-center gap-2">
           <BeeGoVoltxLogo size="sm" />
           <div className="flex items-center gap-1.5 ml-1">
             <span className="text-[10px] font-mono font-black uppercase tracking-wider bg-[#FFF9E6] text-[#E6A800] border border-[#F5C518]/30 px-2 py-0.5 rounded-full">
-              Passenger Auth
+              Passenger
             </span>
           </div>
         </div>
@@ -415,441 +449,629 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
         )}
       </div>
 
-      {/* Scrollable Form Content */}
+      {/* 2. SCROLLABLE FORM CONTENT */}
       <div className="p-5 overflow-y-auto no-scrollbar flex-1 flex flex-col gap-4">
-          
-          {/* Welcome / Brand Banner */}
-          <div className="text-center pt-1 pb-1">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF9E6] text-[#E6A800] text-xs font-bold mb-2 border border-[#F5C518]/30">
-              <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-[#E6A800]" />
-              <span>BeeGo Voltx • Electric Rides Bangladesh</span>
-            </div>
-            <h2 className="text-xl font-black text-[#1A1A1A] tracking-tight">
-              {step === 'otp_verify'
-                ? 'Enter Verification Code'
-                : step === 'forgot_password'
-                ? 'Reset Password'
-                : 'Sign Up or Sign In'}
-            </h2>
-            <p className="text-xs text-zinc-500 mt-1 max-w-[320px] mx-auto leading-relaxed">
-              {step === 'otp_verify'
-                ? `Enter the 6-digit code sent to ${activeTargetLoginId}`
-                : step === 'forgot_password'
-                ? 'We will send reset instructions to your registered account'
-                : 'One seamless account for rides, battery swaps, and green commute'}
-            </p>
+        {/* Title */}
+        <div className="text-center pt-1 pb-1">
+          <h2 className="text-xl font-black text-[#1A1A1A] tracking-tight">
+            {activeTab === 'signup'
+              ? 'Create Passenger Account'
+              : activeTab === 'signin'
+              ? 'Sign in to BeeGo Voltx'
+              : 'Reset Your Password'}
+          </h2>
+          <p className="text-xs text-zinc-500 mt-1">
+            {activeTab === 'signup'
+              ? 'Register with your name, verified email, and phone number'
+              : activeTab === 'signin'
+              ? 'Enter your verified Gmail to receive a one-time login code'
+              : 'Verify your Gmail to set a new account password'}
+          </p>
+        </div>
+
+        {/* 3. TAB SWITCHER (Shown on Sign Up & Sign In) */}
+        {activeTab !== 'forgot' && (
+          <div className="p-1 rounded-2xl bg-zinc-100 flex items-center gap-1 border border-zinc-200/80">
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('signup');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'signup'
+                  ? 'bg-white text-black shadow-xs font-black'
+                  : 'text-zinc-500 hover:text-black font-bold'
+              }`}
+            >
+              <span>Sign Up</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('signin');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className={`flex-1 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                activeTab === 'signin'
+                  ? 'bg-white text-black shadow-xs font-black'
+                  : 'text-zinc-500 hover:text-black font-bold'
+              }`}
+            >
+              <span>Sign In</span>
+            </button>
           </div>
+        )}
 
-          {/* Feedback Messages */}
-          {errorMessage && (
-            <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2 animate-in fade-in">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
-              <div className="flex-1 leading-relaxed">{errorMessage}</div>
-            </div>
-          )}
+        {/* Alerts */}
+        {errorMessage && (
+          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
+            <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+            <div className="flex-1 leading-relaxed">{errorMessage}</div>
+          </div>
+        )}
 
-          {successMessage && (
-            <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2 animate-in fade-in">
-              <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
-              <div className="flex-1 leading-relaxed">{successMessage}</div>
-            </div>
-          )}
+        {successMessage && (
+          <div className="p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-start gap-2 animate-in fade-in">
+            <CheckCircle2 className="w-4 h-4 shrink-0 mt-0.5 text-emerald-600" />
+            <div className="flex-1 leading-relaxed">{successMessage}</div>
+          </div>
+        )}
 
-          {/* STEP 1: INPUT & METHOD SELECTION */}
-          {step === 'input' && (
-            <div className="flex flex-col gap-4">
-              
-              {/* Method Switcher Tabs: Email OTP | Phone OTP | Descope Flow */}
-              <div className="p-1 rounded-2xl bg-zinc-100 flex items-center gap-1 border border-zinc-200/80">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('email_otp');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    activeTab === 'email_otp'
-                      ? 'bg-white text-black shadow-xs font-black'
-                      : 'text-zinc-500 hover:text-black'
-                  }`}
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Email OTP</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('phone_otp');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    activeTab === 'phone_otp'
-                      ? 'bg-white text-black shadow-xs font-black'
-                      : 'text-zinc-500 hover:text-black'
-                  }`}
-                >
-                  <Phone className="w-3.5 h-3.5" />
-                  <span>Phone OTP</span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    setActiveTab('descope_flow');
-                    setErrorMessage(null);
-                  }}
-                  className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    activeTab === 'descope_flow'
-                      ? 'bg-[#F5C518] text-black shadow-xs font-black'
-                      : 'text-zinc-500 hover:text-black'
-                  }`}
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Descope Flow</span>
-                </button>
+        {/* ========================================================= */}
+        {/* OPTION A: SIGN UP FORM                                     */}
+        {/* ========================================================= */}
+        {activeTab === 'signup' && (
+          <form onSubmit={handleCompleteSignup} className="flex flex-col gap-3.5">
+            {/* 1. Full Name */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                <span>Full Name <span className="text-rose-500">*</span></span>
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 text-zinc-400">
+                  <User className="w-4 h-4" />
+                </div>
+                <input
+                  type="text"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  placeholder="e.g. Tanvir Hasan"
+                  required
+                  className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
+                />
               </div>
+            </div>
 
-              {/* TAB 1 & 2: NATIVE MOBILE-FIRST FORM */}
-              {activeTab !== 'descope_flow' ? (
-                <form
-                  onSubmit={activeTab === 'email_otp' ? handleSendEmailOtp : handleSendPhoneOtp}
-                  className="flex flex-col gap-3.5"
-                >
-                  {/* Full Name input (Requirement 3: Registration collects Full Name, Email, Phone) */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
-                      <span>Full Name</span>
-                      <span className="text-[10px] text-zinc-400 font-normal">Required for new riders</span>
-                    </label>
-                    <div className="relative flex items-center">
-                      <div className="absolute left-3 text-zinc-400">
-                        <User className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="e.g. Tanvir Hasan"
-                        className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
-                      />
-                    </div>
+            {/* 2. Email Address with attached Send OTP Button */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                <span>Email Address (@gmail.com) <span className="text-rose-500">*</span></span>
+                {signupEmailVerified ? (
+                  <span className="text-[10px] font-bold text-emerald-600 flex items-center gap-1">
+                    <Check className="w-3 h-3 stroke-[3]" /> Verified
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-amber-600 font-bold">Verification required</span>
+                )}
+              </label>
+
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1 flex items-center">
+                  <div className="absolute left-3 text-zinc-400">
+                    <Mail className="w-4 h-4" />
                   </div>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (signupEmailVerified) setSignupEmailVerified(false);
+                    }}
+                    placeholder="name@gmail.com"
+                    required
+                    disabled={signupEmailVerified}
+                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors disabled:opacity-75 disabled:bg-emerald-50/50"
+                  />
+                </div>
 
-                  {/* Email Input */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
-                      <span>Email Address {activeTab === 'email_otp' && <span className="text-rose-500">*</span>}</span>
-                      {activeTab === 'email_otp' ? (
-                        <span className="text-[10px] text-amber-600 font-bold">OTP will be sent here</span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-400 font-normal">Optional</span>
-                      )}
-                    </label>
-                    <div className="relative flex items-center">
-                      <div className="absolute left-3 text-zinc-400">
-                        <Mail className="w-4 h-4" />
-                      </div>
-                      <input
-                        type="email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        placeholder="name@gmail.com"
-                        required={activeTab === 'email_otp'}
-                        className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Phone Number Input */}
-                  <div className="flex flex-col gap-1">
-                    <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
-                      <span>Phone Number {activeTab === 'phone_otp' && <span className="text-rose-500">*</span>}</span>
-                      {activeTab === 'phone_otp' ? (
-                        <span className="text-[10px] text-amber-600 font-bold">SMS OTP will be sent here</span>
-                      ) : (
-                        <span className="text-[10px] text-zinc-400 font-normal">Required for driver contact</span>
-                      )}
-                    </label>
-                    <div className="relative flex items-center">
-                      <div className="absolute left-3 flex items-center gap-1 text-zinc-500 font-mono text-xs font-bold">
-                        <span>🇧🇩</span>
-                        <span>+880</span>
-                      </div>
-                      <input
-                        type="tel"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        placeholder="1712345678"
-                        required={activeTab === 'phone_otp'}
-                        className="w-full pl-20 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-mono font-medium text-black transition-colors"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Submit / Continue Button */}
-                  <button
-                    type="submit"
-                    disabled={isLoading}
-                    className="w-full mt-1 py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                        <span>Sending Secure OTP...</span>
-                      </>
-                    ) : (
-                      <>
-                        <span>Continue with {activeTab === 'email_otp' ? 'Email OTP' : 'Phone SMS'}</span>
-                        <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                      </>
-                    )}
-                  </button>
-
-                  {/* Social Login Divider */}
-                  <div className="flex items-center my-1">
-                    <div className="flex-1 border-t border-zinc-200" />
-                    <span className="px-3 text-[10px] font-bold text-zinc-400 uppercase tracking-wider">
-                      Or continue with
-                    </span>
-                    <div className="flex-1 border-t border-zinc-200" />
-                  </div>
-
-                  {/* Social Login: Google (Requirement 2) */}
+                {!signupEmailVerified && (
                   <button
                     type="button"
-                    onClick={handleGoogleLogin}
-                    disabled={isLoading}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-zinc-50 active:scale-[0.98] border border-zinc-200/90 text-zinc-800 font-bold text-xs transition-all cursor-pointer flex items-center justify-center gap-2 shadow-2xs"
+                    onClick={handleSendSignupOtp}
+                    disabled={isSendingSignupOtp || !email.trim().endsWith('@gmail.com')}
+                    className="shrink-0 px-3.5 py-2.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs"
                   >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                      />
-                      <path
-                        fill="#34A853"
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                      />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                      />
-                    </svg>
-                    <span>Continue with Google</span>
+                    {isSendingSignupOtp ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <span>{signupOtpSent ? 'Resend' : 'Send OTP'}</span>
+                    )}
                   </button>
-
-                  {/* Forgot Password Link (Requirement 4) */}
-                  <div className="text-center pt-1">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep('forgot_password');
-                        setForgotLoginId(email || phoneNumber || '');
-                        setErrorMessage(null);
-                        setSuccessMessage(null);
-                      }}
-                      className="text-xs font-bold text-zinc-500 hover:text-black transition-colors cursor-pointer"
-                    >
-                      Forgot password or need help?
-                    </button>
-                  </div>
-                </form>
-              ) : (
-                /* TAB 3: OFFICIAL DESCOPE FLOW COMPONENT (Requirement 1 & 7) */
-                <div className="flex flex-col gap-3 py-1">
-                  <div className="p-3 rounded-2xl bg-amber-50/70 border border-[#F5C518]/40 text-zinc-800 text-[11px] flex items-center gap-2">
-                    <Sparkles className="w-4 h-4 text-[#E6A800] shrink-0" />
-                    <span>Official Descope sign-up-or-in cloud flow for BeeGo Voltx</span>
-                  </div>
-
-                  <div className="min-h-[320px] rounded-2xl border border-zinc-200 bg-white p-2 overflow-hidden flex items-center justify-center">
-                    <Descope
-                      flowId="sign-up-or-in"
-                      theme="light"
-                      onSuccess={(e: any) => {
-                        const jwtDetail = e.detail;
-                        const profile = extractDescopeProfile(jwtDetail?.user || jwtDetail, {
-                          name: fullName,
-                          email,
-                          phone: phoneNumber,
-                          method: 'flow',
-                        });
-                        handleSuccessfulLogin(profile);
-                      }}
-                      onError={(err: any) => {
-                        console.error('[Descope Flow Error]', err);
-                        setErrorMessage(
-                          err?.detail?.errorMessage || 'Descope flow encountered an issue. Try the Email OTP tab.'
-                        );
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
-          )}
 
-          {/* STEP 2: OTP VERIFICATION */}
-          {step === 'otp_verify' && (
-            <div className="flex flex-col gap-4 py-2 animate-in fade-in slide-in-from-right-4 duration-200">
-              
-              {/* Back to Edit Button */}
-              <button
-                type="button"
-                onClick={() => setStep('input')}
-                className="self-start text-xs font-bold text-zinc-500 hover:text-black flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Change {activeTab === 'phone_otp' ? 'Phone' : 'Email'}</span>
-              </button>
+            {/* INLINE OTP SECTION: Opens downside of email address section after sending OTP */}
+            {signupOtpSent && !signupEmailVerified && (
+              <div className="p-3.5 rounded-2xl bg-amber-50/70 border border-amber-200/80 flex flex-col gap-2.5 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-black text-amber-950">Enter 6-Digit Email Code:</span>
+                  <span className="text-[10px] text-amber-700 font-mono">Sent to {email}</span>
+                </div>
 
-              {/* 6 Digit Input Boxes */}
-              <div className="flex items-center justify-between gap-1.5 my-2">
-                {otpDigits.map((digit, index) => (
+                <div className="flex items-center gap-2">
                   <input
-                    key={index}
-                    ref={(el) => {
-                      otpInputRefs.current[index] = el;
-                    }}
                     type="text"
                     inputMode="numeric"
-                    pattern="[0-9]*"
-                    maxLength={1}
-                    value={digit}
-                    onChange={(e) => handleOtpDigitChange(index, e.target.value)}
-                    onKeyDown={(e) => handleOtpKeyDown(index, e)}
-                    className="w-12 h-14 text-center text-xl font-mono font-black rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
+                    maxLength={6}
+                    value={signupOtpCode}
+                    onChange={(e) => setSignupOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="123456"
+                    className="w-36 py-2 px-3 text-center text-base tracking-widest font-mono font-black rounded-xl bg-white border border-amber-300 focus:border-[#F5C518] focus:outline-none text-black"
                   />
-                ))}
-              </div>
 
-              {/* Verify Button */}
+                  <button
+                    type="button"
+                    onClick={() => handleVerifySignupOtp()}
+                    disabled={isVerifyingSignupOtp || signupOtpCode.length < 6}
+                    className="flex-1 py-2 px-3 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all cursor-pointer disabled:opacity-50 active:scale-95 shadow-2xs flex items-center justify-center gap-1"
+                  >
+                    {isVerifyingSignupOtp ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <span>Verify Code</span>
+                    )}
+                  </button>
+                </div>
+
+                {/* Instant One-Tap Auto-Verify Option */}
+                {signupActiveDevOtp && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSignupOtpCode(signupActiveDevOtp);
+                      handleVerifySignupOtp(signupActiveDevOtp);
+                    }}
+                    className="w-full py-1.5 px-2.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
+                  >
+                    <Zap className="w-3 h-3 fill-amber-500 text-amber-900" />
+                    <span>Auto-Verify Code (Instant Test Access)</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* 3. Phone Number (Required for Driver Contact) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700 flex items-center justify-between">
+                <span>Phone Number <span className="text-rose-500">*</span></span>
+                <span className="text-[10px] text-zinc-400 font-medium">Captain will call this number</span>
+              </label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 flex items-center gap-1 text-zinc-500 font-mono text-xs font-bold">
+                  <span>🇧🇩</span>
+                  <span>+880</span>
+                </div>
+                <input
+                  type="tel"
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  placeholder="1712345678"
+                  required
+                  className="w-full pl-20 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-mono font-medium text-black transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* 4. Complete Registration Button */}
+            <button
+              type="submit"
+              disabled={isLoading || !signupEmailVerified}
+              className="w-full mt-2 py-3.5 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {isLoading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                  <span>Creating Account...</span>
+                </>
+              ) : (
+                <>
+                  <span>Complete Sign Up & Enter BeeGo</span>
+                  <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                </>
+              )}
+            </button>
+          </form>
+        )}
+
+        {/* ========================================================= */}
+        {/* OPTION B: SIGN IN FORM                                     */}
+        {/* ========================================================= */}
+        {activeTab === 'signin' && (
+          <div className="flex flex-col gap-3.5">
+            {/* 1. Email Input */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs font-bold text-zinc-700">Registered Gmail Address</label>
+              <div className="relative flex items-center">
+                <div className="absolute left-3 text-zinc-400">
+                  <Mail className="w-4 h-4" />
+                </div>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="name@gmail.com"
+                  required
+                  disabled={signinOtpSent}
+                  className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors disabled:opacity-75"
+                />
+              </div>
+            </div>
+
+            {/* Forgot Password Link Button */}
+            <div className="flex items-center justify-end -mt-1">
               <button
                 type="button"
-                onClick={() => handleVerifyOtp()}
-                disabled={isLoading || otpDigits.some((d) => !d)}
-                className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                onClick={() => {
+                  setForgotEmail(email);
+                  setForgotStep('request');
+                  setErrorMessage(null);
+                  setSuccessMessage(null);
+                  setActiveTab('forgot');
+                }}
+                className="text-xs font-bold text-[#E6A800] hover:text-black transition-colors cursor-pointer"
               >
-                {isLoading ? (
+                Forgot Password?
+              </button>
+            </div>
+
+            {/* 2. Request OTP Button (if not yet sent) */}
+            {!signinOtpSent ? (
+              <button
+                type="button"
+                onClick={() => handleSendSigninOtp()}
+                disabled={isSendingSigninOtp || !email.trim().endsWith('@gmail.com')}
+                className="w-full mt-1 py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isSendingSigninOtp ? (
                   <>
                     <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                    <span>Verifying Code...</span>
+                    <span>Requesting Code...</span>
                   </>
                 ) : (
                   <>
-                    <span>Verify & Continue to BeeGo</span>
+                    <span>Request Verification OTP</span>
                     <ArrowRight className="w-4 h-4 stroke-[2.5]" />
                   </>
                 )}
               </button>
+            ) : (
+              /* 3. OTP verification boxes for Sign In */
+              <div className="flex flex-col gap-3 pt-1 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-zinc-700">Enter 6-Digit Code</span>
+                  <button
+                    type="button"
+                    onClick={() => setSigninOtpSent(false)}
+                    className="text-[#E6A800] hover:text-black font-bold cursor-pointer"
+                  >
+                    Change Email
+                  </button>
+                </div>
 
-              {/* Instant One-Tap Auto-Verify Option (Ensures user can work immediately without carrier delay) */}
-              {activeSessionOtp && (
-                <div className="pt-0.5">
+                <div className="flex items-center justify-between gap-1.5 my-1">
+                  {signinOtpDigits.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => {
+                        signinOtpRefs.current[index] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => handleDigitKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-xl font-mono font-black rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleVerifySigninOtp()}
+                  disabled={isVerifyingSigninOtp || signinOtpDigits.some((d) => !d)}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isVerifyingSigninOtp ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Verify & Enter Dashboard</span>
+                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+
+                {/* Instant Auto-Verify Option */}
+                {signinActiveDevOtp && (
                   <button
                     type="button"
                     onClick={() => {
-                      const digits = activeSessionOtp.split('').slice(0, 6);
-                      setOtpDigits(digits);
-                      handleVerifyOtp(activeSessionOtp);
+                      const digits = signinActiveDevOtp.split('').slice(0, 6);
+                      setSigninOtpDigits(digits);
+                      handleVerifySigninOtp(signinActiveDevOtp);
                     }}
                     className="w-full py-2.5 px-3 rounded-2xl bg-[#FFF9E6] hover:bg-[#F5C518] text-zinc-900 border border-[#F5C518]/50 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98]"
                   >
                     <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-black" />
                     <span>One-Tap Auto-Verify (Instant Test Access)</span>
                   </button>
-                  <p className="text-[10px] text-zinc-400 text-center mt-1">
-                    Direct access while external SMS/Email carrier gateways are in setup
-                  </p>
-                </div>
-              )}
+                )}
 
-              {/* Resend OTP */}
-              <div className="text-center text-xs pt-1">
-                {resendCooldown > 0 ? (
-                  <span className="text-zinc-400 font-mono">
-                    Resend code in {resendCooldown}s
-                  </span>
-                ) : (
+                {/* Resend Cooldown */}
+                <div className="text-center text-xs pt-1">
+                  {signinCooldown > 0 ? (
+                    <span className="text-zinc-400 font-mono">
+                      Resend code in {signinCooldown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendSigninOtp()}
+                      className="font-bold text-[#E6A800] hover:text-black transition-colors cursor-pointer"
+                    >
+                      Didn't receive code? Resend OTP
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ========================================================= */}
+        {/* OPTION C: FORGOT PASSWORD FLOW                             */}
+        {/* ========================================================= */}
+        {activeTab === 'forgot' && (
+          <div className="flex flex-col gap-3.5 animate-in fade-in duration-200">
+            {/* Back button to return to Sign In */}
+            <button
+              type="button"
+              onClick={() => {
+                setActiveTab('signin');
+                setErrorMessage(null);
+                setSuccessMessage(null);
+              }}
+              className="self-start text-xs font-bold text-zinc-500 hover:text-black flex items-center gap-1.5 cursor-pointer transition-colors"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Back to Sign In</span>
+            </button>
+
+            {/* STEP 1: Enter Email & Request Reset Code */}
+            {forgotStep === 'request' && (
+              <form onSubmit={handleSendForgotOtp} className="flex flex-col gap-3.5">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-zinc-700">
+                    Registered Gmail Address
+                  </label>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3 text-zinc-400">
+                      <Mail className="w-4 h-4" />
+                    </div>
+                    <input
+                      type="email"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      placeholder="name@gmail.com"
+                      required
+                      className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
+                    />
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSendingForgotOtp || !forgotEmail.trim().endsWith('@gmail.com')}
+                  className="w-full mt-1 py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSendingForgotOtp ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                      <span>Sending Verification Code...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Send 6-Digit Reset Code</span>
+                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
+
+            {/* STEP 2: Enter & Verify 6-digit Code */}
+            {forgotStep === 'verify' && (
+              <div className="flex flex-col gap-3.5 animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-bold text-zinc-700">Enter 6-Digit Code</span>
+                  <button
+                    type="button"
+                    onClick={() => setForgotStep('request')}
+                    className="text-[#E6A800] hover:text-black font-bold cursor-pointer"
+                  >
+                    Change Email
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between gap-1.5 my-1">
+                  {forgotOtpDigits.map((digit, index) => (
+                    <input
+                      key={index}
+                      ref={(el) => {
+                        forgotOtpRefs.current[index] = el;
+                      }}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      maxLength={1}
+                      value={digit}
+                      onChange={(e) => handleForgotDigitChange(index, e.target.value)}
+                      onKeyDown={(e) => handleForgotDigitKeyDown(index, e)}
+                      className="w-12 h-14 text-center text-xl font-mono font-black rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
+                    />
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleVerifyForgotOtp()}
+                  disabled={isVerifyingForgotOtp || forgotOtpDigits.some((d) => !d)}
+                  className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isVerifyingForgotOtp ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                      <span>Verifying...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Verify Code & Continue</span>
+                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+
+                {/* Instant Auto-Verify Option */}
+                {forgotActiveDevOtp && (
                   <button
                     type="button"
                     onClick={() => {
-                      if (activeTab === 'phone_otp') {
-                        handleSendPhoneOtp();
-                      } else {
-                        handleSendEmailOtp();
-                      }
+                      const digits = forgotActiveDevOtp.split('').slice(0, 6);
+                      setForgotOtpDigits(digits);
+                      handleVerifyForgotOtp(forgotActiveDevOtp);
                     }}
-                    className="font-bold text-[#E6A800] hover:text-black transition-colors cursor-pointer"
+                    className="w-full py-2.5 px-3 rounded-2xl bg-[#FFF9E6] hover:bg-[#F5C518] text-zinc-900 border border-[#F5C518]/50 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98]"
                   >
-                    Didn't receive code? Resend OTP
+                    <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-black" />
+                    <span>One-Tap Auto-Verify (Instant Test Access)</span>
                   </button>
                 )}
-              </div>
-            </div>
-          )}
 
-          {/* STEP 3: FORGOT PASSWORD */}
-          {step === 'forgot_password' && (
-            <form onSubmit={handleForgotPassword} className="flex flex-col gap-3.5 py-2 animate-in fade-in duration-200">
-              <button
-                type="button"
-                onClick={() => setStep('input')}
-                className="self-start text-xs font-bold text-zinc-500 hover:text-black flex items-center gap-1 cursor-pointer transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Back to Login</span>
-              </button>
-
-              <div className="flex flex-col gap-1">
-                <label className="text-xs font-bold text-zinc-700">Registered Email or Phone Number</label>
-                <div className="relative flex items-center">
-                  <div className="absolute left-3 text-zinc-400">
-                    <Lock className="w-4 h-4" />
-                  </div>
-                  <input
-                    type="text"
-                    value={forgotLoginId}
-                    onChange={(e) => setForgotLoginId(e.target.value)}
-                    placeholder="e.g. name@gmail.com or 01712345678"
-                    required
-                    className="w-full pl-9 pr-3 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
-                  />
+                {/* Resend Cooldown */}
+                <div className="text-center text-xs pt-1">
+                  {forgotCooldown > 0 ? (
+                    <span className="text-zinc-400 font-mono">
+                      Resend code in {forgotCooldown}s
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleSendForgotOtp()}
+                      className="font-bold text-[#E6A800] hover:text-black transition-colors cursor-pointer"
+                    >
+                      Didn't receive code? Resend OTP
+                    </button>
+                  )}
                 </div>
               </div>
+            )}
 
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isLoading ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 animate-spin text-black" />
-                    <span>Sending Reset Link...</span>
-                  </>
-                ) : (
-                  <>
-                    <span>Send Reset Instructions</span>
-                    <ArrowRight className="w-4 h-4 stroke-[2.5]" />
-                  </>
-                )}
-              </button>
-            </form>
-          )}
+            {/* STEP 3: Enter New Password & Confirm Password */}
+            {forgotStep === 'new_password' && (
+              <form onSubmit={handleSaveNewPassword} className="flex flex-col gap-3.5 animate-in fade-in duration-200">
+                <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200 text-amber-900 text-xs flex items-center gap-2">
+                  <KeyRound className="w-4 h-4 text-[#E6A800] shrink-0" />
+                  <span>Verified for <strong>{forgotEmail}</strong>. Create your new password:</span>
+                </div>
 
-          {/* Footer Safety Badge */}
-          <div className="pt-3 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] text-zinc-400">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Encrypted with Descope Enterprise Auth • Dhaka, BD</span>
+                {/* New Password */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-zinc-700">New Password</label>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3 text-zinc-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="At least 6 characters"
+                      required
+                      className="w-full pl-9 pr-10 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                      className="absolute right-3 text-zinc-400 hover:text-black cursor-pointer"
+                    >
+                      {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Confirm Password */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-bold text-zinc-700">Confirm New Password</label>
+                  <div className="relative flex items-center">
+                    <div className="absolute left-3 text-zinc-400">
+                      <Lock className="w-4 h-4" />
+                    </div>
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="Re-type new password"
+                      required
+                      className="w-full pl-9 pr-10 py-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none text-xs font-medium text-black transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      className="absolute right-3 text-zinc-400 hover:text-black cursor-pointer"
+                    >
+                      {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isResettingPassword || !newPassword || !confirmPassword}
+                  className="w-full mt-1 py-3.5 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-xs transition-all shadow-md shadow-amber-500/20 cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isResettingPassword ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                      <span>Updating Password...</span>
+                    </>
+                  ) : (
+                    <>
+                      <span>Save Password & Return to Sign In</span>
+                      <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+                    </>
+                  )}
+                </button>
+              </form>
+            )}
           </div>
+        )}
 
+        {/* 4. FOOTER SAFETY BADGE */}
+        <div className="pt-3 mt-auto border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] text-zinc-400">
+          <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+          <span>Encrypted with Descope Cloud Auth • Dhaka, BD</span>
         </div>
+      </div>
     </div>
   );
 };
