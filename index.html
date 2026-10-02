@@ -16,6 +16,27 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <script>
+      // Immediately request real browser location permission as soon as the app starts opening
+      (function() {
+        if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+          navigator.geolocation.getCurrentPosition(
+            function(pos) {
+              window.__BEEGO_LIVE_GPS__ = {
+                lat: pos.coords.latitude,
+                lon: pos.coords.longitude,
+                accuracy: pos.coords.accuracy,
+                timestamp: Date.now()
+              };
+            },
+            function(err) {
+              window.__BEEGO_LIVE_GPS_ERR__ = err;
+            },
+            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+          );
+        }
+      })();
+    </script>
   </head>
   <body class="bg-zinc-100 text-zinc-900 antialiased selection:bg-amber-400 selection:text-black">
     <div id="root"></div>

@@ -8,6 +8,22 @@ export const BeegoIntroSplash: React.FC<BeegoIntroSplashProps> = ({ onComplete }
   const [isFadingOut, setIsFadingOut] = useState(false);
 
   useEffect(() => {
+    // Immediately prompt real browser location permission while splash opens
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          (window as any).__BEEGO_LIVE_GPS__ = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            timestamp: Date.now(),
+          };
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
+
     // Exactly 2-second clean intro duration, then transition to app
     const timer = setTimeout(() => {
       setIsFadingOut(true);
@@ -20,6 +36,20 @@ export const BeegoIntroSplash: React.FC<BeegoIntroSplashProps> = ({ onComplete }
   }, [onComplete]);
 
   const handleSkip = () => {
+    if (typeof window !== 'undefined' && 'geolocation' in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          (window as any).__BEEGO_LIVE_GPS__ = {
+            lat: pos.coords.latitude,
+            lon: pos.coords.longitude,
+            accuracy: pos.coords.accuracy,
+            timestamp: Date.now(),
+          };
+        },
+        () => {},
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      );
+    }
     setIsFadingOut(true);
     setTimeout(() => {
       onComplete();

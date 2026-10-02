@@ -69,6 +69,25 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
     };
   }
 
+  // Check if early real browser location prompt in index.html already acquired position
+  const earlyGps = (window as any).__BEEGO_LIVE_GPS__;
+  if (earlyGps && earlyGps.lat && earlyGps.lon) {
+    const lat = earlyGps.lat;
+    const lon = earlyGps.lon;
+    if (Math.abs(lat - 22.35) < 1.2) {
+      setPreferredCity('chattogram');
+    } else if (Math.abs(lat - 23.8) < 1.0) {
+      setPreferredCity('dhaka');
+    }
+    return {
+      lat,
+      lon,
+      accuracy: earlyGps.accuracy,
+      isRealGps: true,
+      isSimulatedBangladesh: false,
+    };
+  }
+
   const queryPosition = (options: PositionOptions): Promise<GeolocationPosition> => {
     return new Promise((resolve, reject) => {
       navigator.geolocation.getCurrentPosition(resolve, reject, options);
@@ -78,13 +97,12 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
   let position: GeolocationPosition | null = null;
   let lastError: GeolocationPositionError | null = null;
 
-  // 1. Try high-accuracy (Hardware GPS / precise Wi-Fi) with 15s timeout
-  // This allows the user ample time to tap "Allow" on the native browser permission prompt!
+  // 1. Try high-accuracy (Hardware GPS / precise Wi-Fi) with maximumAge: 0 to force fresh browser prompt
   try {
     position = await queryPosition({
       enableHighAccuracy: true,
       timeout: 15000,
-      maximumAge: 60000,
+      maximumAge: 0,
     });
   } catch (err: any) {
     lastError = err;
@@ -97,7 +115,7 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
       position = await queryPosition({
         enableHighAccuracy: false,
         timeout: 8000,
-        maximumAge: 300000,
+        maximumAge: 0,
       });
     } catch (err: any) {
       lastError = err;
