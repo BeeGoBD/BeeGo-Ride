@@ -118,23 +118,35 @@ export function clearPendingRegistration() {
 }
 
 /**
+ * Get locally stored passenger profile across localStorage and sessionStorage
+ */
+export function getStoredPassenger(): PassengerProfile | null {
+  try {
+    const raw =
+      localStorage.getItem('beego_active_passenger') ||
+      sessionStorage.getItem('beego_active_passenger') ||
+      localStorage.getItem('beego_descope_user');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed && (parsed.email || parsed.id)) {
+        return parsed as PassengerProfile;
+      }
+    }
+  } catch (e) {}
+  return null;
+}
+
+/**
  * Check currently logged in passenger session with multiple fallback layers:
- * 1. Active session storage cache
+ * 1. Active persistent local/session storage cache
  * 2. Dedicated server session verification (/api/auth/me)
  * 3. Appwrite SDK account session
  */
 export async function getCurrentPassenger(): Promise<PassengerProfile | null> {
   // Check active cached session profile first
-  try {
-    const stored = sessionStorage.getItem('beego_active_passenger');
-    if (stored) {
-      const parsed = JSON.parse(stored) as PassengerProfile;
-      if (parsed && parsed.email) {
-        return parsed;
-      }
-    }
-  } catch (e) {
-    // Continue
+  const cached = getStoredPassenger();
+  if (cached) {
+    return cached;
   }
 
   // Check server session via /api/auth/me
@@ -349,7 +361,10 @@ export async function verifyPassengerOtp(
 
     if (data.profile) {
       try {
+        localStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
         sessionStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
+        localStorage.setItem('beego_descope_user', JSON.stringify(data.profile));
+        localStorage.setItem('beego_user_role', 'passenger');
       } catch (e) {}
       return data.profile as PassengerProfile;
     }
@@ -404,7 +419,10 @@ export async function loginPassengerWithPassword(
 
     if (data.profile) {
       try {
+        localStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
         sessionStorage.setItem('beego_active_passenger', JSON.stringify(data.profile));
+        localStorage.setItem('beego_descope_user', JSON.stringify(data.profile));
+        localStorage.setItem('beego_user_role', 'passenger');
       } catch (e) {}
       return data.profile as PassengerProfile;
     }
@@ -554,7 +572,12 @@ export async function logoutPassenger(): Promise<void> {
 
   clearPendingRegistration();
   try {
+    localStorage.removeItem('beego_active_passenger');
     sessionStorage.removeItem('beego_active_passenger');
+    localStorage.removeItem('beego_descope_user');
+    sessionStorage.removeItem('beego_descope_user');
+    localStorage.removeItem('beego_session_token');
     sessionStorage.removeItem('beego_session_token');
+    localStorage.removeItem('beego_user_role');
   } catch (e) {}
 }

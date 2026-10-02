@@ -60,8 +60,10 @@ export function setCurrentDriver(driver: DriverProfile | null): void {
   try {
     if (driver) {
       localStorage.setItem(CURRENT_DRIVER_KEY, JSON.stringify(driver));
+      localStorage.setItem('beego_user_role', 'rider');
     } else {
       localStorage.removeItem(CURRENT_DRIVER_KEY);
+      localStorage.removeItem('beego_user_role');
     }
   } catch (e) {
     console.warn('Error setting current driver:', e);

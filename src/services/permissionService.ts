@@ -19,7 +19,7 @@ export interface AppPermissionStatus {
   microphone: PermissionState;
 }
 
-const PERMISSIONS_INITIALIZED_KEY = 'beego_permissions_requested_v1';
+const PERMISSIONS_INITIALIZED_KEY = 'beego_permissions_requested_v2';
 
 export function hasRequestedInitialPermissions(): boolean {
   if (typeof window === 'undefined') return true;

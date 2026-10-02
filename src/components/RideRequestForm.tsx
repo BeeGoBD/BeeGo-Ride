@@ -29,7 +29,7 @@ import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { RATE_PER_KM_TAKA, updatePassengerLiveLocation } from '../services/rideSync';
 import { searchBangladeshDistricts, isLocationInBangladesh } from '../data/bangladeshDistricts';
-import { requestLiveCoordinates, watchLiveCoordinates, getPreferredCity, setPreferredCity } from '../services/geolocation';
+import { requestLiveCoordinates, watchLiveCoordinates, getPreferredCity, setPreferredCity, getDefaultSpot } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import {
@@ -119,25 +119,37 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   useEffect(() => {
     let isMounted = true;
 
+    // 1. Instantly select pickup by location upon entering booking, then refine with live GPS
+    if (!pickup) {
+      const defaultSpot = getDefaultSpot();
+      const initialPoint: LocationPoint = {
+        lat: defaultSpot.lat,
+        lon: defaultSpot.lon,
+        name: defaultSpot.name,
+        formatted: defaultSpot.formatted,
+        addressLine1: defaultSpot.name,
+        resultType: 'street',
+      };
+      setPickup(initialPoint);
+      setPickupInput(defaultSpot.formatted);
+      setIsPickupLiveGps(false);
+    }
+
     const autoDetectGps = async () => {
       setIsLocating(true);
       try {
         const res = await requestLiveCoordinates();
         if (!isMounted) return;
         
-        // Only auto-populate pickup if authentic live hardware/device GPS is confirmed in Bangladesh
-        if (res.isRealGps) {
-          setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
-          updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
+        setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
+        updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
 
-          if (!pickup) {
-            const point = await reverseGeocode(res.lat, res.lon, activeKey);
-            if (!isMounted) return;
-            setPickup(point);
-            setPickupInput(point.formatted);
-            setIsPickupLiveGps(true);
-          }
-        }
+        // Update pickup to real live location
+        const point = await reverseGeocode(res.lat, res.lon, activeKey);
+        if (!isMounted) return;
+        setPickup(point);
+        setPickupInput(point.formatted);
+        setIsPickupLiveGps(res.isRealGps);
       } catch (err) {
         console.warn('Auto GPS notice:', err);
       } finally {
@@ -767,16 +779,21 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     id="pickup-input"
                     type="text"
                     value={pickupInput}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
                     onChange={(e) => handlePickupChange(e.target.value)}
                     onFocus={() => {
                       setIsPickupFocused(true);
-                      if (pickupInput && pickupSuggestions.length === 0 && !pickup) {
-                        handlePickupChange(pickupInput);
+                      if (pickupSuggestions.length === 0) {
+                        const query = pickupInput.trim() || getDefaultSpot().name;
+                        const instant = searchBangladeshDistricts(query, 6);
+                        if (instant.length > 0) {
+                          setPickupSuggestions(instant);
+                        }
                       }
                     }}
                     placeholder="Enter pickup location (e.g. GEC Circle, Chittagong)..."
                     autoComplete="off"
-                    className="w-full pl-3 pr-20 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+                    className="w-full pl-3 pr-20 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none cursor-text"
                   />
 
                   {/* Right controls: GPS status badge / toggle or Clear */}
@@ -817,15 +834,36 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 </div>
 
                 {/* Autocomplete Suggestions Dropdown for Pickup */}
-                {isPickupFocused && pickupSuggestions.length > 0 && !pickup && (
+                {isPickupFocused && (
                   <div className="absolute z-50 left-0 right-0 mt-2 bg-white/98 backdrop-blur-xl border border-zinc-200/90 rounded-2xl shadow-[0_20px_48px_rgba(0,0,0,0.18)] overflow-hidden max-h-56 overflow-y-auto no-scrollbar animate-in fade-in zoom-in-95 duration-150">
                     <div className="px-3.5 py-1.5 bg-gradient-to-r from-zinc-50 to-amber-50/40 border-b border-zinc-100 text-[10px] uppercase font-mono font-bold text-zinc-500 flex items-center justify-between">
                       <span className="text-[#E6A800] flex items-center gap-1">
                         <MapPin className="w-3 h-3" />
-                        Suggested Pickups
+                        Pickup Options
                       </span>
-                      <span>Bangladesh</span>
+                      <span className="text-zinc-400 font-sans normal-case text-[10px]">Tap to change</span>
                     </div>
+
+                    {/* Quick Action: Use Live GPS */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleResetToLiveGpsPickup();
+                        setIsPickupFocused(false);
+                      }}
+                      className="w-full text-left px-3.5 py-2 hover:bg-emerald-50/70 border-b border-zinc-100 transition-colors flex items-center gap-2.5 cursor-pointer bg-white group"
+                    >
+                      <LocateFixed className="w-4 h-4 text-emerald-600 group-hover:scale-110 transition-transform shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-black text-emerald-800">
+                          Use Current GPS Location
+                        </div>
+                        <div className="text-[10px] text-emerald-600 truncate mt-0.2">
+                          Detect live coordinates instantly
+                        </div>
+                      </div>
+                    </button>
+
                     {pickupSuggestions.map((item, idx) => (
                       <button
                         key={`pickup-sug-${item.placeId || idx}`}
@@ -858,6 +896,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     id="dropoff-input"
                     type="text"
                     value={dropoffInput}
+                    onClick={(e) => (e.target as HTMLInputElement).select()}
                     onChange={(e) => handleDropoffChange(e.target.value)}
                     onFocus={() => {
                       setIsDropoffFocused(true);
@@ -867,7 +906,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                     }}
                     placeholder="Where to? (e.g. Agrabad, Patenga Beach, Airport)..."
                     autoComplete="off"
-                    className="w-full pl-3 pr-12 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
+                    className="w-full pl-3 pr-12 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none cursor-text"
                   />
 
                   <div className="absolute right-2 flex items-center gap-1">

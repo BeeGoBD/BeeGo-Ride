@@ -94,6 +94,7 @@ export function saveStoredDescopeUser(user: DescopeUserProfile): void {
   try {
     const serialized = JSON.stringify(user);
     localStorage.setItem(STORAGE_KEY, serialized);
+    localStorage.setItem(ACTIVE_PASSENGER_KEY, serialized);
     sessionStorage.setItem(STORAGE_KEY, serialized);
     sessionStorage.setItem(ACTIVE_PASSENGER_KEY, serialized);
     localStorage.setItem('beego_user_role', 'passenger');
@@ -108,6 +109,7 @@ export function saveStoredDescopeUser(user: DescopeUserProfile): void {
 export function clearStoredDescopeUser(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(ACTIVE_PASSENGER_KEY);
     sessionStorage.removeItem(STORAGE_KEY);
     sessionStorage.removeItem(ACTIVE_PASSENGER_KEY);
     sessionStorage.removeItem('beego_session_token');

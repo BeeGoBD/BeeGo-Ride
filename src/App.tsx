@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { LocationPoint, RouteData, RideStage, UserRole, RideRequest } from './types';
-import { getGeoapifyApiKey, saveGeoapifyApiKey, calculateRoute } from './services/geoapify';
+import { getGeoapifyApiKey, saveGeoapifyApiKey, calculateRoute, reverseGeocode } from './services/geoapify';
 import {
   subscribeToRideUpdates,
   requestNewRide,
@@ -9,7 +9,7 @@ import {
   generatePassengerId,
   generateRiderId,
 } from './services/rideSync';
-import { requestLiveCoordinates } from './services/geolocation';
+import { requestLiveCoordinates, getDefaultSpot } from './services/geolocation';
 import { BeegoIntroSplash } from './components/BeegoIntroSplash';
 import { BeegoOnboarding } from './components/BeegoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
@@ -26,10 +26,11 @@ import { hasRequestedInitialPermissions } from './services/permissionService';
 import { getAdminToken, logoutAdmin } from './services/adminService';
 import {
   getCurrentPassenger,
+  getStoredPassenger,
   logoutPassenger,
   PassengerProfile,
 } from './services/passengerAuth';
-import { getCurrentDriver, DriverProfile } from './services/driverAuth';
+import { getCurrentDriver, getStoredDrivers, setCurrentDriver, DriverProfile } from './services/driverAuth';
 import {
   getStoredDescopeUser,
   extractDescopeProfile,
@@ -41,38 +42,69 @@ import './lib/appwrite';
 type AppIntroState = 'splash' | 'onboarding' | 'ready';
 
 export default function App() {
-  // Intro splash: 2-second clean B logo & BeeGo text intro, then immediately starts the app
-  const [introState, setIntroState] = useState<AppIntroState>('splash');
-
-  // STRICT NO-GUEST POLICY:
-  // A customer must choose between passenger and driver every time they visit unless already authenticated.
-  // Refreshing without an active logged-in profile will show the role selection screen, never auto-entering the dashboard.
+  // PERSISTENT LOGIN SESSION:
+  // Once logged in (as passenger, driver, or admin), refreshing the app keeps the user logged in
+  // until they explicitly log out by themselves!
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
-      const paramRole = params.get('role');
-      const storedRole = localStorage.getItem('beego_user_role');
-      const candidateRole =
-        paramRole === 'passenger' || paramRole === 'rider' || paramRole === 'admin'
-          ? (paramRole as UserRole)
-          : storedRole === 'passenger' || storedRole === 'rider' || storedRole === 'admin'
-          ? (storedRole as UserRole)
-          : null;
+      const paramRole = params.get('role') as UserRole | null;
+      const storedRole = localStorage.getItem('beego_user_role') as UserRole | null;
 
-      // Only allow entry if genuinely authenticated with a verified user profile
-      if (candidateRole === 'passenger') {
-        const storedPassenger = getStoredDescopeUser();
-        if (storedPassenger) return 'passenger';
-      } else if (candidateRole === 'rider') {
-        const activeDriver = getCurrentDriver();
-        if (activeDriver && activeDriver.verificationStatus !== 'rejected') return 'rider';
-      } else if (candidateRole === 'admin') {
-        const adminTok = getAdminToken();
-        if (adminTok) return 'admin';
+      // 1. Explicitly stored role has top priority to prevent refreshing from kicking users out
+      if (storedRole === 'rider') {
+        return 'rider';
+      }
+      if (storedRole === 'passenger') {
+        return 'passenger';
+      }
+      if (storedRole === 'admin') {
+        return 'admin';
+      }
+
+      // 2. URL search param fallback
+      if (paramRole === 'rider' || paramRole === 'passenger' || paramRole === 'admin') {
+        localStorage.setItem('beego_user_role', paramRole);
+        return paramRole;
+      }
+
+      // 3. Check existing persistent sessions
+      const activeDriver = getCurrentDriver();
+      if (activeDriver) {
+        localStorage.setItem('beego_user_role', 'rider');
+        return 'rider';
+      }
+
+      const storedPassenger = getStoredDescopeUser() || getStoredPassenger();
+      if (storedPassenger) {
+        localStorage.setItem('beego_user_role', 'passenger');
+        return 'passenger';
+      }
+
+      const adminTok = getAdminToken();
+      if (adminTok) {
+        localStorage.setItem('beego_user_role', 'admin');
+        return 'admin';
       }
     }
-    // No guest access - always show role selection first!
     return null;
+  });
+
+  // Skip splash on refresh if user is already authenticated or returning
+  const [introState, setIntroState] = useState<AppIntroState>(() => {
+    if (typeof window !== 'undefined') {
+      const isAlreadyLoggedIn =
+        localStorage.getItem('beego_user_role') !== null ||
+        !!getCurrentDriver() ||
+        !!getStoredDescopeUser() ||
+        !!getStoredPassenger() ||
+        !!getAdminToken() ||
+        localStorage.getItem('beego_intro_completed') === 'true' ||
+        sessionStorage.getItem('beego_intro_completed') === 'true';
+
+      if (isAlreadyLoggedIn) return 'ready';
+    }
+    return 'splash';
   });
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
@@ -105,7 +137,27 @@ export default function App() {
     return generateRiderId();
   });
 
-  const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(() => getStoredDescopeUser());
+  const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      const stored = getStoredDescopeUser() || getStoredPassenger();
+      if (stored) return stored;
+      if (localStorage.getItem('beego_user_role') === 'passenger') {
+        const fallbackProfile: PassengerProfile = {
+          id: 'pax_' + Math.random().toString(36).slice(2, 9),
+          name: 'BeeGo Passenger',
+          email: '',
+          role: 'passenger',
+          isEmailVerified: true,
+        };
+        try {
+          localStorage.setItem('beego_active_passenger', JSON.stringify(fallbackProfile));
+          localStorage.setItem('beego_descope_user', JSON.stringify(fallbackProfile));
+        } catch (e) {}
+        return fallbackProfile;
+      }
+    }
+    return null;
+  });
   const [passengerAuthModalMode, setPassengerAuthModalMode] = useState<'signup' | 'login' | null>(null);
 
   // Descope React SDK Hooks
@@ -130,7 +182,7 @@ export default function App() {
       const profile = extractDescopeProfile(descopeUser);
       setPassengerProfile(profile);
     } else {
-      const stored = getStoredDescopeUser();
+      const stored = getStoredDescopeUser() || getStoredPassenger();
       if (stored) {
         setPassengerProfile(stored);
       }
@@ -138,7 +190,21 @@ export default function App() {
   }, [descopeUser, isAuthenticated]);
 
   // Driver profile & auth modal state
-  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => getCurrentDriver());
+  const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => {
+    if (typeof window !== 'undefined') {
+      const driver = getCurrentDriver();
+      if (driver) return driver;
+      if (localStorage.getItem('beego_user_role') === 'rider') {
+        const registry = getStoredDrivers();
+        if (registry && registry.length > 0) {
+          const lastDriver = registry[0];
+          setCurrentDriver(lastDriver);
+          return lastDriver;
+        }
+      }
+    }
+    return null;
+  });
   const [driverAuthModalMode, setDriverAuthModalMode] = useState<'register' | 'login' | null>(null);
 
   // Check for existing active passenger session fallback
@@ -156,7 +222,30 @@ export default function App() {
 
   const [stage, setStage] = useState<RideStage>('request');
   const [apiKey, setApiKey] = useState<string>(() => getGeoapifyApiKey());
-  const [pickup, setPickup] = useState<LocationPoint | null>(null);
+  
+  // Instantly auto-selected pickup location from live location or cached spot
+  const [pickup, setPickup] = useState<LocationPoint | null>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const cached = localStorage.getItem('beego_cached_pickup_spot');
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          if (parsed && parsed.lat && parsed.lon) return parsed;
+        }
+      } catch {}
+      const defaultSpot = getDefaultSpot();
+      return {
+        lat: defaultSpot.lat,
+        lon: defaultSpot.lon,
+        name: defaultSpot.name,
+        formatted: defaultSpot.formatted,
+        addressLine1: defaultSpot.name,
+        resultType: 'street',
+      };
+    }
+    return null;
+  });
+
   const [dropoff, setDropoff] = useState<LocationPoint | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [isLoadingRoute, setIsLoadingRoute] = useState(false);
@@ -198,14 +287,27 @@ export default function App() {
     return () => unsubscribe();
   }, [stage]);
 
-  // Request location permission immediately on app load so browser prompts user
+  // Request location permission & immediately resolve passenger live coordinates
   useEffect(() => {
-    if (typeof window !== 'undefined' && navigator.geolocation) {
-      requestLiveCoordinates().catch((err) => {
-        console.warn('Initial GPS permission request:', err);
-      });
+    if (typeof window !== 'undefined') {
+      requestLiveCoordinates()
+        .then(async (res) => {
+          try {
+            const keyToUse = apiKey.trim() || getGeoapifyApiKey();
+            const point = await reverseGeocode(res.lat, res.lon, keyToUse);
+            setPickup(point);
+            try {
+              localStorage.setItem('beego_cached_pickup_spot', JSON.stringify(point));
+            } catch {}
+          } catch (e) {
+            console.warn('Initial reverse geocode notice:', e);
+          }
+        })
+        .catch((err) => {
+          console.warn('Initial GPS permission request:', err);
+        });
     }
-  }, []);
+  }, [apiKey]);
 
   const handleApiKeyChange = (newKey: string) => {
     setApiKey(newKey);
@@ -330,7 +432,19 @@ export default function App() {
 
   // 1. INTRO SPLASH: 2-second clean B logo & BeeGo text, then app starts directly
   if (introState === 'splash') {
-    return <BeegoIntroSplash onComplete={() => setIntroState('ready')} />;
+    return (
+      <BeegoIntroSplash
+        onComplete={() => {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('beego_intro_completed', 'true');
+              sessionStorage.setItem('beego_intro_completed', 'true');
+            } catch {}
+          }
+          setIntroState('ready');
+        }}
+      />
+    );
   }
 
   // 2. ONBOARDING SLIDES: 4 slides with next/back buttons
