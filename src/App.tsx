@@ -21,6 +21,8 @@ import { DescopeAuthScreen } from './components/DescopeAuthScreen';
 import { DriverAuthModal } from './components/DriverAuthModal';
 import { AdminDashboard } from './components/AdminDashboard';
 import { AdminSecretGateModal } from './components/AdminSecretGateModal';
+import { AppPermissionsModal } from './components/AppPermissionsModal';
+import { hasRequestedInitialPermissions } from './services/permissionService';
 import { getAdminToken, logoutAdmin } from './services/adminService';
 import {
   getCurrentPassenger,
@@ -75,6 +77,10 @@ export default function App() {
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
   const [isAdminGateOpen, setIsAdminGateOpen] = useState(false);
+  const [isPermissionsOpen, setIsPermissionsOpen] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return !hasRequestedInitialPermissions();
+  });
 
   // Generated Guest IDs
   const [passengerId] = useState<string>(() => {
@@ -533,6 +539,12 @@ export default function App() {
               localStorage.setItem('beego_user_role', 'admin');
             }
           }}
+        />
+
+        {/* First-time App Permissions Master Dialog */}
+        <AppPermissionsModal
+          isOpen={isPermissionsOpen}
+          onComplete={() => setIsPermissionsOpen(false)}
         />
       </div>
     </div>

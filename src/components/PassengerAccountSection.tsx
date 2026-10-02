@@ -29,6 +29,7 @@ import {
 import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
 import { clearStoredDescopeUser } from '../services/descopeService';
 import { useDescope } from '@descope/react-sdk';
+import { AppPermissionsModal } from './AppPermissionsModal';
 
 interface PassengerAccountSectionProps {
   passengerId: string;
@@ -47,6 +48,7 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
 }) => {
   const sdk = useDescope();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [activeNotice, setActiveNotice] = useState<string | null>(null);
 
   const displayName = passengerProfile?.name || 'Verified Passenger';
@@ -202,6 +204,22 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
           </button>
         )}
 
+        {/* App Permissions Management */}
+        <button
+          type="button"
+          onClick={() => setShowPermissionsModal(true)}
+          className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
+        >
+          <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
+            <Lock className="w-4 h-4 text-[#E6A800]" />
+            <span>App Permissions</span>
+          </div>
+          <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
+            <Check className="w-3 h-3" />
+            <span>Manage</span>
+          </span>
+        </button>
+
         {/* App Version */}
         <div className="w-full px-3.5 py-3 flex items-center justify-between text-left">
           <div className="flex items-center gap-3 text-xs font-bold text-zinc-500">
@@ -231,6 +249,12 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
       <div className="pt-4 pb-2 text-center text-[10px] text-zinc-400 font-medium">
         Crafted with love for BeeGo Voltx • Dhaka, Bangladesh
       </div>
+
+      {/* Permissions Modal */}
+      <AppPermissionsModal
+        isOpen={showPermissionsModal}
+        onComplete={() => setShowPermissionsModal(false)}
+      />
 
       {/* Logout Confirmation Modal */}
       {showSignOutConfirm && (

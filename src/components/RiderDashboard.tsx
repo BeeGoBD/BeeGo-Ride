@@ -236,8 +236,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     setRiderLiveGps({
       lat: spot.lat,
       lon: spot.lon,
-      isRealGps: false,
-      isSimulatedBangladesh: true,
+      accuracy: 10,
     });
     if (mapInstanceRef.current) {
       mapInstanceRef.current.flyTo([spot.lat, spot.lon], 15, { duration: 1 });
@@ -512,7 +511,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 {isUnderReview
                   ? 'Locked: Approval required before accepting rides'
                   : isOnline
-                  ? 'Accepting rides across Dhaka at flat ৳70/km'
+                  ? `Accepting passenger rides at flat ৳${RATE_PER_KM_TAKA}/km`
                   : 'Go online to start receiving trip requests'}
               </p>
             </div>
@@ -554,12 +553,12 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       {/* 2. THE MAP STARTS RIGHT AFTER "YOU ARE ONLINE" (Increased from upside into the gap) */}
       <div className="w-full relative bg-zinc-100 border-b border-zinc-200 shrink-0">
         {/* Top Floating Map Radar Banner */}
-        <div className="absolute top-2.5 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
-          <div className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center gap-2 pointer-events-auto max-w-[78%]">
+        <div className="absolute top-2.5 left-3 right-3 z-10 flex items-center justify-between pointer-events-none gap-2">
+          <div className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center gap-2 pointer-events-auto min-w-0 flex-1">
             <div className="w-6 h-6 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#E6A800] shrink-0">
               <Compass className="w-3.5 h-3.5" />
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <span className="text-[9px] uppercase font-mono font-bold text-[#E6A800] flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 Live GPS Radar
@@ -568,13 +567,39 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 {riderAddress}
               </span>
             </div>
+
+            {/* Quick City Hub Toggle */}
+            <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-xl border border-zinc-200 shrink-0">
+              <button
+                type="button"
+                onClick={() => handleSelectCity('chattogram')}
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  getPreferredCity() === 'chattogram'
+                    ? 'bg-[#F5C518] text-black shadow-xs'
+                    : 'text-zinc-500 hover:text-black'
+                }`}
+              >
+                Chittagong
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectCity('dhaka')}
+                className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
+                  getPreferredCity() === 'dhaka'
+                    ? 'bg-[#F5C518] text-black shadow-xs'
+                    : 'text-zinc-500 hover:text-black'
+                }`}
+              >
+                Dhaka
+              </button>
+            </div>
           </div>
 
           <button
             type="button"
             onClick={handleRecenterGps}
             title="Recenter GPS"
-            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-700 hover:text-black cursor-pointer pointer-events-auto active:scale-95 transition-all"
+            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-700 hover:text-black cursor-pointer pointer-events-auto active:scale-95 transition-all shrink-0"
           >
             <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-[#E6A800]' : ''}`} />
           </button>

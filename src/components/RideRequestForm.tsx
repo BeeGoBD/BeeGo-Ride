@@ -29,7 +29,7 @@ import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { RATE_PER_KM_TAKA, updatePassengerLiveLocation } from '../services/rideSync';
 import { searchBangladeshDistricts, isLocationInBangladesh } from '../data/bangladeshDistricts';
-import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
+import { requestLiveCoordinates, watchLiveCoordinates, getPreferredCity, setPreferredCity } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import {
@@ -709,9 +709,36 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                   <span>View Map</span>
                 </button>
               ) : (
-                <span className="text-[10px] font-black uppercase tracking-wider text-zinc-400 font-mono">
-                  Dhaka
-                </span>
+                <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-xl border border-zinc-200">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreferredCity('chattogram');
+                      window.location.reload();
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition-all cursor-pointer ${
+                      getPreferredCity() === 'chattogram'
+                        ? 'bg-[#F5C518] text-black shadow-xs'
+                        : 'text-zinc-500 hover:text-black'
+                    }`}
+                  >
+                    Chittagong
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreferredCity('dhaka');
+                      window.location.reload();
+                    }}
+                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition-all cursor-pointer ${
+                      getPreferredCity() === 'dhaka'
+                        ? 'bg-[#F5C518] text-black shadow-xs'
+                        : 'text-zinc-500 hover:text-black'
+                    }`}
+                  >
+                    Dhaka
+                  </button>
+                </div>
               )}
             </div>
 
@@ -747,7 +774,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         handlePickupChange(pickupInput);
                       }
                     }}
-                    placeholder="Pickup location in Dhaka / Bangladesh..."
+                    placeholder="Enter pickup location (e.g. GEC Circle, Chittagong)..."
                     autoComplete="off"
                     className="w-full pl-3 pr-20 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
                   />
@@ -838,7 +865,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         handleDropoffChange(dropoffInput);
                       }
                     }}
-                    placeholder="Where to? (e.g. Gulshan, Airport, Dhanmondi)..."
+                    placeholder="Where to? (e.g. Agrabad, Patenga Beach, Airport)..."
                     autoComplete="off"
                     className="w-full pl-3 pr-12 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none"
                   />

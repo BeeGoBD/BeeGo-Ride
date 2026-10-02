@@ -31,6 +31,7 @@ import {
   Timer,
 } from 'lucide-react';
 import { RATE_PER_KM_TAKA } from '../services/rideSync';
+import { getPreferredCity, setPreferredCity, requestLiveCoordinates } from '../services/geolocation';
 
 interface PassengerHomeDashboardProps {
   onTakeRide: (suggestedDropoff?: string) => void;
@@ -366,7 +367,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         </div>
       )}
 
-      {/* 1. TOP GREETING */}
+      {/* 1. TOP GREETING & CITY HUB SELECTOR */}
       <div className="flex items-center justify-between pt-1 px-0.5">
         <div>
           <h1 className="text-xl font-black text-[#1A1A1A] tracking-tight">
@@ -378,6 +379,38 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               {passengerName ? `${passengerName} • Fast Electric Ride Dispatch` : 'Fast Electric Ride Dispatch'}
             </span>
           </p>
+        </div>
+
+        {/* City Hub Selector */}
+        <div className="flex items-center gap-1 bg-white border border-zinc-200/90 rounded-2xl p-1 shadow-2xs">
+          <button
+            type="button"
+            onClick={() => {
+              setPreferredCity('chattogram');
+              window.location.reload();
+            }}
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+              getPreferredCity() === 'chattogram'
+                ? 'bg-[#F5C518] text-black shadow-xs'
+                : 'text-zinc-500 hover:text-black'
+            }`}
+          >
+            Chittagong
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setPreferredCity('dhaka');
+              window.location.reload();
+            }}
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
+              getPreferredCity() === 'dhaka'
+                ? 'bg-[#F5C518] text-black shadow-xs'
+                : 'text-zinc-500 hover:text-black'
+            }`}
+          >
+            Dhaka
+          </button>
         </div>
       </div>
 
@@ -421,7 +454,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               <button
                 key={i}
                 type="button"
-                onClick={() => onTakeRide(sc.query)}
+                onClick={() => onTakeRide()}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-[#FFF9E6] border border-zinc-200 hover:border-[#F5C518] shadow-2xs text-xs font-bold text-zinc-700 hover:text-[#1A1A1A] transition-all shrink-0 cursor-pointer active:scale-95"
               >
                 <Icon className="w-3.5 h-3.5 text-[#E6A800]" />
