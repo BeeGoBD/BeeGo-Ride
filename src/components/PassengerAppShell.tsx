@@ -19,6 +19,7 @@ import { PassengerAccountSection } from './PassengerAccountSection';
 import { OffersSection } from './OffersSection';
 import { QrScannerSection } from './QrScannerSection';
 import { BatterySwapModal } from './BatterySwapModal';
+import { HourlyRentalModal } from './HourlyRentalModal';
 import { RideRequestForm } from './RideRequestForm';
 
 interface PassengerAppShellProps {
@@ -50,6 +51,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [isPowerStationsOpen, setIsPowerStationsOpen] = useState(false);
+  const [isHourlyRentOpen, setIsHourlyRentOpen] = useState(false);
 
   const displayName = props.passengerProfile?.name || 'Passenger';
   const initials =
@@ -146,6 +148,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
               <PassengerHomeDashboard
                 onTakeRide={handleOpenBooking}
                 onOpenPowerStations={() => setIsPowerStationsOpen(true)}
+                onOpenHourlyRent={() => setIsHourlyRentOpen(true)}
                 onOpenOffers={() => setActiveTab('offers')}
                 userLiveAddress={props.pickup?.formatted}
                 passengerName={props.passengerProfile?.name || props.passengerId}
@@ -376,6 +379,12 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
           }}
         />
       )}
+
+      {/* 5. HOURLY EV RENTAL COMING SOON MODAL */}
+      <HourlyRentalModal
+        isOpen={isHourlyRentOpen}
+        onClose={() => setIsHourlyRentOpen(false)}
+      />
     </div>
   );
 };

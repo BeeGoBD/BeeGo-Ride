@@ -35,6 +35,7 @@ import { RATE_PER_KM_TAKA } from '../services/rideSync';
 interface PassengerHomeDashboardProps {
   onTakeRide: (suggestedDropoff?: string) => void;
   onOpenPowerStations: () => void;
+  onOpenHourlyRent?: () => void;
   onOpenOffers: () => void;
   userLiveAddress?: string | null;
   passengerName?: string | null;
@@ -43,6 +44,7 @@ interface PassengerHomeDashboardProps {
 export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
   onTakeRide,
   onOpenPowerStations,
+  onOpenHourlyRent,
   onOpenOffers,
   userLiveAddress,
   passengerName,
@@ -211,8 +213,8 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
     {
       id: 'hour_station',
       name: 'Hourly Rent',
-      desc: 'Flexible rental',
-      badge: 'Available',
+      desc: 'Flexible EV rental',
+      badge: 'Coming Soon',
       icon: Clock,
       accentBg: 'bg-amber-50',
       accentColor: 'text-amber-700',
@@ -220,7 +222,9 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       disabled: false,
       onClick: () => {
         setSelectedService('hour_station');
-        onOpenPowerStations();
+        if (onOpenHourlyRent) {
+          onOpenHourlyRent();
+        }
       },
     },
   ];

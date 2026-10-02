@@ -30,7 +30,11 @@ import {
   Sparkles,
   Route,
   ArrowRight,
+  Flag,
+  ShieldAlert,
+  User,
 } from 'lucide-react';
+import { ReportIssueModal } from './ReportIssueModal';
 import { LocationPoint, RideRequest, RouteData, UserRole, LiveTrackingData } from '../types';
 import {
   arriveAtPickupSpot,
@@ -200,7 +204,12 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   const isInTransit = status === 'in_transit';
   const isCompleted = status === 'completed';
 
-  // Driver details
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Passenger & Driver details
+  const passengerName = activeRide.passengerName || activeRide.passengerId || 'Passenger';
+  const passengerPhone = activeRide.passengerPhone || '';
+
   const driver = activeRide.driverDetails || {
     name: 'Captain Tanvir',
     vehicleModel: 'Voltx Eco Speed (Electric)',
@@ -791,37 +800,83 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
           {/* Passenger & Driver Details Strip */}
           <div className="flex items-center justify-between gap-3 pt-1 border-t border-zinc-100">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center font-bold text-white shrink-0">
-                <Bike className="w-5 h-5 text-[#E6A800]" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-xs font-black text-[#1A1A1A] flex items-center gap-1.5 truncate">
-                  <span>{driver.name}</span>
-                  <span className="flex items-center text-[10px] text-[#E6A800] bg-[#FFF9E6] border border-[#F5C518]/40 px-1.5 py-0.2 rounded font-bold">
-                    ★ {driver.rating}
-                  </span>
+            {role === 'rider' ? (
+              /* Driver viewing Passenger Profile */
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-amber-100 border border-amber-300 text-amber-800 flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <User className="w-5 h-5" />
                 </div>
-                <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
-                  {driver.vehicleModel} • <span className="font-mono text-zinc-700">{driver.plateNumber}</span>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-[#1A1A1A] flex items-center gap-1.5 truncate">
+                    <span>{passengerName}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-50 text-amber-800 border border-amber-200">
+                      Passenger
+                    </span>
+                  </div>
+                  <div className="text-[11px] font-mono text-zinc-600 font-bold truncate mt-0.5 flex items-center gap-1">
+                    <Phone className="w-3 h-3 text-[#E6A800]" />
+                    <span>{passengerPhone || 'No phone provided'}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : (
+              /* Passenger viewing Driver Profile */
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center font-bold text-white shrink-0 shadow-xs">
+                  <Bike className="w-5 h-5 text-[#E6A800]" />
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-black text-[#1A1A1A] flex items-center gap-1.5 truncate">
+                    <span>{driver.name}</span>
+                    <span className="flex items-center text-[10px] text-[#E6A800] bg-[#FFF9E6] border border-[#F5C518]/40 px-1.5 py-0.2 rounded font-bold">
+                      ★ {driver.rating}
+                    </span>
+                  </div>
+                  <div className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
+                    {driver.vehicleModel} • <span className="font-mono text-zinc-700">{driver.plateNumber}</span>
+                  </div>
+                </div>
+              </div>
+            )}
 
-            {/* In-Ride Communications (Call Dialer & Synchronized Chat) */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleCallDriver}
-                title={`Call Captain: ${driver.phone}`}
-                className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-              >
-                <Phone className="w-4 h-4" />
-              </button>
+            {/* In-Ride Communications (Call Dialer, Chat & Report Issue) */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Call Button */}
+              {role === 'rider' ? (
+                passengerPhone ? (
+                  <a
+                    href={`tel:${passengerPhone}`}
+                    title={`Call Passenger: ${passengerPhone}`}
+                    className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                  >
+                    <Phone className="w-4 h-4" />
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setContactMessage('Passenger has not provided a phone number.')}
+                    className="w-9 h-9 rounded-xl bg-zinc-100 text-zinc-400 border border-zinc-200 flex items-center justify-center cursor-not-allowed"
+                    title="No passenger phone"
+                  >
+                    <Phone className="w-4 h-4" />
+                  </button>
+                )
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleCallDriver}
+                  title={`Call Captain: ${driver.phone}`}
+                  className="w-9 h-9 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                >
+                  <Phone className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Chat Button */}
               <button
                 type="button"
                 onClick={() => setIsChatOpen(true)}
-                title="Chat with Captain"
+                title={role === 'rider' ? 'Chat with Passenger' : 'Chat with Captain'}
                 className="w-9 h-9 rounded-xl bg-[#FFF9E6] hover:bg-[#F5C518] text-black border border-[#F5C518]/40 flex items-center justify-center transition-colors cursor-pointer active:scale-95 relative"
               >
                 <MessageSquare className="w-4 h-4" />
@@ -830,6 +885,17 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                     {activeRide.chatMessages!.length}
                   </span>
                 )}
+              </button>
+
+              {/* Report Issue Button (Accessible anytime during or after ride) */}
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                title={role === 'rider' ? 'Report Passenger Incident (Not responding, no-show, etc.)' : 'Report Captain Incident'}
+                className="h-9 px-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1 transition-colors cursor-pointer active:scale-95 text-xs font-bold"
+              >
+                <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600 shrink-0" />
+                <span>Report</span>
               </button>
             </div>
 
@@ -946,16 +1012,27 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
             {/* Completed: Finish Ride */}
             {isCompleted && (
-              <button
-                type="button"
-                onClick={() => {
-                  clearCurrentRide();
-                  onResetRide?.();
-                }}
-                className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <span>Complete Trip & Back to Home</span>
-              </button>
+              <div className="flex flex-col gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer active:scale-98 text-xs shadow-2xs"
+                >
+                  <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                  <span>{role === 'passenger' ? 'Report Captain / Trip Incident' : 'Report Passenger / Issue'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearCurrentRide();
+                    onResetRide?.();
+                  }}
+                  className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <span>Complete Trip & Back to Home</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -1065,6 +1142,20 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
           </div>
         </div>
       )}
+
+      {/* 6. REPORT INCIDENT MODAL (Accessible before and after completing ride) */}
+      <ReportIssueModal
+        isOpen={isReportModalOpen}
+        onClose={() => setIsReportModalOpen(false)}
+        reporterRole={role === 'rider' ? 'driver' : 'passenger'}
+        reporterId={role === 'rider' ? (activeRide.riderId || driver.phone || 'driver') : activeRide.passengerId}
+        reporterName={role === 'rider' ? driver.name : passengerName}
+        reportedRole={role === 'rider' ? 'passenger' : 'driver'}
+        reportedId={role === 'rider' ? activeRide.passengerId : (activeRide.riderId || 'driver')}
+        reportedName={role === 'rider' ? passengerName : driver.name}
+        reportedPhone={role === 'rider' ? passengerPhone : driver.phone}
+        rideId={activeRide.id}
+      />
     </div>
   );
 };

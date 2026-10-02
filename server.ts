@@ -18,6 +18,7 @@ async function startServer() {
   const DRIVERS_FILE = path.join(DATA_DIR, 'beego_drivers.json');
   const RESTRICTIONS_FILE = path.join(DATA_DIR, 'beego_restrictions.json');
   const SESSIONS_FILE = path.join(DATA_DIR, 'beego_sessions.json');
+  const REPORTS_FILE = path.join(DATA_DIR, 'beego_reports.json');
 
   if (!fs.existsSync(DATA_DIR)) {
     try {
@@ -190,6 +191,44 @@ async function startServer() {
       fs.writeFileSync(SESSIONS_FILE, JSON.stringify(sessions, null, 2), 'utf-8');
     } catch (e) {
       console.warn('[Storage] Error saving sessions file:', e);
+    }
+  }
+
+  interface StoredReport {
+    id: string;
+    reporterRole: 'passenger' | 'driver';
+    reporterId: string;
+    reporterName: string;
+    reportedRole: 'passenger' | 'driver';
+    reportedId: string;
+    reportedName: string;
+    reportedPhone?: string;
+    rideId?: string;
+    category: string;
+    description: string;
+    status: 'pending' | 'resolved' | 'released' | 'bin';
+    adminNotes?: string;
+    createdAt: number;
+    updatedAt: number;
+  }
+
+  function loadReports(): Record<string, StoredReport> {
+    try {
+      if (fs.existsSync(REPORTS_FILE)) {
+        const raw = fs.readFileSync(REPORTS_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Storage] Error reading reports file:', e);
+    }
+    return {};
+  }
+
+  function saveReports(reports: Record<string, StoredReport>) {
+    try {
+      fs.writeFileSync(REPORTS_FILE, JSON.stringify(reports, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving reports file:', e);
     }
   }
 
@@ -847,6 +886,9 @@ async function startServer() {
       const approvedDrivers = drivers.filter((d) => d.verificationStatus === 'approved').length;
       const rejectedDrivers = drivers.filter((d) => d.verificationStatus === 'rejected').length;
 
+      const reports = Object.values(loadReports());
+      const pendingReports = reports.filter((r) => r.status === 'pending').length;
+
       return res.json({
         success: true,
         stats: {
@@ -856,10 +898,136 @@ async function startServer() {
           totalDrivers: drivers.length,
           totalPassengers: passengers.length,
           totalRestricted: restrictions.length,
+          totalReports: reports.length,
+          pendingReports,
         },
       });
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to fetch admin stats.' });
+    }
+  });
+
+  // POST /api/reports - Passenger or Driver submits an incident report
+  app.post('/api/reports', (req, res) => {
+    try {
+      const {
+        reporterRole,
+        reporterId,
+        reporterName,
+        reportedRole,
+        reportedId,
+        reportedName,
+        reportedPhone,
+        rideId,
+        category,
+        description,
+      } = req.body || {};
+
+      if (!reporterId || !reportedId || !category || !description) {
+        return res.status(400).json({ error: 'All report fields are required.' });
+      }
+
+      const reportId = 'rep_' + Date.now().toString(36) + Math.random().toString(36).substring(2, 6);
+      const reports = loadReports();
+
+      reports[reportId] = {
+        id: reportId,
+        reporterRole: reporterRole || 'passenger',
+        reporterId,
+        reporterName: reporterName || 'Anonymous',
+        reportedRole: reportedRole || 'driver',
+        reportedId,
+        reportedName: reportedName || 'Anonymous',
+        reportedPhone,
+        rideId,
+        category,
+        description,
+        status: 'pending',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      saveReports(reports);
+      console.log(`[Incident Report] New report filed: ${reportId} (${category}) by ${reporterRole} ${reporterId}`);
+
+      return res.json({
+        success: true,
+        id: reportId,
+        message: 'Report submitted successfully. Our safety team will review it immediately.',
+      });
+    } catch (err: any) {
+      console.error('[Report Submission Error]', err);
+      return res.status(500).json({ error: 'Failed to submit incident report.' });
+    }
+  });
+
+  // GET /api/admin/reports - Fetch all reports with status filtering
+  app.get('/api/admin/reports', (req, res) => {
+    try {
+      const statusFilter = (req.query.status as string) || 'all';
+      const allReports = Object.values(loadReports()).sort((a, b) => b.createdAt - a.createdAt);
+
+      if (statusFilter === 'all') {
+        return res.json({ success: true, reports: allReports });
+      }
+
+      const filtered = allReports.filter((r) => r.status === statusFilter);
+      return res.json({ success: true, reports: filtered });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch incident reports.' });
+    }
+  });
+
+  // POST /api/admin/reports/:id/action - Admin actions on report: 'resolve', 'release', or 'delete'
+  app.post('/api/admin/reports/:id/action', (req, res) => {
+    try {
+      const reportId = req.params.id;
+      const { action, notes } = req.body || {};
+
+      if (!reportId || !['resolve', 'release', 'bin', 'restore', 'delete'].includes(action)) {
+        return res.status(400).json({ error: 'Invalid report action.' });
+      }
+
+      const reports = loadReports();
+      const report = reports[reportId];
+
+      if (!report && action !== 'delete') {
+        return res.status(404).json({ error: 'Report not found.' });
+      }
+
+      if (action === 'delete') {
+        delete reports[reportId];
+        saveReports(reports);
+        return res.json({ success: true, message: 'Report permanently deleted.' });
+      }
+
+      if (action === 'bin') {
+        report.status = 'bin';
+      } else if (action === 'restore') {
+        report.status = 'pending';
+      } else {
+        report.status = action === 'resolve' ? 'resolved' : 'released';
+      }
+      if (notes) report.adminNotes = notes;
+      report.updatedAt = Date.now();
+
+      saveReports(reports);
+      console.log(`[Admin Reports] Report ${reportId} updated to ${report.status}`);
+
+      return res.json({
+        success: true,
+        report,
+        message:
+          action === 'bin'
+            ? 'Report moved to bin/deleted without issue.'
+            : action === 'restore'
+            ? 'Report restored to pending review.'
+            : action === 'resolve'
+            ? 'Report marked as resolved/completed.'
+            : 'Report checked and released without penalty.',
+      });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update report.' });
     }
   });
 

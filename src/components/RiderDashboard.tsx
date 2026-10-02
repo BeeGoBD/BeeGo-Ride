@@ -8,20 +8,21 @@ import {
   Banknote,
   Compass,
   ArrowRight,
-  Radio,
   LocateFixed,
   Loader2,
   Check,
   Bike,
   ShieldCheck,
-  BatteryCharging,
-  Zap,
-  TrendingUp,
-  Clock,
-  Layers,
-  ChevronRight,
   Power,
   Phone,
+  Flag,
+  User,
+  MessageSquare,
+  Send,
+  X,
+  Radio,
+  Clock,
+  ChevronRight,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, DriverProfile, DriverVerificationStatus } from '../types';
 import {
@@ -31,11 +32,13 @@ import {
   completeTrip,
   declineRide,
   clearCurrentRide,
+  sendInRideChatMessage,
   RATE_PER_KM_TAKA,
 } from '../services/rideSync';
 import { calculateRoute, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
-import { getCurrentDriver, updateDriverStatus } from '../services/driverAuth';
+import { getCurrentDriver } from '../services/driverAuth';
+import { ReportIssueModal } from './ReportIssueModal';
 
 interface RiderDashboardProps {
   riderId: string;
@@ -47,6 +50,67 @@ interface RiderDashboardProps {
   onOpenPowerStations?: () => void;
   hideHeader?: boolean;
 }
+
+// Interactive Swipe to Confirm Slider (Pathao / Uber style for drivers)
+const SwipeActionSlider: React.FC<{
+  label: string;
+  onConfirm: () => void;
+  icon?: React.ReactNode;
+}> = ({ label, onConfirm, icon }) => {
+  const [sliderX, setSliderX] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const startDrag = () => setIsDragging(true);
+
+  const onDrag = (clientX: number) => {
+    if (!isDragging || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const maxDrag = rect.width - 56;
+    const currentDrag = Math.max(0, Math.min(clientX - rect.left - 24, maxDrag));
+    setSliderX(currentDrag);
+
+    if (currentDrag >= maxDrag * 0.85) {
+      setIsDragging(false);
+      setSliderX(0);
+      onConfirm();
+    }
+  };
+
+  const stopDrag = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+    setSliderX(0);
+  };
+
+  return (
+    <div
+      ref={containerRef}
+      onMouseMove={(e) => onDrag(e.clientX)}
+      onMouseUp={stopDrag}
+      onMouseLeave={stopDrag}
+      onTouchMove={(e) => onDrag(e.touches[0].clientX)}
+      onTouchEnd={stopDrag}
+      className="relative w-full h-14 rounded-2xl bg-zinc-900 border-2 border-[#F5C518]/60 overflow-hidden flex items-center p-1.5 select-none shadow-xl cursor-grab active:cursor-grabbing"
+    >
+      <div
+        style={{ width: `${sliderX + 50}px` }}
+        className="absolute left-0 top-0 bottom-0 bg-[#F5C518]/25 transition-all pointer-events-none"
+      />
+      <div className="w-full text-center text-xs font-black uppercase tracking-wider text-zinc-200 pointer-events-none z-10 flex items-center justify-center gap-1.5 px-12">
+        <span>{label}</span>
+      </div>
+      <div
+        style={{ transform: `translateX(${sliderX}px)` }}
+        onMouseDown={startDrag}
+        onTouchStart={startDrag}
+        className="absolute left-1.5 w-11 h-11 rounded-xl bg-[#F5C518] text-black shadow-md flex items-center justify-center z-20 cursor-pointer active:scale-95 transition-transform"
+      >
+        {icon || <ArrowRight className="w-5 h-5 stroke-[2.5]" />}
+      </div>
+    </div>
+  );
+};
 
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   riderId,
@@ -74,23 +138,36 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
   // Big Yellow Switch: Online / Offline (locked if under review)
   const [isOnline, setIsOnline] = useState<boolean>(() => !isUnderReview);
+  const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 
-  // Toggle simulation for testing admin approval
-  const handleToggleAdminStatus = () => {
-    if (!driverProfile) return;
-    const nextStatus: DriverVerificationStatus =
-      driverProfile.verificationStatus === 'approved' ? 'under_review' : 'approved';
-    const updated = updateDriverStatus(driverProfile.id, nextStatus);
-    if (updated) {
-      setDriverProfile({ ...updated });
-      if (nextStatus === 'approved') {
-        setIsOnline(true);
-        setActionError(null);
-      } else {
-        setIsOnline(false);
+  // In-Ride Chat drawer state
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [chatInputText, setChatInputText] = useState('');
+
+  // Real-time synchronization of driver verification from local storage & admin updates
+  useEffect(() => {
+    const syncProfile = () => {
+      const current = getCurrentDriver();
+      if (current) {
+        setDriverProfile((prev) => {
+          if (!prev || prev.verificationStatus !== current.verificationStatus) {
+            if (current.verificationStatus === 'approved') {
+              setIsOnline(true);
+              setActionError(null);
+            }
+            return current;
+          }
+          return prev;
+        });
       }
-    }
-  };
+    };
+    window.addEventListener('storage', syncProfile);
+    const interval = setInterval(syncProfile, 1000);
+    return () => {
+      window.removeEventListener('storage', syncProfile);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Rider Live GPS state
   const [riderLiveGps, setRiderLiveGps] = useState<{
@@ -100,44 +177,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   } | null>(null);
   const [riderAddress, setRiderAddress] = useState<string>('Gulshan 2 Circle, Dhaka');
   const [isLocating, setIsLocating] = useState<boolean>(false);
-  const [locationPrompted, setLocationPrompted] = useState<boolean>(false);
 
   const [isAccepting, setIsAccepting] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
-  const [isMapExpanded, setIsMapExpanded] = useState(false);
 
-  // Nearby Power Stations Data
-  const nearbyStations = [
-    {
-      id: 'st-1',
-      name: 'Voltx Hub — Gulshan 2',
-      address: 'Road 90, Near Circle',
-      distance: '0.6 km',
-      batteryLevel: '94%',
-      availableBatteries: 6,
-      status: 'Fast Swap Ready',
-    },
-    {
-      id: 'st-2',
-      name: 'Voltx Hub — Banani 11',
-      address: 'Block D, Near Metro Station',
-      distance: '1.8 km',
-      batteryLevel: '88%',
-      availableBatteries: 4,
-      status: 'Open 24/7',
-    },
-    {
-      id: 'st-3',
-      name: 'Voltx Hub — Dhanmondi 27',
-      address: 'Satmasjid Road',
-      distance: '4.2 km',
-      batteryLevel: '100%',
-      availableBatteries: 8,
-      status: 'High Stock',
-    },
-  ];
-
-  // 1. Automatically request live coordinates on mount
+  // Automatically request live coordinates on mount
   useEffect(() => {
     let isMounted = true;
 
@@ -146,45 +190,48 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
       try {
         const coords = await requestLiveCoordinates();
         if (!isMounted) return;
-        setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+        setRiderLiveGps(coords);
 
-        const point = await reverseGeocode(coords.lat, coords.lon, activeKey);
-        if (!isMounted) return;
-        setRiderAddress(point.formatted);
-      } catch (err: any) {
-        console.warn('Rider GPS detection notice:', err);
-        if (isMounted) setRiderAddress('Gulshan 2 Circle, Dhaka');
+        const rev = await reverseGeocode(coords.lat, coords.lon, activeKey);
+        if (isMounted && rev?.formatted) {
+          setRiderAddress(rev.formatted.split(',')[0] || rev.formatted);
+        }
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.setView([coords.lat, coords.lon], 15);
+        }
+      } catch (err) {
+        console.warn('Could not acquire rider GPS on load:', err);
       } finally {
         if (isMounted) setIsLocating(false);
       }
     };
 
-    if (!locationPrompted) {
-      setLocationPrompted(true);
-      acquireRiderGps();
-    }
+    acquireRiderGps();
 
-    const unwatch = watchLiveCoordinates((coords) => {
+    const stopWatching = watchLiveCoordinates((coords) => {
       if (!isMounted) return;
-      setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+      setRiderLiveGps(coords);
     });
 
     return () => {
       isMounted = false;
-      unwatch();
+      stopWatching();
     };
-  }, [locationPrompted, activeKey]);
+  }, [activeKey]);
 
-  // Re-acquire GPS manually
+  // Recenter GPS
   const handleRecenterGps = async () => {
     setIsLocating(true);
     setActionError(null);
     try {
       const coords = await requestLiveCoordinates();
-      setRiderLiveGps({ lat: coords.lat, lon: coords.lon, accuracy: coords.accuracy });
+      setRiderLiveGps(coords);
 
-      const point = await reverseGeocode(coords.lat, coords.lon, activeKey);
-      setRiderAddress(point.formatted);
+      const rev = await reverseGeocode(coords.lat, coords.lon, activeKey);
+      if (rev?.formatted) {
+        setRiderAddress(rev.formatted.split(',')[0] || rev.formatted);
+      }
 
       if (mapInstanceRef.current) {
         mapInstanceRef.current.flyTo([coords.lat, coords.lon], 16, { duration: 1 });
@@ -196,7 +243,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     }
   };
 
-  // 2. Initialize and maintain Leaflet Map on Rider Dashboard
+  // Initialize and maintain Leaflet Map on Rider Dashboard
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
@@ -241,8 +288,8 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     // Custom yellow rider icon
     const riderIcon = L.divIcon({
       html: `
-        <div style="background-color: #F5C518; border: 2.5px solid #000; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(245, 197, 24, 0.5);">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <div style="background-color: #F5C518; border: 2.5px solid #000; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(245, 197, 24, 0.6);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="18.5" cy="17.5" r="3.5"/>
             <circle cx="5.5" cy="17.5" r="3.5"/>
             <circle cx="15" cy="5" r="1"/>
@@ -251,8 +298,8 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         </div>
       `,
       className: 'rider-custom-pin',
-      iconSize: [28, 28],
-      iconAnchor: [14, 14],
+      iconSize: [32, 32],
+      iconAnchor: [16, 16],
     });
 
     const riderPos: [number, number] = riderLiveGps
@@ -261,44 +308,58 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
     L.marker(riderPos, { icon: riderIcon }).addTo(markersLayer);
 
-    // If incoming request or active ride, plot pickup and dropoff
-    if (activeRide && (activeRide.status === 'requested' || activeRide.status === 'accepted' || activeRide.status === 'in_transit')) {
+    // If active ride is present, plot pickup and dropoff
+    if (activeRide && activeRide.status !== 'idle' && activeRide.status !== 'declined' && activeRide.status !== 'cancelled') {
       const pickupIcon = L.divIcon({
         html: `
-          <div style="background-color: #10B981; border: 2px solid #FFFFFF; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(16, 185, 129, 0.4);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3" fill="#10B981"/></svg>
+          <div style="background-color: #10B981; border: 2.5px solid #FFFFFF; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.5);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="white" stroke="white" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3" fill="#10B981"/></svg>
           </div>
         `,
         className: 'pickup-pin',
-        iconSize: [26, 26],
-        iconAnchor: [13, 26],
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
       });
 
       const dropoffIcon = L.divIcon({
         html: `
-          <div style="background-color: #1A1A1A; border: 2px solid #F5C518; width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.4);">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+          <div style="background-color: #1A1A1A; border: 2.5px solid #F5C518; width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#F5C518" stroke-width="2.5"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
           </div>
         `,
         className: 'dropoff-pin',
-        iconSize: [26, 26],
-        iconAnchor: [13, 26],
+        iconSize: [28, 28],
+        iconAnchor: [14, 28],
       });
 
       L.marker([activeRide.pickup.lat, activeRide.pickup.lon], { icon: pickupIcon }).addTo(markersLayer);
       L.marker([activeRide.dropoff.lat, activeRide.dropoff.lon], { icon: dropoffIcon }).addTo(markersLayer);
 
-      // Draw polyline if routeData exists
-      if (activeRide.routeData && activeRide.routeData.coordinates.length > 0) {
-        const poly = L.polyline(activeRide.routeData.coordinates, {
+      // Determine which route to display (pickup route vs destination route)
+      const currentCoords =
+        activeRide.status === 'accepted' && activeRide.pickupRouteData?.coordinates?.length
+          ? activeRide.pickupRouteData.coordinates
+          : activeRide.routeData?.coordinates?.length
+          ? activeRide.routeData.coordinates
+          : null;
+
+      if (currentCoords && currentCoords.length > 0) {
+        const poly = L.polyline(currentCoords, {
           color: '#E6A800',
-          weight: 4,
-          opacity: 0.9,
+          weight: 5,
+          opacity: 0.95,
           lineJoin: 'round',
         }).addTo(map);
 
         routeLayerRef.current = poly;
-        map.fitBounds(poly.getBounds(), { padding: [30, 30] });
+        map.fitBounds(poly.getBounds(), { padding: [35, 35] });
+      } else {
+        const bounds = L.latLngBounds([
+          riderPos,
+          [activeRide.pickup.lat, activeRide.pickup.lon],
+          [activeRide.dropoff.lat, activeRide.dropoff.lon],
+        ]);
+        map.fitBounds(bounds, { padding: [35, 35] });
       }
     }
   }, [riderLiveGps, activeRide]);
@@ -339,7 +400,24 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     declineRide();
   };
 
-  const hasIncomingRequest = isOnline && activeRide && activeRide.status === 'requested';
+  const handleSendChat = (text: string) => {
+    if (!text.trim()) return;
+    const captainName = driverProfile?.name || 'Captain Tanvir';
+    sendInRideChatMessage('rider', captainName, text.trim());
+    setChatInputText('');
+  };
+
+  const quickPhrases = ['I have arrived', 'On my way', 'Please wait 2 mins', 'Where are you?', 'Ready at pickup'];
+
+  const status = activeRide?.status || 'idle';
+  const hasIncomingRequest = isOnline && activeRide && status === 'requested';
+  const isEnRouteToPickup = isOnline && activeRide && status === 'accepted';
+  const isAtPickup = isOnline && activeRide && status === 'arrived_at_pickup';
+  const isInTransit = isOnline && activeRide && status === 'in_transit';
+  const isCompleted = isOnline && activeRide && status === 'completed';
+
+  const passengerName = activeRide?.passengerName || activeRide?.passengerId || 'Passenger';
+  const passengerPhone = activeRide?.passengerPhone || '';
 
   return (
     <div
@@ -374,11 +452,6 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           <p className="text-xs text-amber-900 font-semibold leading-relaxed bg-white/70 p-2.5 rounded-2xl border border-amber-200/80">
             “Your driver verification is still in processing. Please wait. Review usually takes 1–24 hours.”
           </p>
-
-          <div className="flex items-center justify-between text-[11px] text-amber-800/90 pt-0.5 px-0.5">
-            <span>Documents: NID Front, NID Back & Selfie submitted</span>
-            <span className="font-mono font-bold text-[10px]">Review Active</span>
-          </div>
         </div>
       )}
 
@@ -414,7 +487,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 {isUnderReview
                   ? 'Locked: Approval required before accepting rides'
                   : isOnline
-                  ? 'Accepting rides & battery swap requests'
+                  ? 'Accepting rides across Dhaka at flat ৳70/km'
                   : 'Go online to start receiving trip requests'}
               </p>
             </div>
@@ -453,15 +526,95 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         </div>
       </div>
 
-      <div className="p-4 flex flex-col gap-4">
+      {/* 2. THE MAP STARTS RIGHT AFTER "YOU ARE ONLINE" (Increased from upside into the gap) */}
+      <div className="w-full relative bg-zinc-100 border-b border-zinc-200 shrink-0">
+        {/* Top Floating Map Radar Banner */}
+        <div className="absolute top-2.5 left-3 right-3 z-10 flex items-center justify-between pointer-events-none">
+          <div className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center gap-2 pointer-events-auto max-w-[78%]">
+            <div className="w-6 h-6 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#E6A800] shrink-0">
+              <Compass className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[9px] uppercase font-mono font-bold text-[#E6A800] flex items-center gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live GPS Radar
+              </span>
+              <span className="text-xs font-black text-[#1A1A1A] block truncate">
+                {riderAddress}
+              </span>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleRecenterGps}
+            title="Recenter GPS"
+            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-700 hover:text-black cursor-pointer pointer-events-auto active:scale-95 transition-all"
+          >
+            <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-[#E6A800]' : ''}`} />
+          </button>
+        </div>
+
+        {/* Leaflet Map Frame (Prominent height occupying the top space) */}
+        <div className="w-full h-72 sm:h-80 relative overflow-hidden">
+          <div ref={mapContainerRef} className="w-full h-full" />
+        </div>
+      </div>
+
+      {/* 3. BELOW THE MAP: RIDE DISPATCH, INCOMING REQUESTS & ACTIVE TRIP ACTIONS */}
+      <div className="p-4 flex flex-col gap-3">
         {/* Error notification */}
         {actionError && (
-          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700">
+          <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-xs text-rose-700 animate-in fade-in">
             {actionError}
           </div>
         )}
 
-        {/* 2. INCOMING TRIP REQUEST CARD (Highest Priority when active) */}
+        {/* A. CASE: DRIVER IS OFFLINE */}
+        {!isOnline && (
+          <div className="p-5 rounded-3xl bg-white border border-zinc-200 shadow-sm text-center flex flex-col items-center gap-2.5">
+            <div className="w-12 h-12 rounded-2xl bg-zinc-100 border border-zinc-200 flex items-center justify-center text-zinc-400">
+              <Power className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-[#1A1A1A]">You are currently Offline</h3>
+              <p className="text-xs text-zinc-500 max-w-xs mt-0.5">
+                Turn ON the switch at the top to connect to Dhaka central dispatch and start receiving passenger rides.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* B. CASE: DRIVER IS ONLINE & IDLE (Scanning for Requests) */}
+        {isOnline && (!activeRide || status === 'idle' || status === 'declined' || status === 'cancelled') && (
+          <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#E6A800] relative">
+                  <Radio className="w-4 h-4 animate-pulse" />
+                  <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-white" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-black text-[#1A1A1A]">Radar Active • Waiting for Requests</h3>
+                  <p className="text-[10px] text-zinc-500 font-medium">Auto-dispatching nearest passenger</p>
+                </div>
+              </div>
+              <span className="text-[10px] font-mono font-bold bg-[#FFF9E6] text-[#E6A800] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
+                ৳70/km
+              </span>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2 text-zinc-600">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
+                <span className="font-semibold">Central Dhaka Fleet Connected</span>
+              </div>
+              <span className="font-mono text-zinc-500 text-[11px]">Fair Rate Guarantee</span>
+            </div>
+          </div>
+        )}
+
+        {/* C. CASE: INCOMING TRIP REQUEST (Accept / Decline) */}
         {hasIncomingRequest && (
           <div
             id="incoming-ride-request-card"
@@ -481,7 +634,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             <div className="p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-between">
               <div>
                 <span className="text-[10px] uppercase font-bold text-[#E6A800] block">
-                  Trip Earnings
+                  Trip Earnings (৳70/km)
                 </span>
                 <span className="text-2xl font-black text-[#1A1A1A] flex items-center gap-1">
                   <Banknote className="w-5 h-5 text-[#E6A800]" />
@@ -489,14 +642,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-[10px] font-bold text-zinc-500 block">Distance</span>
+                <span className="text-[10px] font-bold text-zinc-500 block">Trip Distance</span>
                 <span className="text-sm font-black text-[#1A1A1A]">
                   {activeRide.distanceKm} km
                 </span>
               </div>
             </div>
 
-            {/* Locations */}
+            {/* Pickup & Drop-off addresses */}
             <div className="space-y-2 text-xs">
               <div className="flex items-start gap-2.5 p-2 rounded-xl bg-[#F8F9FA] border border-zinc-200">
                 <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0 mt-0.5">
@@ -523,29 +676,51 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
               </div>
             </div>
 
-            {/* Passenger Contact Phone Details (Client Phone) */}
-            {activeRide.passengerPhone && (
-              <div className="flex items-center justify-between p-2.5 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs">
-                <div className="flex items-center gap-2">
-                  <div className="w-6 h-6 rounded-full bg-amber-400 text-black flex items-center justify-center font-bold">
-                    <Phone className="w-3 h-3" />
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-zinc-500 font-bold block">Client Phone</span>
-                    <span className="font-mono font-black text-black">{activeRide.passengerPhone}</span>
-                  </div>
+            {/* Passenger Contact Details & Report Button */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-amber-50/80 border border-amber-200 text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <User className="w-4 h-4" />
                 </div>
-                <a
-                  href={`tel:${activeRide.passengerPhone}`}
-                  className="px-3 py-1.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 active:scale-95"
-                >
-                  <Phone className="w-3 h-3 fill-black" />
-                  <span>Call Client</span>
-                </a>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-black text-black truncate">
+                      {passengerName}
+                    </span>
+                    <span className="text-[9px] font-bold text-amber-900 bg-amber-200/80 px-1.5 py-0.2 rounded shrink-0">
+                      Client
+                    </span>
+                  </div>
+                  <span className="font-mono text-[11px] font-bold text-zinc-700 block mt-0.5 truncate">
+                    {passengerPhone || 'No phone provided'}
+                  </span>
+                </div>
               </div>
-            )}
 
-            {/* Action Buttons: Accept / Reject */}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {passengerPhone && (
+                  <a
+                    href={`tel:${passengerPhone}`}
+                    className="px-2.5 py-1.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs rounded-xl transition-all shadow-xs flex items-center gap-1 active:scale-95"
+                    title="Call Passenger"
+                  >
+                    <Phone className="w-3 h-3 fill-black" />
+                    <span>Call</span>
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95"
+                  title="Report Passenger Incident"
+                >
+                  <Flag className="w-3 h-3 text-rose-600 fill-rose-600" />
+                  <span>Report</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Action Buttons: Accept / Decline */}
             <div className="grid grid-cols-2 gap-2.5 pt-1">
               <button
                 type="button"
@@ -580,174 +755,416 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           </div>
         )}
 
-        {/* 3. TODAY'S EARNINGS SUMMARY CARD */}
-        <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800]">
-                <TrendingUp className="w-4 h-4" />
-              </div>
-              <span className="text-xs font-black text-[#1A1A1A]">Today's Performance</span>
-            </div>
-            <span className="text-[10px] font-mono font-bold bg-[#FFF9E6] text-[#E6A800] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
-              Active Tier: ৳70/km
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 block">Earnings</span>
-              <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">৳1,480</span>
+        {/* D. CASE: RIDE ACCEPTED / EN ROUTE TO PICKUP SPOT */}
+        {isEnRouteToPickup && (
+          <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-lg flex flex-col gap-3 animate-in fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-amber-900 bg-amber-100 border border-amber-300 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Heading to Pickup Spot
+              </span>
+              <span className="text-xs font-mono font-bold text-[#E6A800]">
+                Fare: ৳{activeRide.fareTaka}
+              </span>
             </div>
 
-            <div className="p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 block">Trips Done</span>
-              <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">8</span>
-            </div>
-
-            <div className="p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80">
-              <span className="text-[10px] uppercase font-bold text-zinc-400 block">Online Time</span>
-              <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">5.4 hrs</span>
-            </div>
-          </div>
-
-          {/* Quick breakdown: Trips & Battery Swaps */}
-          <div className="flex items-center justify-between px-1 text-xs text-zinc-500 font-medium">
-            <span className="flex items-center gap-1.5">
-              <Bike className="w-3.5 h-3.5 text-[#E6A800]" />
-              <span>8 Passenger Trips</span>
-            </span>
-            <span>•</span>
-            <span className="flex items-center gap-1.5">
-              <Zap className="w-3.5 h-3.5 text-[#E6A800]" />
-              <span>3 Battery Swaps</span>
-            </span>
-          </div>
-        </div>
-
-        {/* 4. LIVE GPS RADAR & MAP (Collapsible / Expandable) */}
-        <div className="rounded-3xl bg-white border border-zinc-200 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-3.5 flex items-center justify-between border-b border-zinc-100">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-7 h-7 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800] shrink-0">
-                <Compass className="w-4 h-4" />
-              </div>
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase font-mono font-bold text-[#E6A800] flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Live GPS • Dhaka Hub
+            {/* Passenger Profile Strip with Call, Chat & Report */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <User className="w-4 h-4" />
                 </div>
-                <div className="text-xs font-bold text-[#1A1A1A] truncate">
-                  {riderAddress}
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <button
-                type="button"
-                onClick={handleRecenterGps}
-                title="Recenter GPS"
-                className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-700 cursor-pointer"
-              >
-                <LocateFixed className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsMapExpanded(!isMapExpanded)}
-                className="text-xs font-bold text-[#E6A800] px-2 py-1 rounded-lg bg-[#FFF9E6] hover:bg-[#F5C518] hover:text-black transition-colors cursor-pointer"
-              >
-                {isMapExpanded ? 'Collapse' : 'Expand'}
-              </button>
-            </div>
-          </div>
-
-          {/* Leaflet Map Frame */}
-          <div
-            className={`w-full transition-all duration-300 relative ${
-              isMapExpanded ? 'h-72' : 'h-44'
-            }`}
-          >
-            <div ref={mapContainerRef} className="w-full h-full" />
-          </div>
-        </div>
-
-        {/* 5. NEARBY POWER STATIONS LIST */}
-        <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-sm flex flex-col gap-3">
-          <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800]">
-                <Zap className="w-4 h-4 fill-[#F5C518]" />
-              </div>
-              <div>
-                <h3 className="text-xs font-black text-[#1A1A1A]">Nearby Power Stations</h3>
-                <p className="text-[10px] text-zinc-500">Voltx Swappable Battery Hubs</p>
-              </div>
-            </div>
-
-            {onOpenPowerStations && (
-              <button
-                type="button"
-                onClick={onOpenPowerStations}
-                className="text-[11px] font-bold text-[#E6A800] hover:underline cursor-pointer"
-              >
-                View All
-              </button>
-            )}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            {nearbyStations.map((station) => (
-              <div
-                key={station.id}
-                className="p-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80 hover:border-[#F5C518] transition-all flex items-center justify-between"
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 rounded-xl bg-white border border-zinc-200 flex items-center justify-center text-amber-700 shrink-0 shadow-xs">
-                    <BatteryCharging className="w-5 h-5 text-[#E6A800]" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-black text-[#1A1A1A] truncate">
-                        {station.name}
-                      </span>
-                      <span className="text-[9px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.2 rounded">
-                        {station.batteryLevel}
-                      </span>
-                    </div>
-                    <span className="text-[10px] text-zinc-500 block truncate">
-                      {station.address} • {station.distance} away
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span className="font-black text-black truncate">{passengerName}</span>
+                    <span className="text-[9px] font-bold text-amber-900 bg-amber-200 px-1 rounded shrink-0">
+                      Passenger
                     </span>
                   </div>
+                  <span className="font-mono text-[11px] font-bold text-zinc-700 block mt-0.5 truncate">
+                    {passengerPhone || 'No phone provided'}
+                  </span>
                 </div>
+              </div>
 
+              <div className="flex items-center gap-1.5 shrink-0">
+                {passengerPhone && (
+                  <a
+                    href={`tel:${passengerPhone}`}
+                    className="w-8 h-8 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black flex items-center justify-center transition-all shadow-xs active:scale-95"
+                    title="Call Passenger"
+                  >
+                    <Phone className="w-3.5 h-3.5 fill-black" />
+                  </a>
+                )}
                 <button
                   type="button"
-                  onClick={() => {
-                    if (mapInstanceRef.current) {
-                      mapInstanceRef.current.flyTo([23.7925, 90.4078], 16, { duration: 1 });
-                    }
-                  }}
-                  className="px-2.5 py-1 rounded-xl bg-white border border-zinc-200 hover:border-[#F5C518] text-[10px] font-bold text-[#E6A800] hover:text-black hover:bg-[#F5C518] transition-all shadow-xs cursor-pointer active:scale-95 shrink-0"
+                  onClick={() => setIsChatOpen(true)}
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 flex items-center justify-center transition-colors cursor-pointer active:scale-95 relative"
+                  title="Chat with Passenger"
                 >
-                  Navigate
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  {(activeRide.chatMessages?.length || 0) > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-[#E6A800] text-black text-[8px] font-black flex items-center justify-center">
+                      {activeRide.chatMessages!.length}
+                    </span>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer active:scale-95"
+                  title="Report Passenger Incident (Not responding, no-show, etc.)"
+                >
+                  <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                  <span>Report</span>
                 </button>
               </div>
-            ))}
-          </div>
-        </div>
+            </div>
 
-        {/* 6. CAPTAIN SECURITY & POLICY FOOTER */}
-        <div className="pt-2 pb-4 text-center flex flex-col items-center gap-1">
+            {/* Pickup location indicator */}
+            <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs">
+              <div className="w-5 h-5 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                <MapPin className="w-3 h-3" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block">Pickup Location</span>
+                <span className="font-bold text-[#1A1A1A] block truncate">
+                  {activeRide.pickup.addressLine1 || activeRide.pickup.formatted.split(',')[0]}
+                </span>
+              </div>
+            </div>
+
+            {/* Swipe Action: Slide to Confirm Reached Pickup Spot */}
+            <SwipeActionSlider
+              label="Slide: Reached Pickup Spot"
+              onConfirm={() => arriveAtPickupSpot()}
+              icon={<CheckCircle2 className="w-5 h-5 text-black" />}
+            />
+          </div>
+        )}
+
+        {/* E. CASE: ARRIVED AT PICKUP SPOT (Waiting to board passenger) */}
+        {isAtPickup && (
+          <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-lg flex flex-col gap-3 animate-in fade-in">
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-black text-emerald-950">At Pickup Spot • Passenger Notified</span>
+              </div>
+              <span className="text-[10px] font-mono font-bold text-emerald-800">Waiting to board</span>
+            </div>
+
+            {/* Passenger Contact Strip */}
+            <div className="flex items-center justify-between p-3 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-2xl bg-amber-400 text-black flex items-center justify-center font-bold shrink-0 shadow-xs">
+                  <User className="w-4 h-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="font-black text-black truncate">{passengerName}</div>
+                  <span className="font-mono text-[11px] font-bold text-zinc-700 block truncate">
+                    {passengerPhone || 'No phone provided'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {passengerPhone && (
+                  <a
+                    href={`tel:${passengerPhone}`}
+                    className="w-8 h-8 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black flex items-center justify-center transition-all shadow-xs active:scale-95"
+                    title="Call Passenger"
+                  >
+                    <Phone className="w-3.5 h-3.5 fill-black" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsChatOpen(true)}
+                  className="w-8 h-8 rounded-xl bg-white hover:bg-zinc-100 border border-zinc-200 text-zinc-800 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                  title="Chat with Passenger"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="px-2 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer active:scale-95"
+                  title="Report Passenger Incident (Not responding, no-show)"
+                >
+                  <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                  <span>Report</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Destination Preview */}
+            <div className="flex items-center gap-2 p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs">
+              <div className="w-5 h-5 rounded-full bg-zinc-200 text-zinc-700 flex items-center justify-center shrink-0">
+                <Navigation className="w-3 h-3" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block">Going To (Drop-off)</span>
+                <span className="font-bold text-[#1A1A1A] block truncate">
+                  {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}
+                </span>
+              </div>
+            </div>
+
+            {/* Swipe Action: Slide to Start Trip to Destination */}
+            <SwipeActionSlider
+              label="Slide: Picked Up Passenger (Start Trip)"
+              onConfirm={() => startTripToDestination()}
+              icon={<Navigation className="w-5 h-5 fill-black" />}
+            />
+          </div>
+        )}
+
+        {/* F. CASE: IN TRANSIT TO DESTINATION (Trip active) */}
+        {isInTransit && (
+          <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-lg flex flex-col gap-3 animate-in fade-in">
+            <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-emerald-900 bg-emerald-100 border border-emerald-300 px-2.5 py-1 rounded-full flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                Live Navigation to Destination
+              </span>
+              <span className="text-xs font-mono font-bold text-emerald-700">
+                Meter: ৳{Math.round(RATE_PER_KM_TAKA * (activeRide.distanceKm || 1))}
+              </span>
+            </div>
+
+            {/* Drop-off address indicator */}
+            <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#F8F9FA] border border-zinc-200 text-xs">
+              <div className="w-8 h-8 rounded-xl bg-zinc-900 text-[#F5C518] flex items-center justify-center shrink-0">
+                <Navigation className="w-4 h-4" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <span className="text-[9px] uppercase font-bold text-zinc-400 block">Destination Drop-off</span>
+                <span className="font-black text-[#1A1A1A] block truncate">
+                  {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted}
+                </span>
+              </div>
+            </div>
+
+            {/* Passenger Contact Strip */}
+            <div className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs">
+              <div className="min-w-0">
+                <span className="font-bold text-zinc-900 block truncate">{passengerName}</span>
+                <span className="font-mono text-[11px] text-zinc-500 block truncate">{passengerPhone}</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                {passengerPhone && (
+                  <a
+                    href={`tel:${passengerPhone}`}
+                    className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center transition-all active:scale-95"
+                    title="Call"
+                  >
+                    <Phone className="w-3.5 h-3.5 fill-black" />
+                  </a>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setIsChatOpen(true)}
+                  className="w-8 h-8 rounded-xl bg-white border border-zinc-200 text-zinc-800 flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+                  title="Chat"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsReportModalOpen(true)}
+                  className="px-2 py-1.5 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer active:scale-95"
+                  title="Report Issue"
+                >
+                  <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                  <span>Report</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Swipe Action: Slide to Complete Ride at Destination */}
+            <SwipeActionSlider
+              label="Slide: Complete Ride (Destination Reached)"
+              onConfirm={() => completeTrip(activeRide.distanceKm)}
+              icon={<CheckCircle2 className="w-5 h-5 text-black" />}
+            />
+          </div>
+        )}
+
+        {/* G. CASE: TRIP COMPLETED */}
+        {isCompleted && (
+          <div className="p-4 rounded-3xl bg-white border border-zinc-200 shadow-xl flex flex-col gap-3 animate-in fade-in">
+            <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-2xl flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-600" />
+                <span className="text-xs font-black text-emerald-950">Trip Completed Successfully!</span>
+              </div>
+              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                Saved to History
+              </span>
+            </div>
+
+            <div className="p-3.5 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-between">
+              <div>
+                <span className="text-[10px] text-[#E6A800] uppercase font-bold block">Fare Collected</span>
+                <span className="text-2xl font-black text-[#1A1A1A]">
+                  ৳{activeRide.finalFareTaka || activeRide.fareTaka}
+                </span>
+              </div>
+              <div className="text-right text-xs">
+                <span className="text-zinc-500 block">Distance: {activeRide.actualTraveledKm || activeRide.distanceKm} km</span>
+                <span className="text-zinc-500 block font-mono">Payment: {activeRide.paymentMethod || 'Cash'}</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setIsReportModalOpen(true)}
+                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 text-xs shadow-2xs"
+              >
+                <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                <span>Report Passenger Incident / Dispute</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  clearCurrentRide();
+                }}
+                className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <span>Complete Trip & Back to Radar</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* 4. DRIVER SAFETY & FLEET FOOTER */}
+        <div className="pt-2 pb-2 text-center flex flex-col items-center gap-1">
           <div className="flex items-center gap-1.5 text-xs text-zinc-500 font-semibold">
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
-            <span>Driver Safety & Insurance Active • Dhaka Fleet</span>
+            <span>Driver Safety & Insurance Active • Dhaka Fleet Dispatch</span>
           </div>
           <p className="text-[10px] text-zinc-400">
-            Crafted with love from BeeGo Voltx
+            BeeGo Voltx • Eco Electric Fleet Bangladesh
           </p>
         </div>
       </div>
+
+      {/* 5. IN-RIDE REAL-TIME CHAT DRAWER */}
+      {isChatOpen && activeRide && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex flex-col justify-end">
+          <div className="w-full max-w-lg mx-auto bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[80vh] overflow-hidden animate-in slide-in-from-bottom duration-200">
+            {/* Chat Header */}
+            <div className="p-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800]">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-900">Chat with Passenger</h3>
+                  <p className="text-[11px] font-mono text-zinc-500">
+                    {passengerName} • {passengerPhone || 'No phone'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChatOpen(false)}
+                className="w-8 h-8 rounded-full bg-zinc-200 hover:bg-zinc-300 flex items-center justify-center text-zinc-600 cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Chat Message History */}
+            <div className="flex-1 p-4 overflow-y-auto space-y-3 min-h-[180px] max-h-[300px]">
+              {(activeRide.chatMessages || []).length === 0 ? (
+                <div className="text-center py-6 text-zinc-400 text-xs">
+                  No messages yet. Send a quick update to the passenger.
+                </div>
+              ) : (
+                activeRide.chatMessages!.map((msg) => {
+                  const isDriver = msg.sender === 'rider';
+                  return (
+                    <div key={msg.id} className={`flex flex-col ${isDriver ? 'items-end' : 'items-start'}`}>
+                      <div
+                        className={`max-w-[80%] px-3.5 py-2 rounded-2xl text-xs ${
+                          isDriver
+                            ? 'bg-[#F5C518] text-black font-semibold rounded-br-xs'
+                            : 'bg-zinc-100 text-zinc-900 rounded-bl-xs'
+                        }`}
+                      >
+                        {msg.text}
+                      </div>
+                      <span className="text-[9px] text-zinc-400 mt-0.5 px-1 font-mono">
+                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Quick phrases */}
+            <div className="px-4 py-2 bg-zinc-50 border-t border-zinc-100 flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+              {quickPhrases.map((phrase) => (
+                <button
+                  key={phrase}
+                  type="button"
+                  onClick={() => handleSendChat(phrase)}
+                  className="px-2.5 py-1 rounded-xl bg-white border border-zinc-200 hover:border-[#F5C518] text-[11px] text-zinc-700 whitespace-nowrap cursor-pointer active:scale-95"
+                >
+                  {phrase}
+                </button>
+              ))}
+            </div>
+
+            {/* Input bar */}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendChat(chatInputText);
+              }}
+              className="p-3 border-t border-zinc-100 flex items-center gap-2 bg-white"
+            >
+              <input
+                type="text"
+                value={chatInputText}
+                onChange={(e) => setChatInputText(e.target.value)}
+                placeholder="Type message to passenger..."
+                className="flex-1 px-4 py-2.5 rounded-xl bg-zinc-100 border border-zinc-200 text-xs text-zinc-900 focus:outline-hidden focus:border-[#F5C518]"
+              />
+              <button
+                type="submit"
+                disabled={!chatInputText.trim()}
+                className="px-4 py-2.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] disabled:opacity-40 text-black font-black text-xs transition-colors cursor-pointer"
+              >
+                Send
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* 6. REPORT INCIDENT MODAL (Accessible anytime before or after ride) */}
+      {activeRide && (
+        <ReportIssueModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          reporterRole="driver"
+          reporterId={riderId}
+          reporterName={driverProfile?.name || 'Driver'}
+          reportedRole="passenger"
+          reportedId={activeRide.passengerId}
+          reportedName={passengerName}
+          reportedPhone={passengerPhone}
+          rideId={activeRide.id}
+        />
+      )}
     </div>
   );
 };

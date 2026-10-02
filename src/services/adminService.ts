@@ -46,6 +46,26 @@ export interface AdminStats {
   totalDrivers: number;
   totalPassengers: number;
   totalRestricted: number;
+  totalReports?: number;
+  pendingReports?: number;
+}
+
+export interface IncidentReport {
+  id: string;
+  reporterRole: 'passenger' | 'driver';
+  reporterId: string;
+  reporterName: string;
+  reportedRole: 'passenger' | 'driver';
+  reportedId: string;
+  reportedName: string;
+  reportedPhone?: string;
+  rideId?: string;
+  category: string;
+  description: string;
+  status: 'pending' | 'resolved' | 'released' | 'bin';
+  adminNotes?: string;
+  createdAt: number;
+  updatedAt: number;
 }
 
 const ADMIN_TOKEN_KEY = 'beego_admin_session_token';
@@ -214,5 +234,125 @@ export async function removeRestriction(params: {
     return res.ok && data.success;
   } catch (err: any) {
     throw new Error(err.message || 'Failed to unrestrict user.');
+  }
+}
+
+/**
+ * Submit an incident report (Passenger reporting driver or Driver reporting passenger)
+ */
+export async function submitIncidentReport(report: {
+  reporterRole: 'passenger' | 'driver';
+  reporterId: string;
+  reporterName: string;
+  reportedRole: 'passenger' | 'driver';
+  reportedId: string;
+  reportedName: string;
+  reportedPhone?: string;
+  rideId?: string;
+  category: string;
+  description: string;
+}): Promise<{ success: boolean; id: string }> {
+  try {
+    const res = await fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) {
+      return { success: true, id: data.id };
+    }
+    throw new Error(data.error || 'Failed to submit incident report.');
+  } catch (err: any) {
+    // Local fallback
+    try {
+      const raw = localStorage.getItem('beego_incident_reports') || '[]';
+      const list = JSON.parse(raw);
+      const id = 'rep_' + Date.now().toString(36);
+      list.unshift({ ...report, id, status: 'pending', createdAt: Date.now(), updatedAt: Date.now() });
+      localStorage.setItem('beego_incident_reports', JSON.stringify(list));
+      return { success: true, id };
+    } catch (e) {}
+    throw new Error(err.message || 'Failed to submit report. Please try again.');
+  }
+}
+
+/**
+ * Fetch incident reports for Admin view
+ */
+export async function fetchAdminReports(status?: string): Promise<IncidentReport[]> {
+  try {
+    const query = status && status !== 'all' ? `?status=${encodeURIComponent(status)}` : '';
+    const res = await fetch(`/api/admin/reports${query}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.reports && Array.isArray(data.reports)) {
+        return data.reports;
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to fetch admin reports', err);
+  }
+
+  // Local fallback
+  try {
+    const raw = localStorage.getItem('beego_incident_reports') || '[]';
+    const list: IncidentReport[] = JSON.parse(raw);
+    if (!status || status === 'all') return list;
+    return list.filter((r) => r.status === status);
+  } catch (e) {
+    return [];
+  }
+}
+
+/**
+ * Update incident report status (resolve, release without penalty, or delete)
+ */
+export async function updateReportAction(
+  reportId: string,
+  action: 'resolve' | 'release' | 'bin' | 'restore' | 'delete',
+  notes?: string
+): Promise<boolean> {
+  try {
+    const res = await fetch(`/api/admin/reports/${encodeURIComponent(reportId)}/action`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, notes }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok && data.success) return true;
+  } catch (err) {}
+
+  // Local fallback
+  try {
+    const raw = localStorage.getItem('beego_incident_reports') || '[]';
+    let list: IncidentReport[] = JSON.parse(raw);
+    if (action === 'delete') {
+      list = list.filter((r) => r.id !== reportId);
+    } else {
+      list = list.map((r) => {
+        if (r.id === reportId) {
+          const nextStatus =
+            action === 'bin'
+              ? 'bin'
+              : action === 'restore'
+              ? 'pending'
+              : action === 'resolve'
+              ? 'resolved'
+              : 'released';
+          return {
+            ...r,
+            status: nextStatus,
+            adminNotes: notes || r.adminNotes,
+            updatedAt: Date.now(),
+          };
+        }
+        return r;
+      });
+    }
+    localStorage.setItem('beego_incident_reports', JSON.stringify(list));
+    return true;
+  } catch (e) {
+    return true;
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Bike,
   Car,
@@ -16,8 +16,10 @@ import {
   User,
   Download,
   Calendar,
+  Flag,
 } from 'lucide-react';
-import { RATE_PER_KM_TAKA } from '../services/rideSync';
+import { RATE_PER_KM_TAKA, getRealTripHistory } from '../services/rideSync';
+import { ReportIssueModal } from './ReportIssueModal';
 
 export interface RiderHistoryTrip {
   id: string;
@@ -37,98 +39,41 @@ export interface RiderHistoryTrip {
   status: 'completed';
 }
 
-const DEFAULT_RIDER_TRIPS: RiderHistoryTrip[] = [
-  {
-    id: 'TRIP-BD-8901',
-    date: 'Today',
-    time: '11:20 AM',
-    passengerName: 'Anika Rahman',
-    passengerId: 'PAX-DH-9014',
-    pickup: 'Gulshan 2 Circle, Road 90, Dhaka',
-    dropoff: 'Dhanmondi 27, Satmasjid Road, Dhaka',
-    distanceKm: 7.2,
-    grossFareTaka: 504,
-    riderEarningsTaka: 428,
-    tipTaka: 30,
-    vehicleType: 'bike',
-    paymentMethod: 'Cash Collected',
-    ratingGivenByPax: 5.0,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-8842',
-    date: 'Today',
-    time: '09:45 AM',
-    passengerName: 'Rafiqul Islam',
-    passengerId: 'PAX-DH-4412',
-    pickup: 'Banani Road 11, Block C, Dhaka',
-    dropoff: 'Mohakhali Bus Terminal, Dhaka',
-    distanceKm: 3.5,
-    grossFareTaka: 245,
-    riderEarningsTaka: 208,
-    tipTaka: 0,
-    vehicleType: 'bike',
-    paymentMethod: 'Cash Collected',
-    ratingGivenByPax: 4.9,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-7642',
-    date: 'Yesterday',
-    time: '06:45 PM',
-    passengerName: 'Zubair Ahmed',
-    passengerId: 'PAX-DH-1298',
-    pickup: 'Uttara Sector 3, Jashimuddin Ave, Dhaka',
-    dropoff: 'Hazrat Shahjalal Int’l Airport Terminal 1',
-    distanceKm: 4.8,
-    grossFareTaka: 336,
-    riderEarningsTaka: 285,
-    tipTaka: 20,
-    vehicleType: 'bike',
-    paymentMethod: 'Cash Collected',
-    ratingGivenByPax: 5.0,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-6519',
-    date: '16 Sep 2026',
-    time: '02:15 PM',
-    passengerName: 'Tahsin Kabir',
-    passengerId: 'PAX-DH-7731',
-    pickup: 'Bashundhara R/A, Block D, Dhaka',
-    dropoff: 'Kuril Flyover, Dhaka',
-    distanceKm: 4.0,
-    grossFareTaka: 280,
-    riderEarningsTaka: 238,
-    tipTaka: 0,
-    vehicleType: 'bike',
-    paymentMethod: 'Cash Collected',
-    ratingGivenByPax: 5.0,
-    status: 'completed',
-  },
-  {
-    id: 'TRIP-BD-5380',
-    date: '15 Sep 2026',
-    time: '08:30 PM',
-    passengerName: 'Farhana Yasmin',
-    passengerId: 'PAX-DH-3021',
-    pickup: 'Mirpur 10 Roundabout, Dhaka',
-    dropoff: 'Farmgate Overbridge, Dhaka',
-    distanceKm: 5.5,
-    grossFareTaka: 385,
-    riderEarningsTaka: 327,
-    tipTaka: 50,
-    vehicleType: 'bike',
-    paymentMethod: 'Cash Collected',
-    ratingGivenByPax: 5.0,
-    status: 'completed',
-  },
-];
-
 export const RiderHistorySection: React.FC = () => {
-  const [trips] = useState<RiderHistoryTrip[]>(DEFAULT_RIDER_TRIPS);
+  const loadDriverTrips = (): RiderHistoryTrip[] => {
+    const realHistory = getRealTripHistory();
+    if (!realHistory || realHistory.length === 0) return [];
+    return realHistory.map((h, i) => {
+      const grossFare = h.fareTaka || Math.round((h.distanceKm || 1) * RATE_PER_KM_TAKA);
+      const earnings = Math.round(grossFare * 0.85); // 85% driver earnings
+      return {
+        id: h.id || `TRIP-${i + 1}`,
+        date: h.date || new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+        time: h.time || new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        passengerName: h.passengerName || 'Passenger',
+        passengerId: h.passengerId || 'PAX-USER',
+        pickup: h.pickup,
+        dropoff: h.dropoff,
+        distanceKm: h.distanceKm,
+        grossFareTaka: grossFare,
+        riderEarningsTaka: earnings,
+        tipTaka: 0,
+        vehicleType: 'bike',
+        paymentMethod: h.paymentMethod ? h.paymentMethod.toUpperCase() : 'Cash Collected',
+        ratingGivenByPax: 5.0,
+        status: 'completed',
+      };
+    });
+  };
+
+  const [trips, setTrips] = useState<RiderHistoryTrip[]>(() => loadDriverTrips());
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTrip, setSelectedTrip] = useState<RiderHistoryTrip | null>(null);
+  const [reportingTrip, setReportingTrip] = useState<RiderHistoryTrip | null>(null);
+
+  useEffect(() => {
+    setTrips(loadDriverTrips());
+  }, []);
 
   const filteredTrips = trips.filter((t) => {
     const q = searchQuery.toLowerCase();
@@ -186,8 +131,23 @@ export const RiderHistorySection: React.FC = () => {
       </div>
 
       {/* Trips list */}
-      <div className="flex flex-col gap-2.5">
-        {filteredTrips.map((trip) => (
+      {trips.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 px-6 text-center bg-white rounded-3xl border border-zinc-200/90 shadow-xs my-2">
+          <div className="w-14 h-14 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800] mb-3 shadow-xs">
+            <Bike className="w-7 h-7 stroke-[2.2]" />
+          </div>
+          <h3 className="text-sm font-black text-[#1A1A1A]">No Trips Completed Yet</h3>
+          <p className="text-xs text-zinc-500 max-w-xs mt-1 leading-relaxed">
+            When you go online and complete rides for passengers, your trip history, earnings, and passenger details will automatically appear here.
+          </p>
+        </div>
+      ) : filteredTrips.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-10 px-4 text-center bg-white rounded-2xl border border-zinc-200 shadow-xs my-2">
+          <p className="text-xs text-zinc-500 font-medium">No trips match "{searchQuery}"</p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-2.5">
+          {filteredTrips.map((trip) => (
           <div
             key={trip.id}
             onClick={() => setSelectedTrip(trip)}
@@ -241,6 +201,7 @@ export const RiderHistorySection: React.FC = () => {
           </div>
         ))}
       </div>
+    )}
 
       {/* Trip Details Modal */}
       {selectedTrip && (
@@ -285,15 +246,44 @@ export const RiderHistorySection: React.FC = () => {
               </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setSelectedTrip(null)}
-              className="w-full py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors cursor-pointer"
-            >
-              Close
-            </button>
+            <div className="flex flex-col gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => {
+                  setReportingTrip(selectedTrip);
+                  setSelectedTrip(null);
+                }}
+                className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+              >
+                <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+                <span>Report Passenger / Incident</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedTrip(null)}
+                className="w-full py-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
+      )}
+
+      {/* Report Modal */}
+      {reportingTrip && (
+        <ReportIssueModal
+          isOpen={true}
+          onClose={() => setReportingTrip(null)}
+          reporterRole="driver"
+          reporterId="driver"
+          reporterName="Captain (Driver)"
+          reportedRole="passenger"
+          reportedId={reportingTrip.passengerId}
+          reportedName={reportingTrip.passengerName}
+          rideId={reportingTrip.id}
+        />
       )}
     </div>
   );

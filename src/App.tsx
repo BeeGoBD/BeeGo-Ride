@@ -447,37 +447,18 @@ export default function App() {
       />
     );
   } else if (role === 'rider') {
-    // 4. RIDER VIEW
-    if (
-      activeRide &&
-      (activeRide.status === 'accepted' ||
-        activeRide.status === 'arrived_at_pickup' ||
-        activeRide.status === 'in_transit' ||
-        activeRide.status === 'completed')
-    ) {
-      content = (
-        <UberLiveTracking
-          role="rider"
-          activeRide={activeRide}
-          apiKey={apiKey}
-          onBackToRoles={handleBackToRoles}
-          onSwitchRole={handleSwitchToPassenger}
-          onResetRide={handleResetRide}
-        />
-      );
-    } else {
-      content = (
-        <RiderAppShell
-          riderId={riderId}
-          activeRide={activeRide}
-          apiKey={apiKey}
-          onApiKeyChange={handleApiKeyChange}
-          onBackToRoles={handleBackToRoles}
-          onSwitchToPassenger={handleSwitchToPassenger}
-          onReplayIntro={handleReplayIntro}
-        />
-      );
-    }
+    // 4. RIDER VIEW (Captain stays in unified dashboard with map & dispatch)
+    content = (
+      <RiderAppShell
+        riderId={riderId}
+        activeRide={activeRide}
+        apiKey={apiKey}
+        onApiKeyChange={handleApiKeyChange}
+        onBackToRoles={handleBackToRoles}
+        onSwitchToPassenger={handleSwitchToPassenger}
+        onReplayIntro={handleReplayIntro}
+      />
+    );
   } else {
     // 5. PASSENGER VIEW
     if (

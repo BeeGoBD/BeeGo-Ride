@@ -18,9 +18,11 @@ import {
   Banknote,
   AlertCircle,
   Navigation,
+  Flag,
 } from 'lucide-react';
 import { RideRequest } from '../types';
 import { RATE_PER_KM_TAKA, getRealTripHistory, StoredRealTrip } from '../services/rideSync';
+import { ReportIssueModal } from './ReportIssueModal';
 
 export interface HistoryRideItem {
   id: string;
@@ -56,6 +58,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
 }) => {
   const [vehicleFilter, setVehicleFilter] = useState<'bike' | 'car' | 'all'>('bike');
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryRideItem | null>(null);
+  const [reportingTrip, setReportingTrip] = useState<HistoryRideItem | null>(null);
 
   const loadRealTrips = (): HistoryRideItem[] => {
     const realHistory = getRealTripHistory();
@@ -403,8 +406,37 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
                 </>
               )}
             </button>
+
+            {/* Report Issue Button for past completed trip */}
+            <button
+              type="button"
+              onClick={() => {
+                const target = selectedReceipt;
+                setSelectedReceipt(null);
+                setReportingTrip(target);
+              }}
+              className="w-full py-2.5 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-rose-200"
+            >
+              <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
+              <span>Report Issue with this Trip</span>
+            </button>
           </div>
         </div>
+      )}
+
+      {/* Report Incident Modal */}
+      {reportingTrip && (
+        <ReportIssueModal
+          isOpen={true}
+          onClose={() => setReportingTrip(null)}
+          reporterRole="passenger"
+          reporterId="passenger"
+          reporterName="Passenger"
+          reportedRole="driver"
+          reportedId={reportingTrip.plateNumber}
+          reportedName={reportingTrip.driverName}
+          rideId={reportingTrip.id}
+        />
       )}
     </div>
   );

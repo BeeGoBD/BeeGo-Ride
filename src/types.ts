@@ -89,6 +89,7 @@ export type PaymentMethod = 'cash' | 'bkash' | 'nagad' | 'rocket';
 export interface RideRequest {
   id: string; // e.g. RIDE-8392
   passengerId: string; // e.g. PAX-4821
+  passengerName?: string; // Passenger Full Name
   passengerPhone?: string; // Contact phone for Captain calling
   riderId?: string; // e.g. RIDER-9302
   vehicleType?: 'bike' | 'car';

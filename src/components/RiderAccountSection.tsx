@@ -30,6 +30,9 @@ import {
   Phone,
   Mail,
   RefreshCw,
+  TrendingUp,
+  Calendar,
+  BarChart3,
 } from 'lucide-react';
 import { RATE_PER_KM_TAKA } from '../services/rideSync';
 import {
@@ -82,6 +85,95 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
   const [isSubmittingReset, setIsSubmittingReset] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetDevOtp, setResetDevOtp] = useState<string | null>(null);
+
+  // Performance timeframe: 'today' | 'yesterday' | 'week' | 'month' | 'custom'
+  const [perfTimeframe, setPerfTimeframe] = useState<'today' | 'yesterday' | 'week' | 'month' | 'custom'>('today');
+  const [perfCustomDate, setPerfCustomDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
+  // Performance datasets based on timeframe
+  const perfData = {
+    today: {
+      earnings: 1480,
+      trips: 8,
+      onlineHours: 5.4,
+      swaps: 3,
+      avgPerTrip: 185,
+      cashShare: 820,
+      digitalShare: 660,
+      bars: [
+        { label: '8 AM', val: 140 },
+        { label: '10 AM', val: 280 },
+        { label: '12 PM', val: 320 },
+        { label: '2 PM', val: 210 },
+        { label: '4 PM', val: 190 },
+        { label: '6 PM', val: 340 },
+      ],
+    },
+    yesterday: {
+      earnings: 1820,
+      trips: 10,
+      onlineHours: 6.8,
+      swaps: 4,
+      avgPerTrip: 182,
+      cashShare: 1100,
+      digitalShare: 720,
+      bars: [
+        { label: '8 AM', val: 220 },
+        { label: '10 AM', val: 350 },
+        { label: '12 PM', val: 410 },
+        { label: '2 PM', val: 180 },
+        { label: '4 PM', val: 260 },
+        { label: '6 PM', val: 400 },
+      ],
+    },
+    week: {
+      earnings: 10640,
+      trips: 58,
+      onlineHours: 41.2,
+      swaps: 22,
+      avgPerTrip: 183,
+      cashShare: 6200,
+      digitalShare: 4440,
+      bars: [
+        { label: 'Mon', val: 1350 },
+        { label: 'Tue', val: 1520 },
+        { label: 'Wed', val: 1480 },
+        { label: 'Thu', val: 1620 },
+        { label: 'Fri', val: 1840 },
+        { label: 'Sat', val: 1350 },
+        { label: 'Sun', val: 1480 },
+      ],
+    },
+    month: {
+      earnings: 44800,
+      trips: 246,
+      onlineHours: 172.5,
+      swaps: 89,
+      avgPerTrip: 182,
+      cashShare: 26500,
+      digitalShare: 18300,
+      bars: [
+        { label: 'Wk 1', val: 10200 },
+        { label: 'Wk 2', val: 11400 },
+        { label: 'Wk 3', val: 12100 },
+        { label: 'Wk 4', val: 11100 },
+      ],
+    },
+    custom: {
+      earnings: 1560,
+      trips: 9,
+      onlineHours: 5.9,
+      swaps: 3,
+      avgPerTrip: 173,
+      cashShare: 900,
+      digitalShare: 660,
+      bars: [
+        { label: 'Morn', val: 510 },
+        { label: 'Noon', val: 450 },
+        { label: 'Eve', val: 600 },
+      ],
+    },
+  }[perfTimeframe];
 
   const status = driverProfile?.verificationStatus || 'under_review';
   const isPending = status === 'under_review' || status === 'pending';
@@ -482,6 +574,132 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
             <span className="text-[10px] text-zinc-400 block">Digital Wallet Credit</span>
             <span className="font-bold text-[#1A1A1A]">৳660</span>
           </div>
+        </div>
+      </div>
+
+      {/* 3. DRIVER PERFORMANCE & ANALYTICS CHART SECTION */}
+      <div id="driver-performance-analytics-section" className="mt-4 p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-sm flex flex-col gap-3.5">
+        <div className="flex items-center justify-between pb-2 border-b border-zinc-100">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800]">
+              <TrendingUp className="w-4 h-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-black text-[#1A1A1A]">Performance & Earnings Chart</h3>
+              <p className="text-[10px] text-zinc-500 font-medium">Captain Analytics • Flat ৳70/km Tier</p>
+            </div>
+          </div>
+          <span className="text-[10px] font-mono font-bold bg-[#FFF9E6] text-[#E6A800] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
+            ৳70/km
+          </span>
+        </div>
+
+        {/* Timeframe Selector Buttons */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-zinc-100/90 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'today', label: 'Today' },
+            { id: 'yesterday', label: 'Yesterday' },
+            { id: 'week', label: 'This Week' },
+            { id: 'month', label: 'This Month' },
+            { id: 'custom', label: 'By Date' },
+          ].map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setPerfTimeframe(t.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all cursor-pointer shrink-0 ${
+                perfTimeframe === t.id
+                  ? 'bg-white text-black shadow-xs font-black'
+                  : 'text-zinc-500 hover:text-black'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Date picker if custom date is active */}
+        {perfTimeframe === 'custom' && (
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 text-xs animate-in fade-in">
+            <span className="text-zinc-600 font-bold flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-[#E6A800]" />
+              <span>Select Date:</span>
+            </span>
+            <input
+              type="date"
+              value={perfCustomDate}
+              onChange={(e) => setPerfCustomDate(e.target.value)}
+              className="px-2.5 py-1 rounded-xl bg-white border border-zinc-300 font-mono text-xs font-bold text-black focus:outline-none focus:border-[#F5C518]"
+            />
+          </div>
+        )}
+
+        {/* High-Level KPI Summary */}
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="p-2.5 rounded-2xl bg-[#FFF9E6]/60 border border-[#F5C518]/30">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 block">Earnings</span>
+            <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">৳{perfData.earnings.toLocaleString()}</span>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 block">Trips Done</span>
+            <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">{perfData.trips}</span>
+          </div>
+
+          <div className="p-2.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200">
+            <span className="text-[9px] uppercase font-bold text-zinc-500 block">Online Time</span>
+            <span className="text-base font-black text-[#1A1A1A] mt-0.5 block">{perfData.onlineHours} hrs</span>
+          </div>
+        </div>
+
+        {/* Visual Bar Chart Comparison */}
+        <div className="p-3.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200/80 flex flex-col gap-2">
+          <div className="flex items-center justify-between text-[11px] font-bold text-zinc-700">
+            <span className="flex items-center gap-1.5">
+              <BarChart3 className="w-3.5 h-3.5 text-[#E6A800]" />
+              <span>Earnings Progression</span>
+            </span>
+            <span className="font-mono text-zinc-400 text-[10px]">Avg ৳{perfData.avgPerTrip}/trip</span>
+          </div>
+
+          <div className="flex items-end justify-between gap-1.5 h-24 pt-4 px-1">
+            {perfData.bars.map((b, i) => {
+              const maxVal = Math.max(...perfData.bars.map((bar) => bar.val), 1);
+              const heightPct = Math.round((b.val / maxVal) * 85) + 15;
+              return (
+                <div key={i} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end group">
+                  <span className="text-[9px] font-mono font-bold text-zinc-500 opacity-80 group-hover:opacity-100">
+                    ৳{b.val}
+                  </span>
+                  <div
+                    style={{ height: `${heightPct}%` }}
+                    className="w-full max-w-[28px] rounded-t-lg bg-gradient-to-t from-amber-400 to-[#F5C518] hover:brightness-105 transition-all shadow-2xs"
+                  />
+                  <span className="text-[9px] font-bold text-zinc-400 truncate max-w-full">
+                    {b.label}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Detailed Breakdown: Cash vs Digital & Battery Swaps */}
+        <div className="flex items-center justify-between px-2 pt-1 text-xs text-zinc-600 font-medium">
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span>Cash: <strong>৳{perfData.cashShare}</strong></span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full bg-[#E6A800]" />
+            <span>Digital: <strong>৳{perfData.digitalShare}</strong></span>
+          </span>
+          <span>•</span>
+          <span className="flex items-center gap-1.5">
+            <Zap className="w-3 h-3 text-[#E6A800]" />
+            <span>{perfData.swaps} Swaps</span>
+          </span>
         </div>
       </div>
 

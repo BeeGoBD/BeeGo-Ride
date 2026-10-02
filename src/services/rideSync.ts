@@ -125,6 +125,7 @@ export interface StoredRealTrip {
   driverName: string;
   driverRating: number;
   passengerId: string;
+  passengerName?: string;
   paymentMethod: PaymentMethod;
   transactionRef: string;
   status: 'completed';
@@ -340,6 +341,7 @@ export function completeTrip(actualTraveledKm?: number): RideRequest | null {
     driverName: current.driverDetails?.name || DEFAULT_DRIVER.name,
     driverRating: current.driverDetails?.rating || DEFAULT_DRIVER.rating,
     passengerId: current.passengerId,
+    passengerName: current.passengerName,
     paymentMethod: current.paymentMethod || 'cash',
     transactionRef: `TXN-BD-${current.id.replace('RIDE-', '')}-${finalFare}`,
     status: 'completed',

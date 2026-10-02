@@ -78,8 +78,8 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
     initialMode === 'login' ? 'signin' : 'signup'
   );
 
-  // Sign In Mode: 'password' (default) vs 'otp'
-  const [signinMode, setSigninMode] = useState<'password' | 'otp'>('password');
+  // Sign In Mode: 'otp' (default) vs 'password'
+  const [signinMode, setSigninMode] = useState<'password' | 'otp'>('otp');
 
   // Common Form Fields
   const [fullName, setFullName] = useState('');
@@ -96,14 +96,12 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   const [signupOtpSent, setSignupOtpSent] = useState(false);
   const [signupEmailVerified, setSignupEmailVerified] = useState(false);
   const [signupOtpCode, setSignupOtpCode] = useState('');
-  const [signupActiveDevOtp, setSignupActiveDevOtp] = useState<string | null>(null);
   const [isSendingSignupOtp, setIsSendingSignupOtp] = useState(false);
   const [isVerifyingSignupOtp, setIsVerifyingSignupOtp] = useState(false);
 
   // Sign In: Email OTP State
   const [signinOtpSent, setSigninOtpSent] = useState(false);
   const [signinOtpDigits, setSigninOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [signinActiveDevOtp, setSigninActiveDevOtp] = useState<string | null>(null);
   const [isSendingSigninOtp, setIsSendingSigninOtp] = useState(false);
   const [isVerifyingSigninOtp, setIsVerifyingSigninOtp] = useState(false);
   const [signinCooldown, setSigninCooldown] = useState(0);
@@ -112,7 +110,6 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   const [forgotStep, setForgotStep] = useState<'request' | 'verify' | 'new_password'>('request');
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotOtpDigits, setForgotOtpDigits] = useState<string[]>(['', '', '', '', '', '']);
-  const [forgotActiveDevOtp, setForgotActiveDevOtp] = useState<string | null>(null);
   const [isSendingForgotOtp, setIsSendingForgotOtp] = useState(false);
   const [isVerifyingForgotOtp, setIsVerifyingForgotOtp] = useState(false);
   const [forgotCooldown, setForgotCooldown] = useState(0);
@@ -267,10 +264,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
     setIsSendingSigninOtp(true);
     try {
-      const res = await dispatchEmailOtp(cleanEmail);
-      if (res.devOtp) {
-        setSigninActiveDevOtp(res.devOtp);
-      }
+      await dispatchEmailOtp(cleanEmail);
       setSigninOtpSent(true);
       setSigninCooldown(45);
       setSuccessMessage(`Verification code sent to ${cleanEmail}. Please enter the 6 digits below.`);
@@ -343,10 +337,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
     setIsSendingSignupOtp(true);
     try {
-      const res = await dispatchEmailOtp(cleanEmail, fullName.trim() || undefined);
-      if (res.devOtp) {
-        setSignupActiveDevOtp(res.devOtp);
-      }
+      await dispatchEmailOtp(cleanEmail, fullName.trim() || undefined);
       setSignupOtpSent(true);
       setSuccessMessage(`Verification code sent to ${cleanEmail}. Please check your Gmail.`);
     } catch (err: any) {
@@ -454,10 +445,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
     setIsSendingForgotOtp(true);
     try {
-      const res = await dispatchEmailOtp(cleanEmail);
-      if (res.devOtp) {
-        setForgotActiveDevOtp(res.devOtp);
-      }
+      await dispatchEmailOtp(cleanEmail);
       setForgotStep('verify');
       setForgotCooldown(45);
       setSuccessMessage(`Verification code sent to ${cleanEmail}. Enter the 6 digits to verify.`);
@@ -792,20 +780,6 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                     )}
                   </button>
                 </div>
-
-                {signupActiveDevOtp && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSignupOtpCode(signupActiveDevOtp);
-                      handleVerifySignupOtp(signupActiveDevOtp);
-                    }}
-                    className="w-full py-1.5 px-2.5 rounded-xl bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-black transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs"
-                  >
-                    <Zap className="w-3 h-3 fill-amber-500 text-amber-900" />
-                    <span>Auto-Verify Code (Instant Test Access)</span>
-                  </button>
-                )}
               </div>
             )}
 
@@ -1138,21 +1112,6 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                       )}
                     </button>
 
-                    {signinActiveDevOtp && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const digits = signinActiveDevOtp.split('').slice(0, 6);
-                          setSigninOtpDigits(digits);
-                          handleVerifySigninOtp(signinActiveDevOtp);
-                        }}
-                        className="w-full py-2.5 px-3 rounded-2xl bg-[#FFF9E6] hover:bg-[#F5C518] text-zinc-900 border border-[#F5C518]/50 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98]"
-                      >
-                        <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-black" />
-                        <span>One-Tap Auto-Verify (Instant Test Access)</span>
-                      </button>
-                    )}
-
                     <div className="text-center text-xs pt-1">
                       {signinCooldown > 0 ? (
                         <span className="text-zinc-400 font-mono">
@@ -1171,8 +1130,31 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   </div>
                 )}
 
+                {/* Option to continue with ID and Password (Before Google) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSigninMode('password');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="w-full py-2.5 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
+                >
+                  <KeyRound className="w-3.5 h-3.5 text-zinc-600" />
+                  <span>Continue with ID and Password</span>
+                </button>
+
+                {/* Divider */}
+                <div className="relative flex py-1 items-center">
+                  <div className="flex-grow border-t border-zinc-200" />
+                  <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
+                    Or Continue With
+                  </span>
+                  <div className="flex-grow border-t border-zinc-200" />
+                </div>
+
                 {/* Continue with Google */}
-                <div className="pt-2 border-t border-zinc-100">
+                <div className="pt-0">
                   <button
                     type="button"
                     onClick={handleContinueWithGoogle}
@@ -1297,21 +1279,6 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                     </>
                   )}
                 </button>
-
-                {forgotActiveDevOtp && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const digits = forgotActiveDevOtp.split('').slice(0, 6);
-                      setForgotOtpDigits(digits);
-                      handleVerifyForgotOtp(forgotActiveDevOtp);
-                    }}
-                    className="w-full py-2.5 px-3 rounded-2xl bg-[#FFF9E6] hover:bg-[#F5C518] text-zinc-900 border border-[#F5C518]/50 text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs active:scale-[0.98]"
-                  >
-                    <Zap className="w-3.5 h-3.5 fill-[#F5C518] text-black" />
-                    <span>One-Tap Auto-Verify (Instant Test Access)</span>
-                  </button>
-                )}
 
                 <div className="text-center text-xs pt-1">
                   {forgotCooldown > 0 ? (

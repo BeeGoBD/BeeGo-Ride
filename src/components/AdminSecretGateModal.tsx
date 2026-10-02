@@ -93,6 +93,7 @@ export const AdminSecretGateModal: React.FC<AdminSecretGateModalProps> = ({
                 autoCorrect="off"
                 autoComplete="off"
                 spellCheck="false"
+                placeholder="Admin ID (e.g. admin)"
                 value={adminId}
                 onChange={(e) => setAdminId(e.target.value)}
                 className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-zinc-900 border border-zinc-800 focus:border-[#F5C518] focus:outline-hidden text-sm text-white placeholder:text-zinc-600 font-mono transition-colors"
@@ -113,11 +114,29 @@ export const AdminSecretGateModal: React.FC<AdminSecretGateModalProps> = ({
                 autoCorrect="off"
                 autoComplete="new-password"
                 spellCheck="false"
+                placeholder="Secret Key (e.g. admin123)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full pl-10 pr-3.5 py-3 rounded-2xl bg-zinc-900 border border-zinc-800 focus:border-[#F5C518] focus:outline-hidden text-sm text-white placeholder:text-zinc-600 font-mono transition-colors"
               />
             </div>
+          </div>
+
+          {/* Quick Credential Hint & Autofill */}
+          <div className="flex items-center justify-between p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 text-[11px]">
+            <span className="font-mono text-zinc-400">
+              ID: <strong className="text-[#F5C518]">admin</strong> • Key: <strong className="text-[#F5C518]">admin123</strong>
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setAdminId('admin');
+                setPassword('admin123');
+              }}
+              className="text-[#F5C518] hover:underline font-bold cursor-pointer"
+            >
+              Fill Credentials
+            </button>
           </div>
 
           {/* Submit Button */}
