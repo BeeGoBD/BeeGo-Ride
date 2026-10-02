@@ -29,7 +29,7 @@ import {
 import { PassengerProfile, logoutPassenger } from '../services/passengerAuth';
 import { clearStoredDescopeUser } from '../services/descopeService';
 import { useDescope } from '@descope/react-sdk';
-import { AppPermissionsModal } from './AppPermissionsModal';
+import { requestLiveCoordinates } from '../services/geolocation';
 
 interface PassengerAccountSectionProps {
   passengerId: string;
@@ -48,7 +48,6 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
 }) => {
   const sdk = useDescope();
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
-  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [activeNotice, setActiveNotice] = useState<string | null>(null);
 
   const displayName = passengerProfile?.name || 'Verified Passenger';
@@ -204,19 +203,33 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
           </button>
         )}
 
-        {/* App Permissions Management */}
+        {/* Real Device Location Access */}
         <button
           type="button"
-          onClick={() => setShowPermissionsModal(true)}
+          onClick={async () => {
+            try {
+              setActiveNotice('Requesting browser location permission...');
+              const res = await requestLiveCoordinates();
+              if (res.isRealGps) {
+                setActiveNotice('Real GPS location granted & active!');
+              } else {
+                setActiveNotice(res.message || 'Location permission checked.');
+              }
+              setTimeout(() => setActiveNotice(null), 3500);
+            } catch (e: any) {
+              setActiveNotice('Location prompt: ' + (e.message || 'Checked'));
+              setTimeout(() => setActiveNotice(null), 3500);
+            }
+          }}
           className="w-full px-3.5 py-3 flex items-center justify-between hover:bg-zinc-50 rounded-2xl transition-colors cursor-pointer text-left"
         >
           <div className="flex items-center gap-3 text-xs font-bold text-[#1A1A1A]">
-            <Lock className="w-4 h-4 text-[#E6A800]" />
-            <span>App Permissions</span>
+            <MapPin className="w-4 h-4 text-emerald-600" />
+            <span>Device Location Access</span>
           </div>
           <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md flex items-center gap-1">
             <Check className="w-3 h-3" />
-            <span>Manage</span>
+            <span>Enable</span>
           </span>
         </button>
 
@@ -249,12 +262,6 @@ export const PassengerAccountSection: React.FC<PassengerAccountSectionProps> = (
       <div className="pt-4 pb-2 text-center text-[10px] text-zinc-400 font-medium">
         Crafted with love for BeeGo Voltx • Dhaka, Bangladesh
       </div>
-
-      {/* Permissions Modal */}
-      <AppPermissionsModal
-        isOpen={showPermissionsModal}
-        onComplete={() => setShowPermissionsModal(false)}
-      />
 
       {/* Logout Confirmation Modal */}
       {showSignOutConfirm && (

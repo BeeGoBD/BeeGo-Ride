@@ -107,33 +107,21 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
 
   if (position) {
     const { latitude, longitude, accuracy } = position.coords;
-    const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
-
-    if (inBD) {
-      // Auto-detect if user is in Chattogram or Dhaka region
-      if (Math.abs(latitude - 22.35) < 1.2) {
-        setPreferredCity('chattogram');
-      } else if (Math.abs(latitude - 23.8) < 1.0) {
-        setPreferredCity('dhaka');
-      }
-
-      return {
-        lat: latitude,
-        lon: longitude,
-        accuracy,
-        isRealGps: true,
-        isSimulatedBangladesh: false,
-      };
-    } else {
-      return {
-        lat: defaultSpot.lat,
-        lon: defaultSpot.lon,
-        accuracy: 10,
-        isRealGps: false,
-        isSimulatedBangladesh: true,
-        message: `Device GPS (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) is outside Bangladesh. Using ${defaultSpot.name}.`,
-      };
+    
+    // Auto-detect if user is in Chattogram or Dhaka region
+    if (Math.abs(latitude - 22.35) < 1.2) {
+      setPreferredCity('chattogram');
+    } else if (Math.abs(latitude - 23.8) < 1.0) {
+      setPreferredCity('dhaka');
     }
+
+    return {
+      lat: latitude,
+      lon: longitude,
+      accuracy,
+      isRealGps: true,
+      isSimulatedBangladesh: false,
+    };
   }
 
   // Error handling if permission denied or unavailable
@@ -169,22 +157,19 @@ export function watchLiveCoordinates(
   const watchId = navigator.geolocation.watchPosition(
     (position) => {
       const { latitude, longitude, accuracy } = position.coords;
-      const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
-      if (inBD) {
-        if (Math.abs(latitude - 22.35) < 1.2) {
-          setPreferredCity('chattogram');
-        } else if (Math.abs(latitude - 23.8) < 1.0) {
-          setPreferredCity('dhaka');
-        }
-
-        onUpdate({
-          lat: latitude,
-          lon: longitude,
-          accuracy,
-          isRealGps: true,
-          isSimulatedBangladesh: false,
-        });
+      if (Math.abs(latitude - 22.35) < 1.2) {
+        setPreferredCity('chattogram');
+      } else if (Math.abs(latitude - 23.8) < 1.0) {
+        setPreferredCity('dhaka');
       }
+
+      onUpdate({
+        lat: latitude,
+        lon: longitude,
+        accuracy,
+        isRealGps: true,
+        isSimulatedBangladesh: false,
+      });
     },
     (err) => {
       console.warn('watchPosition update error:', err);
