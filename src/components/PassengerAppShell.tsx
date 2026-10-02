@@ -62,14 +62,8 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
       .join('')
       .toUpperCase() || 'P';
 
-  const handleOpenBooking = (suggestedDestination?: string) => {
-    if (suggestedDestination) {
-      props.setDropoff({
-        lat: 23.7925,
-        lon: 90.4078,
-        formatted: suggestedDestination,
-      });
-    }
+  const handleOpenBooking = (_suggestedDestination?: string) => {
+    // Keep dropoff empty by default so nothing is chosen automatically
     setIsBookingOpen(true);
   };
 
@@ -177,12 +171,7 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
                 onViewLiveTracking={() => {
                   setIsBookingOpen(true);
                 }}
-                onRebookRide={(dropoffStr: string) => {
-                  props.setDropoff({
-                    lat: 23.7925,
-                    lon: 90.4078,
-                    formatted: dropoffStr,
-                  });
+                onRebookRide={(_dropoffStr: string) => {
                   setIsBookingOpen(true);
                 }}
               />

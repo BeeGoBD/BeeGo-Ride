@@ -9,6 +9,7 @@ import {
   generatePassengerId,
   generateRiderId,
 } from './services/rideSync';
+import { requestLiveCoordinates } from './services/geolocation';
 import { BeegoIntroSplash } from './components/BeegoIntroSplash';
 import { BeegoOnboarding } from './components/BeegoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
@@ -179,11 +180,9 @@ export default function App() {
           setStage('navigation');
         }
       } else if (!ride || ride.status === 'completed' || ride.status === 'cancelled' || ride.status === 'declined') {
-        if (ride?.status === 'cancelled' || ride?.status === 'declined') {
-          setPickup(null);
-          setDropoff(null);
-          setRouteData(null);
-        }
+        setPickup(null);
+        setDropoff(null);
+        setRouteData(null);
         if (stage === 'navigation') {
           setStage('request');
         }
@@ -192,6 +191,15 @@ export default function App() {
 
     return () => unsubscribe();
   }, [stage]);
+
+  // Request location permission immediately on app load so browser prompts user
+  useEffect(() => {
+    if (typeof window !== 'undefined' && navigator.geolocation) {
+      requestLiveCoordinates().catch((err) => {
+        console.warn('Initial GPS permission request:', err);
+      });
+    }
+  }, []);
 
   const handleApiKeyChange = (newKey: string) => {
     setApiKey(newKey);

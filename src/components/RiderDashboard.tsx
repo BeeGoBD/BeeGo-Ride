@@ -36,7 +36,15 @@ import {
   RATE_PER_KM_TAKA,
 } from '../services/rideSync';
 import { calculateRoute, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
-import { requestLiveCoordinates, watchLiveCoordinates } from '../services/geolocation';
+import {
+  requestLiveCoordinates,
+  watchLiveCoordinates,
+  getDefaultSpot,
+  getPreferredCity,
+  setPreferredCity,
+  CHATTOGRAM_SPOT,
+  DHAKA_SPOT,
+} from '../services/geolocation';
 import { getCurrentDriver } from '../services/driverAuth';
 import { ReportIssueModal } from './ReportIssueModal';
 
@@ -220,6 +228,22 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     };
   }, [activeKey]);
 
+  // City Hub Selector for drivers
+  const handleSelectCity = (city: 'chattogram' | 'dhaka') => {
+    setPreferredCity(city);
+    const spot = city === 'dhaka' ? DHAKA_SPOT : CHATTOGRAM_SPOT;
+    setRiderAddress(spot.name);
+    setRiderLiveGps({
+      lat: spot.lat,
+      lon: spot.lon,
+      isRealGps: false,
+      isSimulatedBangladesh: true,
+    });
+    if (mapInstanceRef.current) {
+      mapInstanceRef.current.flyTo([spot.lat, spot.lon], 15, { duration: 1 });
+    }
+  };
+
   // Recenter GPS
   const handleRecenterGps = async () => {
     setIsLocating(true);
@@ -248,8 +272,9 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
     if (!mapContainerRef.current) return;
 
     if (!mapInstanceRef.current) {
-      const initialLat = riderLiveGps?.lat || activeRide?.pickup.lat || 23.7925;
-      const initialLon = riderLiveGps?.lon || activeRide?.pickup.lon || 90.4078;
+      const defaultSpot = getDefaultSpot();
+      const initialLat = riderLiveGps?.lat || activeRide?.pickup.lat || defaultSpot.lat;
+      const initialLon = riderLiveGps?.lon || activeRide?.pickup.lon || defaultSpot.lon;
 
       const map = L.map(mapContainerRef.current, {
         center: [initialLat, initialLon],

@@ -124,15 +124,19 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
       try {
         const res = await requestLiveCoordinates();
         if (!isMounted) return;
-        setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
-        updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
+        
+        // Only auto-populate pickup if authentic live hardware/device GPS is confirmed in Bangladesh
+        if (res.isRealGps) {
+          setUserLiveGps({ lat: res.lat, lon: res.lon, accuracy: res.accuracy });
+          updatePassengerLiveLocation({ lat: res.lat, lon: res.lon });
 
-        if (!pickup) {
-          const point = await reverseGeocode(res.lat, res.lon, activeKey);
-          if (!isMounted) return;
-          setPickup(point);
-          setPickupInput(point.formatted);
-          setIsPickupLiveGps(true);
+          if (!pickup) {
+            const point = await reverseGeocode(res.lat, res.lon, activeKey);
+            if (!isMounted) return;
+            setPickup(point);
+            setPickupInput(point.formatted);
+            setIsPickupLiveGps(true);
+          }
         }
       } catch (err) {
         console.warn('Auto GPS notice:', err);

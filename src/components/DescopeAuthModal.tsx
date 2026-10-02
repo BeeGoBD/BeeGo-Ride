@@ -972,22 +972,8 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   )}
                 </button>
 
-                {/* Switch to OTP Verification */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSigninMode('otp');
-                    setSigninOtpSent(false);
-                    setErrorMessage(null);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                >
-                  <Mail className="w-3.5 h-3.5" />
-                  <span>Sign In with One-Time Email Code (OTP)</span>
-                </button>
-
                 {/* Divider */}
-                <div className="relative flex py-1 items-center">
+                <div className="relative flex py-2 items-center my-0.5">
                   <div className="flex-grow border-t border-zinc-200" />
                   <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
                     Or Continue With
@@ -995,19 +981,19 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   <div className="flex-grow border-t border-zinc-200" />
                 </div>
 
-                {/* Continue with Google Button */}
+                {/* Switch to OTP Verification */}
                 <button
                   type="button"
-                  onClick={handleContinueWithGoogle}
-                  disabled={isGoogleLoading}
-                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-xs transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2.5 active:scale-[0.98]"
+                  onClick={() => {
+                    setSigninMode('otp');
+                    setSigninOtpSent(false);
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 text-zinc-800 font-bold text-xs transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2.5 active:scale-[0.98]"
                 >
-                  {isGoogleLoading ? (
-                    <RefreshCw className="w-4 h-4 animate-spin text-zinc-500" />
-                  ) : (
-                    <GoogleIcon className="w-4 h-4" />
-                  )}
-                  <span>Continue with Google</span>
+                  <Mail className="w-4 h-4 text-amber-500" />
+                  <span>Continue with One-Time Email Code (OTP)</span>
                 </button>
               </form>
             )}
@@ -1017,13 +1003,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
               <div className="flex flex-col gap-3 animate-in fade-in duration-200">
                 <div className="flex items-center justify-between text-xs font-bold text-zinc-700">
                   <span>Sign In via Email OTP</span>
-                  <button
-                    type="button"
-                    onClick={() => setSigninMode('password')}
-                    className="text-[#E6A800] hover:text-black font-bold cursor-pointer"
-                  >
-                    Use Password instead
-                  </button>
+                  <span className="text-[11px] font-medium text-zinc-400">One-Time Password</span>
                 </div>
 
                 {/* Email Input */}
@@ -1074,7 +1054,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                       </button>
                     </div>
 
-                    <div className="flex items-center justify-between gap-1.5 my-1">
+                    <div className="grid grid-cols-6 gap-2 w-full my-2">
                       {signinOtpDigits.map((digit, index) => (
                         <input
                           key={index}
@@ -1088,7 +1068,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                           value={digit}
                           onChange={(e) => handleDigitChange(index, e.target.value)}
                           onKeyDown={(e) => handleDigitKeyDown(index, e)}
-                          className="w-12 h-14 text-center text-xl font-mono font-black rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
+                          className="w-full h-12 text-center text-lg sm:text-xl font-mono font-black rounded-xl sm:rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
                         />
                       ))}
                     </div>
@@ -1130,22 +1110,8 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   </div>
                 )}
 
-                {/* Option to continue with ID and Password (Before Google) */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSigninMode('password');
-                    setErrorMessage(null);
-                    setSuccessMessage(null);
-                  }}
-                  className="w-full py-2.5 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-2 active:scale-[0.98]"
-                >
-                  <KeyRound className="w-3.5 h-3.5 text-zinc-600" />
-                  <span>Continue with ID and Password</span>
-                </button>
-
                 {/* Divider */}
-                <div className="relative flex py-1 items-center">
+                <div className="relative flex py-2 items-center my-0.5">
                   <div className="flex-grow border-t border-zinc-200" />
                   <span className="flex-shrink mx-3 text-[10px] uppercase font-bold text-zinc-400 tracking-wider">
                     Or Continue With
@@ -1153,18 +1119,19 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   <div className="flex-grow border-t border-zinc-200" />
                 </div>
 
-                {/* Continue with Google */}
-                <div className="pt-0">
-                  <button
-                    type="button"
-                    onClick={handleContinueWithGoogle}
-                    disabled={isGoogleLoading}
-                    className="w-full py-2.5 px-4 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-800 font-bold text-xs transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2.5 active:scale-[0.98]"
-                  >
-                    <GoogleIcon className="w-4 h-4" />
-                    <span>Continue with Google</span>
-                  </button>
-                </div>
+                {/* Continue with ID and Password Section */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSigninMode('password');
+                    setErrorMessage(null);
+                    setSuccessMessage(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 text-zinc-800 font-bold text-xs transition-all shadow-2xs cursor-pointer flex items-center justify-center gap-2.5 active:scale-[0.98]"
+                >
+                  <KeyRound className="w-4 h-4 text-zinc-600 stroke-[2.2]" />
+                  <span>Continue with ID and Password</span>
+                </button>
               </div>
             )}
           </div>
@@ -1242,7 +1209,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center justify-between gap-1.5 my-1">
+                <div className="grid grid-cols-6 gap-2 w-full my-2">
                   {forgotOtpDigits.map((digit, index) => (
                     <input
                       key={index}
@@ -1256,7 +1223,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                       value={digit}
                       onChange={(e) => handleForgotDigitChange(index, e.target.value)}
                       onKeyDown={(e) => handleForgotDigitKeyDown(index, e)}
-                      className="w-12 h-14 text-center text-xl font-mono font-black rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
+                      className="w-full h-12 text-center text-lg sm:text-xl font-mono font-black rounded-xl sm:rounded-2xl bg-zinc-50 border-2 border-zinc-200 focus:border-[#F5C518] focus:bg-white focus:outline-none transition-all shadow-2xs"
                     />
                   ))}
                 </div>

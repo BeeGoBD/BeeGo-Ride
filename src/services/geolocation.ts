@@ -10,27 +10,62 @@ export interface GeolocationResult {
   message?: string;
 }
 
-// Default Bangladesh fallback spot (Gulshan-2 Circle, Dhaka)
-export const DEFAULT_BANGLADESH_SPOT = {
+// Hub coordinates for Bangladesh cities
+export const CHATTOGRAM_SPOT = {
+  lat: 22.3569,
+  lon: 91.7832,
+  name: 'GEC Circle, Chattogram',
+  formatted: 'GEC Circle, Nasirabad, Chattogram, Bangladesh',
+};
+
+export const DHAKA_SPOT = {
   lat: 23.7925,
   lon: 90.4078,
-  name: 'Gulshan-2 Circle',
+  name: 'Gulshan-2 Circle, Dhaka',
   formatted: 'Gulshan-2 Circle, Dhaka, Bangladesh',
 };
 
+const PREFERRED_CITY_KEY = 'beego_preferred_city';
+
+export function getPreferredCity(): 'chattogram' | 'dhaka' {
+  if (typeof window === 'undefined') return 'chattogram';
+  try {
+    const stored = localStorage.getItem(PREFERRED_CITY_KEY);
+    if (stored === 'dhaka' || stored === 'chattogram') return stored;
+  } catch {}
+  return 'chattogram'; // Default to Chittagong as requested by user
+}
+
+export function setPreferredCity(city: 'chattogram' | 'dhaka'): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(PREFERRED_CITY_KEY, city);
+  } catch {}
+}
+
+export function getDefaultSpot() {
+  const pref = getPreferredCity();
+  return pref === 'dhaka' ? DHAKA_SPOT : CHATTOGRAM_SPOT;
+}
+
+// Default Bangladesh fallback spot
+export const DEFAULT_BANGLADESH_SPOT = CHATTOGRAM_SPOT;
+
 /**
- * Requests the browser's live geolocation with high accuracy and low-accuracy network fallback.
+ * Requests the browser's live geolocation with high accuracy.
+ * Gives ample timeout (15s) so the browser's permission prompt is not cut off.
  * If user is in Bangladesh, returns their exact GPS coordinates.
- * If user is testing outside Bangladesh, gracefully localizes to Dhaka hub for Bangladesh ride operations.
  */
 export async function requestLiveCoordinates(): Promise<GeolocationResult> {
+  const defaultSpot = getDefaultSpot();
+
   if (typeof window === 'undefined' || !navigator.geolocation) {
     return {
-      lat: DEFAULT_BANGLADESH_SPOT.lat,
-      lon: DEFAULT_BANGLADESH_SPOT.lon,
+      lat: defaultSpot.lat,
+      lon: defaultSpot.lon,
       isRealGps: false,
       isSimulatedBangladesh: true,
-      message: 'Geolocation is not supported by your browser. Defaulting to Dhaka.',
+      message: 'Geolocation is not supported by your browser.',
     };
   }
 
@@ -43,27 +78,30 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
   let position: GeolocationPosition | null = null;
   let lastError: GeolocationPositionError | null = null;
 
-  // 1. Try high-accuracy (Hardware GPS / precise Wi-Fi) with 4s timeout
+  // 1. Try high-accuracy (Hardware GPS / precise Wi-Fi) with 15s timeout
+  // This allows the user ample time to tap "Allow" on the native browser permission prompt!
   try {
     position = await queryPosition({
       enableHighAccuracy: true,
-      timeout: 4000,
-      maximumAge: 0,
+      timeout: 15000,
+      maximumAge: 60000,
     });
   } catch (err: any) {
     lastError = err;
+    console.warn('[Geolocation] High-accuracy GPS attempt failed/timed out, trying fast network fallback:', err?.message || err);
   }
 
   // 2. Fallback to standard network-based location (instant Wi-Fi / IP) if high accuracy timed out or failed
-  if (!position) {
+  if (!position && lastError?.code !== 1) {
     try {
       position = await queryPosition({
         enableHighAccuracy: false,
-        timeout: 6000,
-        maximumAge: 60000,
+        timeout: 8000,
+        maximumAge: 300000,
       });
     } catch (err: any) {
       lastError = err;
+      console.warn('[Geolocation] Standard network location failed:', err?.message || err);
     }
   }
 
@@ -72,6 +110,13 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
     const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
 
     if (inBD) {
+      // Auto-detect if user is in Chattogram or Dhaka region
+      if (Math.abs(latitude - 22.35) < 1.2) {
+        setPreferredCity('chattogram');
+      } else if (Math.abs(latitude - 23.8) < 1.0) {
+        setPreferredCity('dhaka');
+      }
+
       return {
         lat: latitude,
         lon: longitude,
@@ -81,12 +126,12 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
       };
     } else {
       return {
-        lat: DEFAULT_BANGLADESH_SPOT.lat,
-        lon: DEFAULT_BANGLADESH_SPOT.lon,
+        lat: defaultSpot.lat,
+        lon: defaultSpot.lon,
         accuracy: 10,
-        isRealGps: true,
+        isRealGps: false,
         isSimulatedBangladesh: true,
-        message: `Detected device GPS (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) is outside Bangladesh. Localized to Dhaka hub for Bangladesh ride services.`,
+        message: `Device GPS (${latitude.toFixed(2)}, ${longitude.toFixed(2)}) is outside Bangladesh. Using ${defaultSpot.name}.`,
       };
     }
   }
@@ -96,14 +141,15 @@ export async function requestLiveCoordinates(): Promise<GeolocationResult> {
   if (lastError?.code === 1) {
     msg = 'Location permission was denied. Please allow location access in your browser.';
   } else if (lastError?.code === 2) {
-    msg = 'Location information unavailable. Defaulting to Dhaka.';
+    msg = 'Location information unavailable. Using default city center.';
   } else if (lastError?.code === 3) {
-    msg = 'Location request timed out. Defaulting to Dhaka.';
+    msg = 'Location request timed out. Please tap "Detect My Location" to retry.';
   }
 
   return {
-    lat: DEFAULT_BANGLADESH_SPOT.lat,
-    lon: DEFAULT_BANGLADESH_SPOT.lon,
+    lat: defaultSpot.lat,
+    lon: defaultSpot.lon,
+    accuracy: 10,
     isRealGps: false,
     isSimulatedBangladesh: true,
     message: msg,
@@ -125,6 +171,12 @@ export function watchLiveCoordinates(
       const { latitude, longitude, accuracy } = position.coords;
       const inBD = isLocationInBangladesh({ lat: latitude, lon: longitude });
       if (inBD) {
+        if (Math.abs(latitude - 22.35) < 1.2) {
+          setPreferredCity('chattogram');
+        } else if (Math.abs(latitude - 23.8) < 1.0) {
+          setPreferredCity('dhaka');
+        }
+
         onUpdate({
           lat: latitude,
           lon: longitude,
@@ -139,8 +191,8 @@ export function watchLiveCoordinates(
     },
     {
       enableHighAccuracy: true,
-      timeout: 10000,
-      maximumAge: 10000,
+      timeout: 15000,
+      maximumAge: 15000,
     }
   );
 

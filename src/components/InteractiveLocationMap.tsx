@@ -14,6 +14,7 @@ import {
 import { LocationPoint, RouteData } from '../types';
 import { reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import { isLocationInBangladesh } from '../data/bangladeshDistricts';
+import { getDefaultSpot } from '../services/geolocation';
 
 export type PinMode = 'pickup' | 'dropoff';
 
@@ -84,8 +85,9 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
     if (!mapContainerRef.current) return;
     if (mapInstanceRef.current) return;
 
-    const initialLat = userLiveGps?.lat || pickup?.lat || 23.7925;
-    const initialLon = userLiveGps?.lon || pickup?.lon || 90.4078;
+    const defaultSpot = getDefaultSpot();
+    const initialLat = userLiveGps?.lat || pickup?.lat || defaultSpot.lat;
+    const initialLon = userLiveGps?.lon || pickup?.lon || defaultSpot.lon;
     const initialZoom = userLiveGps || pickup ? 15 : 13;
 
     const map = L.map(mapContainerRef.current, {
@@ -175,6 +177,9 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
           icon: gpsIcon,
           zIndexOffset: 1000,
         }).addTo(map);
+        if (!pickup) {
+          map.flyTo([userLiveGps.lat, userLiveGps.lon], 15, { duration: 1 });
+        }
       } else {
         liveGpsMarkerRef.current.setLatLng([userLiveGps.lat, userLiveGps.lon]);
       }
