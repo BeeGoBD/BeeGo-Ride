@@ -16,24 +16,52 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <meta http-equiv="Permissions-Policy" content="geolocation=(self '*'), camera=(self '*'), microphone=(self '*')" />
     <script>
-      // Immediately request real browser location permission as soon as the app starts opening
+      // Immediately request real device location permission when app opens
       (function() {
-        if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
-          navigator.geolocation.getCurrentPosition(
-            function(pos) {
-              window.__BEEGO_LIVE_GPS__ = {
-                lat: pos.coords.latitude,
-                lon: pos.coords.longitude,
-                accuracy: pos.coords.accuracy,
-                timestamp: Date.now()
-              };
-            },
-            function(err) {
-              window.__BEEGO_LIVE_GPS_ERR__ = err;
-            },
-            { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
-          );
+        function triggerGpsPrompt() {
+          if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
+            navigator.geolocation.getCurrentPosition(
+              function(pos) {
+                window.__BEEGO_LIVE_GPS__ = {
+                  lat: pos.coords.latitude,
+                  lon: pos.coords.longitude,
+                  accuracy: pos.coords.accuracy,
+                  timestamp: Date.now()
+                };
+              },
+              function(err) {
+                window.__BEEGO_LIVE_GPS_ERR__ = err;
+              },
+              { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+            );
+          }
+        }
+
+        // 1. Initial attempt on launch
+        triggerGpsPrompt();
+
+        // 2. Guaranteed user-gesture trigger on first tap (Crucial for Android WebView & Web2App wrappers)
+        function handleFirstUserTouch() {
+          triggerGpsPrompt();
+          window.removeEventListener('pointerdown', handleFirstUserTouch);
+          window.removeEventListener('touchstart', handleFirstUserTouch);
+          window.removeEventListener('click', handleFirstUserTouch);
+        }
+        window.addEventListener('pointerdown', handleFirstUserTouch, { passive: true });
+        window.addEventListener('touchstart', handleFirstUserTouch, { passive: true });
+        window.addEventListener('click', handleFirstUserTouch, { passive: true });
+
+        // 3. Register service worker for PWA / Web app wrapper compliance
+        if ('serviceWorker' in navigator) {
+          window.addEventListener('load', function() {
+            navigator.serviceWorker.register('/sw.js').catch(function() {});
+          });
         }
       })();
     </script>

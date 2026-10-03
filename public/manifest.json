@@ -1,0 +1,45 @@
+{
+  "id": "/",
+  "name": "BeeGo Voltx",
+  "short_name": "BeeGo",
+  "description": "BeeGo Voltx — Rides, battery swaps, and power stations across Bangladesh at flat ৳70/km with instant verified dispatch.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#F5C518",
+  "categories": ["travel", "navigation", "transportation"],
+  "permissions": [
+    "geolocation",
+    "notifications"
+  ],
+  "features": [
+    "geolocation"
+  ],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}

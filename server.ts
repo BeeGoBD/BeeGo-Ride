@@ -9,6 +9,13 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
+  // Permissions Policy & CORS headers for WebViews, PWAs, and Native App Wrappers
+  app.use((req, res, next) => {
+    res.setHeader('Permissions-Policy', 'geolocation=(self "*"), camera=(self "*"), microphone=(self "*")');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    next();
+  });
+
   const APPWRITE_UPSTREAM = process.env.VITE_APPWRITE_ENDPOINT || 'https://fra.cloud.appwrite.io/v1';
   const APPWRITE_PROJECT_ID = process.env.VITE_APPWRITE_PROJECT_ID || '6aaec93d001b38fee383';
 
