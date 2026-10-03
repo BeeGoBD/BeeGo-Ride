@@ -222,13 +222,13 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
 
     if (localDriver.verificationStatus === 'pending') {
       throw new Error(
-        'Your driver registration request is pending manual verification. Please log into the Admin Panel to approve this driver before logging in.'
+        'Your driver registration request is currently under manual verification by our operations team. Once verified and activated, you will be able to log in. Please check back shortly.'
       );
     }
 
     if (localDriver.verificationStatus === 'rejected') {
       throw new Error(
-        `Your driver application was rejected. ${localDriver.rejectionReason || 'Please contact BeeGo operations admin.'}`
+        `Your driver application was rejected. ${localDriver.rejectionReason || 'Please contact BeeGo driver operations.'}`
       );
     }
   }
@@ -237,7 +237,7 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
   if (backendPending) {
     throw new Error(
       backendError ||
-      'Your driver registration request is pending manual verification. Please log into the Admin Panel to approve this driver before logging in.'
+      'Your driver registration request is currently under manual verification by our operations team. Once verified and activated, you will be able to log in. Please check back shortly.'
     );
   }
 

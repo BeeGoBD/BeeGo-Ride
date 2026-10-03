@@ -33,14 +33,12 @@ interface DriverAuthModalProps {
   initialMode?: 'register' | 'login';
   onAuthenticated: (driver: DriverProfile) => void;
   onCancel: () => void;
-  onOpenAdminGate?: () => void;
 }
 
 export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   initialMode = 'register',
   onAuthenticated,
   onCancel,
-  onOpenAdminGate,
 }) => {
   const [mode, setMode] = useState<'register' | 'login'>(initialMode);
 
@@ -314,7 +312,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
               </div>
               <h3 className="text-base font-black text-zinc-900">Registration Request Submitted</h3>
               <p className="text-xs text-zinc-600 max-w-xs leading-relaxed">
-                Driver registration is <span className="font-bold text-zinc-900">completely manual</span>. Your application has been sent to the BeeGo Admin Panel. Our operations team will review your NID and documents for verification. Once approved in the Admin Panel, you can log in immediately.
+                Thank you for applying. Driver onboarding is verified manually by our operations team. We will review your National ID and credentials. Once approved and activated, you can log in immediately.
               </p>
               <div className="w-full p-3 rounded-2xl bg-zinc-100 border border-zinc-200 text-left text-xs font-mono space-y-1.5">
                 <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">Application Summary:</div>
@@ -324,27 +322,17 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                 {email && <div className="text-zinc-600 text-[11px]">Email: {email}</div>}
                 <div className="pt-1 flex items-center gap-1.5 text-amber-700 font-bold">
                   <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span>Status: Pending Admin Approval</span>
+                  <span>Status: Pending Verification</span>
                 </div>
               </div>
               <div className="w-full flex flex-col gap-2 mt-2">
-                {onOpenAdminGate && (
-                  <button
-                    type="button"
-                    onClick={onOpenAdminGate}
-                    className="w-full py-3 rounded-2xl bg-zinc-900 hover:bg-black text-[#F5C518] font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
-                  >
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Open Admin Panel to Approve Driver</span>
-                  </button>
-                )}
                 <button
                   type="button"
                   onClick={() => {
                     setIsSubmittedSuccess(false);
                     setMode('login');
                   }}
-                  className="w-full py-2.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
                   <span>Go to Driver Login</span>
                   <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -352,7 +340,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="w-full py-2 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                  className="w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
                 >
                   Close
                 </button>
@@ -361,35 +349,25 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
           ) : (
             <>
               {/* Informative Manual Verification or Error Banner */}
-              {errorMessage && (errorMessage.includes('manual verification') || errorMessage.includes('manual review') || errorMessage.includes('pending')) ? (
+              {errorMessage && (errorMessage.includes('manual verification') || errorMessage.includes('manual review') || errorMessage.includes('pending') || errorMessage.includes('under review')) ? (
                 <div className="p-4 rounded-3xl bg-amber-500/10 border-2 border-[#F5C518] text-amber-950 text-xs space-y-2.5 shadow-sm animate-in fade-in">
                   <div className="flex items-start gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0 shadow-xs">
                       <Clock className="w-4 h-4 stroke-[2.5]" />
                     </div>
                     <div className="flex-1">
-                      <div className="font-black text-xs text-zinc-900">Application Under Manual Review</div>
+                      <div className="font-black text-xs text-zinc-900">Application Under Verification</div>
                       <p className="text-zinc-700 text-[11px] mt-1 leading-relaxed">
-                        Driver registration is <strong>completely manual</strong>. The BeeGo operations admin must verify your National ID and approve your account from the Admin Panel before you can log in.
+                        Your driver registration request is currently <strong>under manual verification</strong> by our operations team. Once verified and activated, you will be able to log in. Please check back shortly.
                       </p>
                     </div>
                   </div>
 
-                  <div className="pt-1 flex flex-col sm:flex-row items-center gap-2">
-                    {onOpenAdminGate && (
-                      <button
-                        type="button"
-                        onClick={onOpenAdminGate}
-                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-zinc-900 hover:bg-black text-[#F5C518] font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
-                      >
-                        <ShieldCheck className="w-3.5 h-3.5" />
-                        <span>Open Admin Panel to Approve</span>
-                      </button>
-                    )}
+                  <div className="pt-1 flex items-center justify-end">
                     <button
                       type="button"
                       onClick={handleLoginSubmit}
-                      className="w-full sm:w-auto py-2 px-3 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                      className="py-2 px-3.5 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
                     >
                       <RefreshCw className="w-3 h-3" />
                       <span>Re-Check Status</span>

@@ -623,10 +623,6 @@ export default function App() {
           }
         }}
         onCancel={() => setDriverAuthModalMode(null)}
-        onOpenAdminGate={() => {
-          setDriverAuthModalMode(null);
-          setIsAdminGateOpen(true);
-        }}
       />
     );
   } else if (role === null) {

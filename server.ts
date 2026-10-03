@@ -1396,7 +1396,7 @@ async function startServer() {
       // Check verification status: must be approved by admin
       if (driver.verificationStatus === 'pending') {
         return res.status(403).json({
-          error: 'Your driver registration is under manual review. The BeeGo operations admin will verify your details and approve your account from the Admin Panel before you can log in.',
+          error: 'Your driver registration is currently under manual verification. Our operations team is reviewing your details to activate your account. Please check back shortly.',
           status: 'pending',
           driverName: driver.name,
           submittedAt: driver.submittedAtFormatted,
@@ -1405,7 +1405,7 @@ async function startServer() {
 
       if (driver.verificationStatus === 'rejected') {
         return res.status(403).json({
-          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo operations admin.'}`,
+          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo driver support.'}`,
           status: 'rejected',
         });
       }
