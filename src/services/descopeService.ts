@@ -69,15 +69,15 @@ export function getStoredDescopeUser(): DescopeUserProfile | null {
     const raw = localStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(STORAGE_KEY) || sessionStorage.getItem(ACTIVE_PASSENGER_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed && (parsed.email || parsed.id || parsed.name)) {
+    if (parsed && typeof parsed.email === 'string' && parsed.email.trim().length > 0) {
       return {
         id: parsed.id || parsed.userId || 'pax_' + Math.random().toString(36).slice(2, 8),
-        name: parsed.name || 'BeeGo Passenger',
-        email: parsed.email || '',
+        name: parsed.name || parsed.email.split('@')[0] || 'Passenger',
+        email: parsed.email.trim(),
         phone: parsed.phone || '',
         role: 'passenger',
         isEmailVerified: parsed.isEmailVerified ?? true,
-        authMethod: parsed.authMethod || 'flow',
+        authMethod: parsed.authMethod || 'email_otp',
         picture: parsed.picture,
       };
     }

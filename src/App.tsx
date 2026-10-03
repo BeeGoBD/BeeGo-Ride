@@ -10,7 +10,6 @@ import {
   generateRiderId,
 } from './services/rideSync';
 import { requestLiveCoordinates, getDefaultSpot } from './services/geolocation';
-import { BeegoIntroSplash } from './components/BeegoIntroSplash';
 import { BeegoOnboarding } from './components/BeegoOnboarding';
 import { RoleSelectDashboard } from './components/RoleSelectDashboard';
 import { PassengerAppShell } from './components/PassengerAppShell';
@@ -32,14 +31,45 @@ import { getCurrentDriver, getStoredDrivers, setCurrentDriver, DriverProfile } f
 import {
   getStoredDescopeUser,
   extractDescopeProfile,
+  saveStoredDescopeUser,
   DescopeUserProfile,
 } from './services/descopeService';
-import { useSession, useUser } from '@descope/react-sdk';
+import { useSession, useUser, useDescope } from '@descope/react-sdk';
 import './lib/appwrite';
 
-type AppIntroState = 'splash' | 'onboarding' | 'ready';
+type AppIntroState = 'onboarding' | 'ready';
 
 export default function App() {
+  const sdk = useDescope();
+
+  // One-time cleanup of legacy mock/demo user data on initial mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const legacyKeys = [
+          'beego_demo_users',
+          'beego_mock_passengers',
+          'beego_old_accounts',
+          'beego_local_passwords',
+        ];
+        legacyKeys.forEach((k) => localStorage.removeItem(k));
+
+        // Wipe empty-email dummy passengers
+        const rawPax = localStorage.getItem('beego_active_passenger');
+        if (rawPax) {
+          const parsed = JSON.parse(rawPax);
+          if (!parsed?.email || typeof parsed.email !== 'string' || !parsed.email.trim()) {
+            localStorage.removeItem('beego_active_passenger');
+            localStorage.removeItem('beego_descope_user');
+            if (localStorage.getItem('beego_user_role') === 'passenger') {
+              localStorage.removeItem('beego_user_role');
+            }
+          }
+        }
+      } catch (e) {}
+    }
+  }, []);
+
   // PERSISTENT LOGIN SESSION:
   // Once logged in (as passenger, driver, or admin), refreshing the app keeps the user logged in
   // until they explicitly log out by themselves!
@@ -54,7 +84,10 @@ export default function App() {
         return 'rider';
       }
       if (storedRole === 'passenger') {
-        return 'passenger';
+        const storedPassenger = getStoredDescopeUser() || getStoredPassenger();
+        if (storedPassenger && storedPassenger.email) {
+          return 'passenger';
+        }
       }
       if (storedRole === 'admin') {
         return 'admin';
@@ -74,7 +107,7 @@ export default function App() {
       }
 
       const storedPassenger = getStoredDescopeUser() || getStoredPassenger();
-      if (storedPassenger) {
+      if (storedPassenger && storedPassenger.email) {
         localStorage.setItem('beego_user_role', 'passenger');
         return 'passenger';
       }
@@ -94,15 +127,15 @@ export default function App() {
       const isAlreadyLoggedIn =
         localStorage.getItem('beego_user_role') !== null ||
         !!getCurrentDriver() ||
-        !!getStoredDescopeUser() ||
-        !!getStoredPassenger() ||
+        !!(getStoredDescopeUser()?.email) ||
+        !!(getStoredPassenger()?.email) ||
         !!getAdminToken() ||
         localStorage.getItem('beego_intro_completed') === 'true' ||
         sessionStorage.getItem('beego_intro_completed') === 'true';
 
       if (isAlreadyLoggedIn) return 'ready';
     }
-    return 'splash';
+    return 'onboarding';
   });
 
   const [pendingRoleForAuth, setPendingRoleForAuth] = useState<UserRole>('passenger');
@@ -134,21 +167,7 @@ export default function App() {
   const [passengerProfile, setPassengerProfile] = useState<PassengerProfile | null>(() => {
     if (typeof window !== 'undefined') {
       const stored = getStoredDescopeUser() || getStoredPassenger();
-      if (stored) return stored;
-      if (localStorage.getItem('beego_user_role') === 'passenger') {
-        const fallbackProfile: PassengerProfile = {
-          id: 'pax_' + Math.random().toString(36).slice(2, 9),
-          name: 'BeeGo Passenger',
-          email: '',
-          role: 'passenger',
-          isEmailVerified: true,
-        };
-        try {
-          localStorage.setItem('beego_active_passenger', JSON.stringify(fallbackProfile));
-          localStorage.setItem('beego_descope_user', JSON.stringify(fallbackProfile));
-        } catch (e) {}
-        return fallbackProfile;
-      }
+      if (stored && stored.email) return stored;
     }
     return null;
   });
@@ -170,14 +189,76 @@ export default function App() {
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
 
+  // Listen for Google OAuth redirect callback (token in hash or code in query)
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    // 1. Google OAuth Token in URL Hash (#access_token=...)
+    if (window.location.hash && window.location.hash.includes('access_token=')) {
+      try {
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        const accessToken = hashParams.get('access_token');
+        if (accessToken) {
+          fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+          })
+            .then((r) => r.json())
+            .then((userData) => {
+              if (userData && userData.email) {
+                const profile: DescopeUserProfile = {
+                  id: `pax_google_${Date.now().toString(36)}`,
+                  name: userData.name || userData.email.split('@')[0],
+                  email: userData.email,
+                  role: 'passenger',
+                  isEmailVerified: true,
+                  authMethod: 'oauth_google',
+                  picture: userData.picture,
+                };
+                saveStoredDescopeUser(profile);
+                setPassengerProfile(profile);
+                setRole('passenger');
+                localStorage.setItem('beego_user_role', 'passenger');
+                window.history.replaceState({}, '', window.location.pathname);
+              }
+            })
+            .catch((e) => console.warn('[Google OAuth note]', e));
+        }
+      } catch (e) {}
+    }
+
+    // 2. Descope OAuth Code in query (?code=...)
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code && (sdk?.oauth as any)?.exchange) {
+      (sdk.oauth as any)
+        .exchange(code)
+        .then((res: any) => {
+          if (res?.data?.user) {
+            const profile = extractDescopeProfile(res.data.user);
+            saveStoredDescopeUser(profile);
+            setPassengerProfile(profile);
+            setRole('passenger');
+            localStorage.setItem('beego_user_role', 'passenger');
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('code');
+            window.history.replaceState({}, '', cleanUrl.toString());
+          }
+        })
+        .catch((err: any) => {
+          console.warn('[OAuth code exchange note]', err);
+        });
+    }
+  }, [sdk]);
+
   // Sync Descope user profile into passengerProfile
   useEffect(() => {
     if (descopeUser) {
       const profile = extractDescopeProfile(descopeUser);
       setPassengerProfile(profile);
+      saveStoredDescopeUser(profile);
     } else {
       const stored = getStoredDescopeUser() || getStoredPassenger();
-      if (stored) {
+      if (stored && stored.email) {
         setPassengerProfile(stored);
       }
     }
@@ -341,6 +422,8 @@ export default function App() {
     setErrorMessage(null);
     if (typeof window !== 'undefined') {
       localStorage.removeItem('beego_user_role');
+      localStorage.removeItem('beego_active_passenger');
+      localStorage.removeItem('beego_descope_user');
       localStorage.removeItem('beego_current_driver');
       sessionStorage.removeItem('geoapify_guest_pax_id');
       const url = new URL(window.location.href);
@@ -359,19 +442,25 @@ export default function App() {
   };
 
   const handleReplayIntro = () => {
+    localStorage.removeItem('beego_intro_completed');
     sessionStorage.removeItem('beego_intro_completed');
     sessionStorage.removeItem('bigo_intro_completed');
-    setIntroState('splash');
+    setIntroState('onboarding');
   };
 
   // Passenger clicks "Request for Ride"
   const handleRequestRide = async () => {
-    // Requirement 9: Protect ride booking action - require login
+    // Require authenticated passenger
     if (!passengerProfile && !isAuthenticated) {
-      setPendingRoleForAuth('passenger');
-      setPassengerAuthModalMode('login');
-      setErrorMessage('Please sign in or create an account with Descope to request an electric ride.');
-      return;
+      const stored = getStoredDescopeUser() || getStoredPassenger();
+      if (stored && stored.email) {
+        setPassengerProfile(stored);
+      } else {
+        setPendingRoleForAuth('passenger');
+        setPassengerAuthModalMode('login');
+        setErrorMessage('Please continue as passenger to request an electric ride.');
+        return;
+      }
     }
 
     if (!pickup || !dropoff) {
@@ -418,29 +507,17 @@ export default function App() {
     setStage('request');
   };
 
-  // 1. INTRO SPLASH: 2-second clean B logo & BeeGo text, then app starts directly
-  if (introState === 'splash') {
+  // 3 MOCK ONBOARDING SLIDES: Fast electric rides, 30s battery swap, zero-surge fares
+  if (introState === 'onboarding') {
     return (
-      <BeegoIntroSplash
-        onComplete={() => {
+      <BeegoOnboarding
+        onFinish={() => {
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('beego_intro_completed', 'true');
               sessionStorage.setItem('beego_intro_completed', 'true');
             } catch {}
           }
-          setIntroState('ready');
-        }}
-      />
-    );
-  }
-
-  // 2. ONBOARDING SLIDES: 4 slides with next/back buttons
-  if (introState === 'onboarding') {
-    return (
-      <BeegoOnboarding
-        onFinish={() => {
-          sessionStorage.setItem('beego_intro_completed', 'true');
           setIntroState('ready');
         }}
       />

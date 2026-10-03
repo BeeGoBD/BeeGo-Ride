@@ -2,17 +2,16 @@ import React, { useState, useRef } from 'react';
 import {
   ArrowRight,
   ArrowLeft,
-  Smartphone,
   MapPin,
   BatteryCharging,
   Bike,
   Car,
-  Building2,
   Zap,
-  Wallet,
   Banknote,
-  CheckCircle2,
   ShieldCheck,
+  Sparkles,
+  CheckCircle2,
+  Clock,
 } from 'lucide-react';
 import { BeeGoVoltxLogo } from './BeeGoVoltxLogo';
 
@@ -22,6 +21,7 @@ interface BeegoOnboardingProps {
 
 interface SlideData {
   id: number;
+  badge: string;
   headline: string;
   subtext: string;
   illustration: React.ReactNode;
@@ -41,7 +41,7 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
     if (touchStartX.current === null) return;
     const diffX = e.changedTouches[0].clientX - touchStartX.current;
     if (Math.abs(diffX) > 40) {
-      if (diffX < 0 && currentSlide < 3) {
+      if (diffX < 0 && currentSlide < slides.length - 1) {
         // Swiped Left -> Next
         setCurrentSlide((prev) => prev + 1);
       } else if (diffX > 0 && currentSlide > 0) {
@@ -52,207 +52,210 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
     touchStartX.current = null;
   };
 
+  // 3 Mock Slides based on the BeeGo Voltx Website
   const slides: SlideData[] = [
+    // SLIDE 1: INSTANT ELECTRIC RIDES (Ride Booking & ৳70/km Flat Rate)
     {
       id: 0,
-      headline: 'One App for All Services',
-      subtext: 'Get a ride, battery swap, power station access and much more at your fingertips.',
+      badge: 'Eco-Friendly Rides • Flat ৳70/km',
+      headline: 'Instant Electric Rides',
+      subtext: 'Book fast, zero-surge electric rides across Dhaka and Chittagong with guaranteed flat ৳70/km pricing.',
       illustration: (
-        <div className="relative w-full h-64 flex items-center justify-center">
-          {/* Subtle background circles */}
-          <div className="absolute w-52 h-52 rounded-full bg-[#FFF9E6] -z-0" />
-          <div className="absolute w-40 h-40 rounded-full bg-[#F5C518]/15 -z-0" />
+        <div className="relative w-full h-72 flex items-center justify-center">
+          {/* Subtle background glow */}
+          <div className="absolute w-60 h-60 rounded-full bg-[#FFF9E6] -z-0" />
+          <div className="absolute w-44 h-44 rounded-full bg-[#F5C518]/20 -z-0 animate-pulse" />
 
-          {/* Hand holding phone illustration */}
-          <div className="relative z-10 w-36 h-56 bg-[#1A1A1A] rounded-[28px] p-2 shadow-2xl shadow-amber-500/10 border-4 border-white flex flex-col justify-between">
-            {/* Phone Screen Header */}
-            <div className="w-12 h-3.5 bg-zinc-800 rounded-full mx-auto mb-1" />
-            
-            {/* Mini Map on Screen */}
-            <div className="flex-1 bg-[#F8F9FA] rounded-xl p-2 relative overflow-hidden flex flex-col justify-between border border-zinc-200">
-              <div className="w-full h-full absolute inset-0 opacity-40 bg-[radial-gradient(#CBD5E1_1px,transparent_1px)] [background-size:10px_10px]" />
-              
-              {/* Route line */}
-              <div className="relative z-10 flex items-center justify-between text-[8px] font-bold text-zinc-600 bg-white/90 p-1.5 rounded-lg shadow-sm">
-                <span className="flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                  Gulshan 2
-                </span>
-                <span className="text-[#E6A800]">৳70/km</span>
+          {/* Mock Website Ride Booking Card */}
+          <div className="relative z-10 w-72 bg-white rounded-3xl p-4 shadow-2xl border border-zinc-200/90 flex flex-col gap-3">
+            {/* Mock Route Selector */}
+            <div className="bg-zinc-50 rounded-2xl p-2.5 border border-zinc-100 flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-emerald-200 shrink-0" />
+                <div className="min-w-0 flex-1 truncate font-bold text-zinc-900">
+                  Gulshan 2 Circle, Dhaka
+                </div>
+                <span className="text-[10px] font-mono text-[#B38000] font-black shrink-0">Pickup</span>
               </div>
+              <div className="ml-1 w-0.5 h-2.5 bg-zinc-200" />
+              <div className="flex items-center gap-2 text-xs">
+                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-200 shrink-0" />
+                <div className="min-w-0 flex-1 truncate font-bold text-zinc-900">
+                  Dhanmondi 27, Dhaka
+                </div>
+                <span className="text-[10px] font-mono text-zinc-400 font-bold shrink-0">Drop-off</span>
+              </div>
+            </div>
 
-              {/* Pin */}
-              <div className="relative z-10 flex items-center justify-center my-auto">
-                <div className="w-8 h-8 rounded-full bg-[#F5C518] flex items-center justify-center shadow-md shadow-amber-400/40 animate-bounce">
-                  <MapPin className="w-4 h-4 text-black fill-black" />
+            {/* Vehicle Options Mockup */}
+            <div className="grid grid-cols-2 gap-2">
+              {/* Option 1: Moto (Active) */}
+              <div className="p-2.5 rounded-2xl bg-[#FFF9E6] border-2 border-[#F5C518] shadow-xs flex flex-col justify-between relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <div className="w-7 h-7 rounded-xl bg-[#F5C518] flex items-center justify-center text-black shadow-xs">
+                    <Bike className="w-4 h-4 stroke-[2.5]" />
+                  </div>
+                  <span className="text-[9px] font-mono font-black text-[#B38000] uppercase bg-white/80 px-1.5 py-0.5 rounded-md">
+                    2 min
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xs font-black text-zinc-900">Voltx Moto</div>
+                  <div className="text-[10px] font-bold text-[#B38000]">৳70 / km flat</div>
                 </div>
               </div>
 
-              <div className="relative z-10 text-[9px] font-black text-center bg-white/90 py-1 rounded-md text-zinc-900 shadow-sm">
-                BeeGo Voltx
+              {/* Option 2: Comfort Sedan */}
+              <div className="p-2.5 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col justify-between">
+                <div className="flex items-center justify-between">
+                  <div className="w-7 h-7 rounded-xl bg-zinc-200 flex items-center justify-center text-zinc-700">
+                    <Car className="w-4 h-4" />
+                  </div>
+                  <span className="text-[9px] font-mono font-bold text-zinc-500 bg-white px-1.5 py-0.5 rounded-md">
+                    4 min
+                  </span>
+                </div>
+                <div className="mt-2">
+                  <div className="text-xs font-bold text-zinc-800">Voltx Sedan</div>
+                  <div className="text-[10px] text-zinc-500">AC Comfort</div>
+                </div>
               </div>
             </div>
 
-            {/* Home indicator */}
-            <div className="w-10 h-1 bg-zinc-700 rounded-full mx-auto mt-1" />
-          </div>
-
-          {/* Floating Power Battery Badge */}
-          <div className="absolute -top-1 right-8 z-20 bg-white border border-[#F5C518]/30 rounded-2xl px-3 py-2 shadow-xl shadow-amber-500/15 flex items-center gap-2 animate-pulse">
-            <div className="w-7 h-7 rounded-xl bg-[#F5C518] flex items-center justify-center text-black shadow-sm">
-              <BatteryCharging className="w-4 h-4 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="text-[10px] font-black text-[#1A1A1A]">100% Charged</div>
-              <div className="text-[9px] text-[#E6A800] font-semibold">Ready to swap</div>
-            </div>
-          </div>
-
-          {/* Floating Mini Ride Badge */}
-          <div className="absolute bottom-4 left-6 z-20 bg-white border border-zinc-200 rounded-2xl px-3 py-2 shadow-lg flex items-center gap-2">
-            <div className="w-7 h-7 rounded-xl bg-zinc-900 flex items-center justify-center text-[#F5C518]">
-              <Bike className="w-4 h-4" />
-            </div>
-            <div>
-              <div className="text-[10px] font-black text-[#1A1A1A]">Bee Moto</div>
-              <div className="text-[9px] text-zinc-500">2 mins away</div>
+            {/* Verified Driver Pill */}
+            <div className="pt-2 border-t border-zinc-100 flex items-center justify-between text-[10px]">
+              <div className="flex items-center gap-1.5 text-zinc-600 font-semibold">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Verified Captain • 4.9 ★</span>
+              </div>
+              <span className="font-mono font-black text-zinc-900">৳210 Total</span>
             </div>
           </div>
         </div>
       ),
     },
+
+    // SLIDE 2: 30-SECOND BATTERY SWAP (Voltx Power Station Network)
     {
       id: 1,
-      headline: 'Get On Time',
-      subtext: 'Fast, reliable rides and battery services when you need them.',
+      badge: 'Voltx Power Network • 12+ City Hubs',
+      headline: '30-Second Battery Swap',
+      subtext: 'Never wait hours to charge. Swap your battery in 30 seconds at any of our 12+ city Voltx power stations.',
       illustration: (
-        <div className="relative w-full h-64 flex items-center justify-center">
-          <div className="absolute w-52 h-52 rounded-full bg-[#FFF9E6] -z-0" />
+        <div className="relative w-full h-72 flex items-center justify-center">
+          <div className="absolute w-60 h-60 rounded-full bg-[#FFF9E6] -z-0" />
+          <div className="absolute w-44 h-44 rounded-full bg-emerald-500/10 -z-0" />
 
-          {/* City skyline background */}
-          <div className="absolute bottom-6 w-4/5 h-20 bg-gradient-to-t from-zinc-200/80 to-transparent rounded-t-2xl flex items-end justify-around px-4 pb-2 z-0">
-            <Building2 className="w-10 h-14 text-zinc-300 stroke-[1.5]" />
-            <Building2 className="w-8 h-18 text-zinc-400 stroke-[1.5]" />
-            <Building2 className="w-12 h-12 text-zinc-300 stroke-[1.5]" />
-            <Building2 className="w-7 h-16 text-zinc-300 stroke-[1.5]" />
-          </div>
-
-          {/* Electric Bike Card */}
-          <div className="relative z-10 flex flex-col items-center gap-3">
-            <div className="w-44 h-24 rounded-2xl bg-white border border-zinc-200/90 p-3 shadow-xl flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-mono font-bold text-[#E6A800] uppercase tracking-wider">Fast Transit</span>
-                <span className="text-sm font-black text-[#1A1A1A]">Electric Moto</span>
-                <span className="text-[10px] text-zinc-500">৳70 / km flat rate</span>
-              </div>
-              <div className="w-12 h-12 rounded-xl bg-[#F5C518] flex items-center justify-center shadow-md shadow-amber-400/30">
-                <Bike className="w-6 h-6 text-black stroke-[2.5]" />
-              </div>
-            </div>
-
-            {/* Comfort AC Car Card */}
-            <div className="w-44 h-16 rounded-xl bg-white/90 border border-zinc-200 p-2.5 shadow-md flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-xs font-bold text-[#1A1A1A]">Comfort Car</span>
-                <span className="text-[9px] text-zinc-500">Dual AC sedan</span>
-              </div>
-              <div className="w-9 h-9 rounded-lg bg-zinc-900 flex items-center justify-center text-[#F5C518]">
-                <Car className="w-4 h-4" />
-              </div>
-            </div>
-          </div>
-        </div>
-      ),
-    },
-    {
-      id: 2,
-      headline: 'Power Anywhere',
-      subtext: 'Access hundreds of power stations and swap batteries in seconds.',
-      illustration: (
-        <div className="relative w-full h-64 flex items-center justify-center">
-          <div className="absolute w-52 h-52 rounded-full bg-[#FFF9E6] -z-0" />
-
-          {/* Battery Swap Grid Illustration */}
-          <div className="relative z-10 w-52 bg-white rounded-3xl p-4 shadow-2xl border border-zinc-200">
-            <div className="flex items-center justify-between pb-3 border-b border-zinc-100 mb-3">
+          {/* Mock Voltx Power Station Hub Card */}
+          <div className="relative z-10 w-72 bg-white rounded-3xl p-4 shadow-2xl border border-zinc-200/90 flex flex-col gap-3">
+            {/* Station Header */}
+            <div className="flex items-center justify-between pb-2.5 border-b border-zinc-100">
               <div className="flex items-center gap-2">
-                <div className="w-6 h-6 rounded-lg bg-[#F5C518] flex items-center justify-center text-black">
-                  <Zap className="w-3.5 h-3.5 fill-black" />
+                <div className="w-8 h-8 rounded-xl bg-[#F5C518] flex items-center justify-center text-black shadow-xs">
+                  <Zap className="w-4 h-4 fill-black text-black" />
                 </div>
-                <span className="text-xs font-black text-[#1A1A1A]">Voltx Station #4</span>
+                <div>
+                  <div className="text-xs font-black text-zinc-950">Voltx Hub #4 • Mohakhali</div>
+                  <div className="text-[10px] text-zinc-400 font-medium">Fast Exchange Dock</div>
+                </div>
               </div>
-              <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+              <span className="text-[9px] font-bold font-mono px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                 Online
               </span>
             </div>
 
-            {/* 6 Battery Cells Grid */}
+            {/* 6 Battery Cells Mockup */}
             <div className="grid grid-cols-3 gap-2">
-              {[1, 2, 3, 4, 5, 6].map((cell) => (
-                <div
-                  key={cell}
-                  className={`h-12 rounded-xl border flex flex-col items-center justify-center gap-1 ${
-                    cell <= 5
-                      ? 'bg-[#FFF9E6] border-[#F5C518]/50 text-amber-700'
-                      : 'bg-zinc-50 border-zinc-200 text-zinc-400'
-                  }`}
-                >
-                  <BatteryCharging className={`w-3.5 h-3.5 ${cell <= 5 ? 'text-[#E6A800]' : 'text-zinc-400'}`} />
-                  <span className="text-[8px] font-mono font-bold">
-                    {cell <= 5 ? '100%' : 'Charging'}
-                  </span>
-                </div>
-              ))}
+              {[1, 2, 3, 4, 5, 6].map((cell) => {
+                const isFull = cell <= 5;
+                return (
+                  <div
+                    key={cell}
+                    className={`h-13 rounded-2xl border p-1.5 flex flex-col items-center justify-center gap-1 transition-all ${
+                      isFull
+                        ? 'bg-[#FFF9E6] border-[#F5C518] text-[#B38000] shadow-2xs'
+                        : 'bg-zinc-50 border-zinc-200 text-zinc-400'
+                    }`}
+                  >
+                    <BatteryCharging className={`w-4 h-4 ${isFull ? 'text-[#E6A800]' : 'text-zinc-400'}`} />
+                    <span className="text-[9px] font-mono font-black">
+                      {isFull ? '100%' : '85%'}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
 
-            <div className="mt-3 pt-2 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-500 font-medium">
-              <span>Available Swap:</span>
-              <span className="font-bold text-[#E6A800]">5 Batteries</span>
+            {/* Live Swap Metrics */}
+            <div className="grid grid-cols-2 gap-2 pt-1">
+              <div className="p-2 rounded-xl bg-zinc-50 border border-zinc-100 text-center">
+                <span className="text-[9px] text-zinc-400 font-semibold block uppercase tracking-wider">Swap Time</span>
+                <span className="text-xs font-black text-zinc-900 font-mono">~30 seconds</span>
+              </div>
+              <div className="p-2 rounded-xl bg-amber-50/60 border border-amber-200/60 text-center">
+                <span className="text-[9px] text-amber-800 font-semibold block uppercase tracking-wider">Range per Pack</span>
+                <span className="text-xs font-black text-[#B38000] font-mono">65 km</span>
+              </div>
             </div>
           </div>
         </div>
       ),
     },
+
+    // SLIDE 3: ZERO-SURGE & CASH ON ARRIVAL (Transparent Pricing Guarantee)
     {
-      id: 3,
-      headline: 'Simple Payments',
-      subtext: 'Pay with cash easily. Digital options coming soon.',
+      id: 2,
+      badge: 'Zero-Surge Guarantee • Cash on Arrival',
+      headline: 'Zero-Surge & Cash Payment',
+      subtext: 'Pay cash on arrival with total peace of mind. Guaranteed flat transparent pricing with zero surge fees, ever.',
       illustration: (
-        <div className="relative w-full h-64 flex items-center justify-center">
-          <div className="absolute w-52 h-52 rounded-full bg-[#FFF9E6] -z-0" />
+        <div className="relative w-full h-72 flex items-center justify-center">
+          <div className="absolute w-60 h-60 rounded-full bg-[#FFF9E6] -z-0" />
+          <div className="absolute w-44 h-44 rounded-full bg-[#F5C518]/15 -z-0" />
 
-          {/* Cash Payment Card (Active) */}
-          <div className="relative z-10 w-56 flex flex-col gap-3">
-            <div className="bg-white rounded-2xl p-4 shadow-xl border-2 border-[#F5C518] relative">
-              <div className="absolute -top-2.5 right-3 bg-[#F5C518] text-black text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-sm">
-                Active
-              </div>
-
+          {/* Mock Website Transparent Pricing Card */}
+          <div className="relative z-10 w-72 bg-white rounded-3xl p-4 shadow-2xl border border-zinc-200/90 flex flex-col gap-3">
+            {/* Primary Payment Card */}
+            <div className="p-3 rounded-2xl bg-white border-2 border-[#F5C518] shadow-md flex items-center justify-between relative overflow-hidden">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#E6A800]">
+                <div className="w-10 h-10 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#B38000]">
                   <Banknote className="w-5 h-5 stroke-[2.5]" />
                 </div>
                 <div>
-                  <div className="text-sm font-black text-[#1A1A1A]">Cash on Arrival</div>
-                  <div className="text-[10px] text-zinc-500">Pay directly to Rider in Taka</div>
+                  <div className="text-xs font-black text-zinc-950 flex items-center gap-1.5">
+                    <span>Cash on Arrival</span>
+                    <span className="text-[9px] bg-[#F5C518] text-black font-black px-1.5 py-0.2 rounded-md uppercase">
+                      Active
+                    </span>
+                  </div>
+                  <div className="text-[10px] text-zinc-500 font-medium">Pay directly in Taka to Captain</div>
                 </div>
               </div>
             </div>
 
-            {/* Digital Payment Card (Coming Soon) */}
-            <div className="bg-white/80 rounded-2xl p-3 border border-zinc-200/80 shadow-sm flex items-center justify-between opacity-80">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-lg bg-zinc-100 flex items-center justify-center text-zinc-500">
-                  <Wallet className="w-4 h-4" />
-                </div>
-                <div>
-                  <div className="text-xs font-bold text-zinc-700">bKash & Nagad</div>
-                  <div className="text-[9px] text-zinc-400">Digital Wallet</div>
-                </div>
+            {/* Zero Surge Fare Breakdown Mockup */}
+            <div className="p-2.5 rounded-2xl bg-zinc-50 border border-zinc-100 flex flex-col gap-1.5 text-[11px]">
+              <div className="flex items-center justify-between text-zinc-600">
+                <span>Base Fare</span>
+                <span className="font-mono font-bold text-zinc-900">৳50</span>
               </div>
-              <span className="text-[9px] font-mono font-bold bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-md">
-                Coming Soon
-              </span>
+              <div className="flex items-center justify-between text-zinc-600">
+                <span>Standard Distance (per km)</span>
+                <span className="font-mono font-bold text-zinc-900">৳70 flat</span>
+              </div>
+              <div className="flex items-center justify-between font-bold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-lg">
+                <span className="flex items-center gap-1">
+                  <Sparkles className="w-3 h-3 text-emerald-600" />
+                  Peak / Rain Surge Fee
+                </span>
+                <span className="font-mono font-black">৳0 (Guaranteed)</span>
+              </div>
+            </div>
+
+            {/* Safety Assurance */}
+            <div className="pt-2 border-t border-zinc-100 flex items-center justify-center gap-1.5 text-[10px] text-zinc-500 font-semibold">
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
+              <span>SOS & 24/7 Helpline • BeeGo Voltx Bangladesh</span>
             </div>
           </div>
         </div>
@@ -268,45 +271,53 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
       id="beego-voltx-onboarding"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
-      className="w-full min-h-screen bg-white text-[#1A1A1A] flex flex-col justify-between p-6 select-none max-w-[430px] mx-auto shadow-2xl relative"
+      className="w-full h-full min-h-[100dvh] bg-white text-[#1A1A1A] flex flex-col justify-between p-5 sm:p-6 select-none max-w-[430px] mx-auto shadow-2xl relative font-sans"
     >
       {/* Top Header: Logo + Skip */}
-      <div className="w-full flex items-center justify-between pt-2">
+      <div className="w-full flex items-center justify-between pt-1">
         <BeeGoVoltxLogo size="md" />
 
-        {!isLast && (
+        {!isLast ? (
           <button
             type="button"
             onClick={onFinish}
-            className="text-xs font-bold text-zinc-400 hover:text-zinc-700 transition-colors px-2 py-1 rounded-lg cursor-pointer"
+            className="text-xs font-bold text-zinc-400 hover:text-zinc-800 transition-colors px-2.5 py-1 rounded-xl cursor-pointer hover:bg-zinc-100 active:scale-95"
           >
             Skip
           </button>
+        ) : (
+          <span className="text-[10px] font-mono font-bold text-zinc-400 uppercase tracking-wider px-2 py-0.5">
+            Step 3 of 3
+          </span>
         )}
       </div>
 
-      {/* Middle Illustration Area */}
-      <div className="my-auto py-4 flex flex-col items-center">
+      {/* Middle Illustration & Content Area */}
+      <div className="my-auto py-2 flex flex-col items-center">
         {/* Animated Illustration */}
         <div className="w-full transition-all duration-300 ease-out">
           {slide.illustration}
         </div>
 
-        {/* Headline & Subtext */}
-        <div className="w-full text-center px-4 mt-6">
+        {/* Badge, Headline & Subtext */}
+        <div className="w-full text-center px-4 mt-4">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF9E6] border border-[#F5C518]/40 text-[#B38000] text-[10px] font-mono font-black uppercase tracking-wider mb-2">
+            <span>{slide.badge}</span>
+          </div>
+
           <h2 className="text-2xl font-black tracking-tight text-[#1A1A1A] mb-2">
             {slide.headline}
           </h2>
-          <p className="text-sm text-zinc-500 leading-relaxed font-normal">
+          <p className="text-xs sm:text-sm text-zinc-500 leading-relaxed font-medium max-w-[320px] mx-auto">
             {slide.subtext}
           </p>
         </div>
       </div>
 
       {/* Bottom Navigation: Progress Dots & Action Buttons */}
-      <div className="w-full flex flex-col gap-4 pb-4">
+      <div className="w-full flex flex-col gap-3.5 pb-2">
         {/* Progress Dots */}
-        <div className="flex items-center justify-center gap-1.5 py-2">
+        <div className="flex items-center justify-center gap-1.5 py-1">
           {slides.map((s, idx) => (
             <button
               key={s.id}
@@ -315,7 +326,7 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
               aria-label={`Go to slide ${idx + 1}`}
               className={`h-2 rounded-full transition-all duration-300 cursor-pointer ${
                 idx === currentSlide
-                  ? 'w-6 bg-[#F5C518]'
+                  ? 'w-7 bg-[#F5C518] shadow-xs'
                   : 'w-2 bg-zinc-200 hover:bg-zinc-300'
               }`}
             />
@@ -323,12 +334,12 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
         </div>
 
         {/* Buttons Row */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           {currentSlide > 0 && (
             <button
               type="button"
               onClick={() => setCurrentSlide((prev) => prev - 1)}
-              className="w-12 h-12 rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50 flex items-center justify-center text-zinc-700 transition-all cursor-pointer shrink-0"
+              className="w-13 h-13 rounded-2xl border border-zinc-200/90 bg-white hover:bg-zinc-50 active:scale-95 flex items-center justify-center text-zinc-700 transition-all cursor-pointer shrink-0 shadow-2xs"
               title="Previous"
             >
               <ArrowLeft className="w-5 h-5" />
@@ -340,19 +351,19 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
               type="button"
               id="onboarding-get-started-button"
               onClick={onFinish}
-              className="flex-1 py-3.5 px-6 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/25 transition-all cursor-pointer"
+              className="flex-1 h-13 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
             >
               <span>Get Started</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              <ArrowRight className="w-4 h-4 stroke-[2.8]" />
             </button>
           ) : (
             <button
               type="button"
               onClick={() => setCurrentSlide((prev) => prev + 1)}
-              className="flex-1 py-3.5 px-6 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-400/20 transition-all cursor-pointer"
+              className="flex-1 h-13 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-black font-black text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20 transition-all cursor-pointer"
             >
-              <span>Get Started</span>
-              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
+              <span>Next</span>
+              <ArrowRight className="w-4 h-4 stroke-[2.8]" />
             </button>
           )}
         </div>
@@ -360,3 +371,4 @@ export const BeegoOnboarding: React.FC<BeegoOnboardingProps> = ({ onFinish }) =>
     </div>
   );
 };
+export default BeegoOnboarding;

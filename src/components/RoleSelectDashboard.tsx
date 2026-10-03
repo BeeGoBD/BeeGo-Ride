@@ -108,7 +108,14 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
           {/* CARD 1: PASSENGER CARD */}
           <div
             id="role-select-passenger-card"
-            className="group w-full p-4.5 rounded-3xl bg-white border-2 border-zinc-200/80 hover:border-[#F5C518] shadow-sm hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col gap-3.5 relative overflow-hidden"
+            onClick={() => {
+              if (onOpenPassengerAuth) {
+                onOpenPassengerAuth('login');
+              } else {
+                onSelectRole('passenger');
+              }
+            }}
+            className="group w-full p-4.5 rounded-3xl bg-white border-2 border-zinc-200/80 hover:border-[#F5C518] shadow-sm hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col gap-3.5 relative overflow-hidden cursor-pointer"
           >
             <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-[#FFF9E6] to-transparent rounded-bl-full -z-0 pointer-events-none group-hover:scale-110 transition-transform" />
 
@@ -130,10 +137,11 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
               </p>
             </div>
 
-            {/* Passenger Action Split: Sign In or Register */}
-            <div className="relative z-10 pt-2.5 border-t border-zinc-100 flex items-center gap-2">
+            {/* Passenger Action: Single Unified Yellow Button */}
+            <div className="relative z-10 pt-2.5 border-t border-zinc-100">
               <button
                 type="button"
+                id="role-continue-passenger-btn"
                 onClick={() => {
                   if (onOpenPassengerAuth) {
                     onOpenPassengerAuth('login');
@@ -141,26 +149,11 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                     onSelectRole('passenger');
                   }
                 }}
-                className="flex-1 py-2.5 px-3 rounded-2xl bg-zinc-100 hover:bg-zinc-200 active:scale-95 text-xs font-black text-zinc-800 text-center transition-all cursor-pointer border border-zinc-200/70 flex items-center justify-center gap-1.5"
+                className="w-full py-3.5 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-sm font-black text-black text-center transition-all cursor-pointer shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
               >
-                <LogIn className="w-3.5 h-3.5 text-zinc-600" />
-                <span>Sign In</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  if (onOpenPassengerAuth) {
-                    onOpenPassengerAuth('signup');
-                  } else {
-                    onSelectRole('passenger');
-                  }
-                }}
-                className="flex-1 py-2.5 px-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black text-center transition-all cursor-pointer shadow-xs flex items-center justify-center gap-1.5"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Sign Up</span>
-                <ArrowRight className="w-3 h-3 stroke-[2.5]" />
+                <User className="w-4 h-4 stroke-[2.5]" />
+                <span>Continue as Passenger</span>
+                <ArrowRight className="w-4 h-4 stroke-[2.8]" />
               </button>
             </div>
           </div>

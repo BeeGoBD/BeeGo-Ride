@@ -400,7 +400,7 @@ async function startServer() {
       }
 
       // 3. If SMTP credentials exist in environment, also deliver via SMTP
-      if (cleanEmail && cleanEmail.endsWith('@gmail.com')) {
+      if (cleanEmail) {
         const transporter = getMailTransporter();
         if (transporter) {
           try {

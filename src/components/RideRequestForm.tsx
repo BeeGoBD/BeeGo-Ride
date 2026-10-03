@@ -807,12 +807,12 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         }
                       }
                     }}
-                    placeholder={isLocating ? "📍 Detecting your current location..." : "Enter pickup spot (or tap GPS Locate)..."}
+                    placeholder={isLocating ? "📍 Detecting your current location..." : "Enter pickup spot (e.g. road, area)..."}
                     autoComplete="off"
-                    className="w-full pl-3 pr-20 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none cursor-text"
+                    className="w-full pl-3 pr-10 py-2.5 bg-transparent text-xs font-semibold text-zinc-900 placeholder:text-zinc-400 focus:outline-none cursor-text"
                   />
 
-                  {/* Right controls: GPS status badge / toggle or Clear */}
+                  {/* Right controls: Clear button if input has text */}
                   <div className="absolute right-2 flex items-center gap-1.5">
                     {isSearchingPickup && (
                       <Loader2 className="w-3.5 h-3.5 text-[#E6A800] animate-spin" />
@@ -832,56 +832,8 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                         <X className="w-3.5 h-3.5" />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={handleResetToLiveGpsPickup}
-                      disabled={isLocating}
-                      className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer shadow-2xs active:scale-95 ${
-                        isPickupLiveGps
-                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/80 hover:bg-emerald-100'
-                          : 'bg-zinc-100 text-zinc-500 hover:text-[#E6A800] hover:bg-amber-50'
-                      }`}
-                      title={isPickupLiveGps ? 'GPS location active' : 'Use real-time GPS location'}
-                    >
-                      <LocateFixed className={`w-3 h-3 ${isPickupLiveGps ? 'text-emerald-600 animate-pulse' : 'text-zinc-400'}`} />
-                      <span>{isPickupLiveGps ? 'GPS' : isLocating ? '...' : 'Locate'}</span>
-                    </button>
                   </div>
                 </div>
-
-                {/* Real-time Location Prompt Banner for Web App & WebViews */}
-                {!pickup && (
-                  <div className="mt-2 px-3 py-2 rounded-xl bg-amber-50/90 border border-amber-200/90 flex items-center justify-between gap-2 shadow-2xs animate-in fade-in duration-200">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-6 h-6 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
-                        <LocateFixed className={`w-3.5 h-3.5 text-amber-700 ${isLocating ? 'animate-spin' : ''}`} />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-[11px] font-bold text-zinc-900 truncate">
-                          {isLocating ? 'Detecting your live address...' : 'Allow Location Permission'}
-                        </p>
-                        <p className="text-[9px] text-zinc-500 truncate">
-                          {isLocating ? 'Acquiring GPS coordinates' : 'Tap to show your current pickup address'}
-                        </p>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleResetToLiveGpsPickup}
-                      disabled={isLocating}
-                      className="px-2.5 py-1.5 rounded-lg bg-[#F5C518] hover:bg-amber-400 text-black text-[10px] font-black shrink-0 transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
-                    >
-                      {isLocating ? (
-                        <>
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Locating...</span>
-                        </>
-                      ) : (
-                        <span>Allow GPS</span>
-                      )}
-                    </button>
-                  </div>
-                )}
 
                 {/* Autocomplete Suggestions Dropdown for Pickup */}
                 {isPickupFocused && (
@@ -1013,64 +965,6 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 )}
               </div>
             </div>
-
-            {/* Quick 1-Tap Popular Dhaka Destination Pills (Shown when destination is empty) */}
-            {!dropoff && (
-              <div className="pt-2.5 mt-1">
-                <div className="flex items-center justify-between mb-1.5 px-0.5">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-[#E6A800]" />
-                    Quick Destinations
-                  </span>
-                </div>
-                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                  {[
-                    {
-                      name: 'Gulshan 2',
-                      lat: 23.7925,
-                      lon: 90.4078,
-                      formatted: 'Gulshan 2 Circle, Dhaka',
-                      addressLine1: 'Gulshan 2 Circle',
-                      addressLine2: 'North Commercial Hub, Dhaka',
-                    },
-                    {
-                      name: 'Banani 11',
-                      lat: 23.7937,
-                      lon: 90.4042,
-                      formatted: 'Banani Road 11, Dhaka',
-                      addressLine1: 'Banani Road 11',
-                      addressLine2: 'Road 11 Lifestyle Hub, Dhaka',
-                    },
-                    {
-                      name: 'Airport T1',
-                      lat: 23.8433,
-                      lon: 90.4029,
-                      formatted: 'Hazrat Shahjalal Int. Airport Terminal 1, Dhaka',
-                      addressLine1: 'Airport Terminal 1',
-                      addressLine2: 'Uttara, Dhaka',
-                    },
-                    {
-                      name: 'Dhanmondi 27',
-                      lat: 23.7538,
-                      lon: 90.3768,
-                      formatted: 'Dhanmondi 27 Satmasjid Road, Dhaka',
-                      addressLine1: 'Dhanmondi 27',
-                      addressLine2: 'Satmasjid Road, Dhaka',
-                    },
-                  ].map((spot) => (
-                    <button
-                      key={spot.name}
-                      type="button"
-                      onClick={() => handleSelectDropoff(spot)}
-                      className="shrink-0 px-2.5 py-1 rounded-xl bg-zinc-100 hover:bg-[#FFF9E6] border border-zinc-200/80 hover:border-[#F5C518]/60 text-zinc-700 hover:text-black text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                    >
-                      <MapPin className="w-3 h-3 text-[#E6A800]" />
-                      <span>{spot.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
 
             {/* Micro hint & Route status footer */}
             <div className="pt-2 mt-2.5 border-t border-zinc-100 flex items-center justify-between text-[10px] text-zinc-400 font-medium">

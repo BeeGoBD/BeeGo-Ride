@@ -49,25 +49,17 @@ async function safeParseJson(res: Response): Promise<any> {
   return {};
 }
 
-// Gmail address validation mandate: must end with @gmail.com
+// Email address validation: checks for standard valid email format
 export function validateGmailAddress(email: string): { isValid: boolean; error?: string } {
   const trimmed = email.trim().toLowerCase();
   if (!trimmed) {
     return { isValid: false, error: 'Email address is required.' };
   }
 
-  // Basic email structure
+  // Standard email format verification
   const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
   if (!emailRegex.test(trimmed)) {
-    return { isValid: false, error: 'Please enter a valid email format.' };
-  }
-
-  // Strict Gmail mandate
-  if (!trimmed.endsWith('@gmail.com')) {
-    return {
-      isValid: false,
-      error: 'Only @gmail.com email addresses are allowed.',
-    };
+    return { isValid: false, error: 'Please enter a valid email address (e.g. yourname@gmail.com).' };
   }
 
   return { isValid: true };
@@ -128,7 +120,7 @@ export function getStoredPassenger(): PassengerProfile | null {
       localStorage.getItem('beego_descope_user');
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && (parsed.email || parsed.id)) {
+      if (parsed && typeof parsed.email === 'string' && parsed.email.trim().length > 0) {
         return parsed as PassengerProfile;
       }
     }
