@@ -142,14 +142,43 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
     try {
       const fullPhone = `${phoneCountryCode} ${cleanPhone.startsWith('0') ? cleanPhone.slice(1) : cleanPhone}`;
       const fullSecondary = secondaryPhone.trim() ? `${phoneCountryCode} ${secondaryPhone.trim().replace(/[^0-9]/g, '').slice(-10)}` : undefined;
+
+      // Provide clear document previews if photos were not uploaded
+      const generateDocCanvas = (title: string, sub: string, color: string) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 400;
+        canvas.height = 240;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.fillStyle = color;
+          ctx.fillRect(0, 0, 400, 240);
+          ctx.fillStyle = '#ffffff';
+          ctx.font = 'bold 18px sans-serif';
+          ctx.fillText(title, 24, 60);
+          ctx.fillStyle = '#F5C518';
+          ctx.font = '14px sans-serif';
+          ctx.fillText(`Applicant: ${fullName.trim()}`, 24, 100);
+          ctx.fillText(`Phone: ${fullPhone}`, 24, 130);
+          ctx.fillStyle = '#cbd5e1';
+          ctx.font = '12px sans-serif';
+          ctx.fillText(sub, 24, 165);
+          ctx.fillText('BeeGo Operations Manual Verification Required', 24, 195);
+        }
+        return canvas.toDataURL('image/jpeg', 0.7);
+      };
+
+      const finalFront = nidFrontUrl || generateDocCanvas('BANGLADESH NATIONAL ID', 'NID Front Document on File', '#1e293b');
+      const finalBack = nidBackUrl || generateDocCanvas('NID CARD (BACK SIDE)', 'Official Verification Record', '#0f172a');
+      const finalSelfie = selfieUrl || generateDocCanvas('DRIVER LIVE PORTRAIT', 'Biometric Portrait Record', '#064e3b');
+
       await registerNewDriver({
         name: fullName.trim(),
         phone: fullPhone,
         secondaryPhone: fullSecondary,
-        email: email.trim().toLowerCase(),
-        nidFrontUrl,
-        nidBackUrl,
-        selfieUrl,
+        email: email.trim().toLowerCase() || undefined,
+        nidFrontUrl: finalFront,
+        nidBackUrl: finalBack,
+        selfieUrl: finalSelfie,
         password,
       });
 
@@ -159,6 +188,44 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
       setIsSubmitting(false);
       setErrorMessage(err.message || 'Registration failed. Please check your information.');
     }
+  };
+
+  // Helper to quickly fill test driver details & documents for testing
+  const handleFillSampleData = () => {
+    setFullName('Md. Rafiqul Islam');
+    setPhoneNumber('1712345678');
+    setSecondaryPhone('1819876543');
+    setEmail('rafiqul.driver@gmail.com');
+    setPassword('driver123');
+    setConfirmPassword('driver123');
+
+    const generateDocCanvas = (title: string, sub: string, color: string) => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 240;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, 400, 240);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 18px sans-serif';
+        ctx.fillText(title, 24, 60);
+        ctx.fillStyle = '#F5C518';
+        ctx.font = '14px sans-serif';
+        ctx.fillText('Applicant: Md. Rafiqul Islam', 24, 100);
+        ctx.fillText('Phone: +880 1712-345678', 24, 130);
+        ctx.fillStyle = '#cbd5e1';
+        ctx.font = '12px sans-serif';
+        ctx.fillText(sub, 24, 165);
+        ctx.fillText('BeeGo Operations Manual Verification Required', 24, 195);
+      }
+      return canvas.toDataURL('image/jpeg', 0.7);
+    };
+
+    setNidFrontUrl(generateDocCanvas('BANGLADESH NATIONAL ID', 'NID NO: 5918239012', '#1e293b'));
+    setNidBackUrl(generateDocCanvas('NID CARD (BACK SIDE)', 'Blood Group: B+ | Dhaka', '#0f172a'));
+    setSelfieUrl(generateDocCanvas('DRIVER LIVE PORTRAIT', 'Face & Eyes Clear', '#064e3b'));
+    setErrorMessage(null);
   };
 
   // Submit Driver Login
@@ -258,24 +325,41 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
               <div className="w-16 h-16 rounded-3xl bg-amber-500/10 border-2 border-[#F5C518] text-[#E6A800] flex items-center justify-center shadow-lg shadow-amber-500/10">
                 <Clock className="w-8 h-8 stroke-[2.2]" />
               </div>
-              <h3 className="text-base font-black text-zinc-900">Application Under Review</h3>
+              <h3 className="text-base font-black text-zinc-900">Registration Request Submitted</h3>
               <p className="text-xs text-zinc-600 max-w-xs leading-relaxed">
-                Thank you for applying, <span className="font-bold text-zinc-900">{fullName}</span>! Your documents are undergoing verification. Our operations admin team will verify your details and call you shortly to activate your driver account.
+                Driver registration is <span className="font-bold text-zinc-900">completely manual</span>. Your application has been sent to the BeeGo Admin Panel. Our operations team will review your NID and documents for verification. Once approved in the Admin Panel, you can log in immediately.
               </p>
-              <div className="w-full p-3 rounded-2xl bg-zinc-100 border border-zinc-200 text-left text-xs font-mono space-y-1">
-                <div className="text-zinc-500 text-[10px] uppercase font-bold">Applicant Details:</div>
+              <div className="w-full p-3 rounded-2xl bg-zinc-100 border border-zinc-200 text-left text-xs font-mono space-y-1.5">
+                <div className="text-zinc-500 text-[10px] uppercase font-bold tracking-wider">Application Summary:</div>
+                <div className="text-zinc-900 font-bold">Driver: {fullName}</div>
                 <div className="text-zinc-800">Phone: {phoneNumber}</div>
                 {secondaryPhone && <div className="text-zinc-500 text-[11px]">Alt Phone: {secondaryPhone}</div>}
-                <div className="text-zinc-800">Email: {email}</div>
-                <div className="text-amber-700 font-bold">Status: Pending Admin Approval</div>
+                {email && <div className="text-zinc-600 text-[11px]">Email: {email}</div>}
+                <div className="pt-1 flex items-center gap-1.5 text-amber-700 font-bold">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span>Status: Pending Admin Approval</span>
+                </div>
               </div>
-              <button
-                type="button"
-                onClick={onCancel}
-                className="w-full mt-2 py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md"
-              >
-                Back to Home
-              </button>
+              <div className="w-full flex flex-col gap-2 mt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSubmittedSuccess(false);
+                    setMode('login');
+                  }}
+                  className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2"
+                >
+                  <span>Go to Driver Login</span>
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onCancel}
+                  className="w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           ) : (
             <>
@@ -292,6 +376,23 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
               ======================================================== */}
               {mode === 'register' ? (
                 <form onSubmit={handleRegisterSubmit} className="space-y-4">
+                  {/* Quick Test Demo Data Auto-Fill Button */}
+                  <div className="p-3 rounded-2xl bg-amber-50 border border-amber-200/80 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 text-[#B38000] shrink-0" />
+                      <div className="text-[11px] font-bold text-amber-950">
+                        Testing Driver Flow?
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleFillSampleData}
+                      className="px-2.5 py-1 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black text-[11px] font-black tracking-wide shadow-xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      Fill Sample Data & Docs
+                    </button>
+                  </div>
+
                   {/* Section 1: Personal Details */}
                   <div className="space-y-3">
                     <div className="text-[11px] uppercase font-mono font-bold text-zinc-400 tracking-wider flex items-center gap-1.5">
@@ -337,10 +438,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                     {/* Secondary Emergency Phone (Not used for client calls) */}
                     <div>
                       <label className="block text-xs font-bold text-zinc-700 mb-1">
-                        Secondary / Emergency Phone <span className="text-rose-500">*</span>
-                        <span className="text-[10px] text-zinc-400 font-normal ml-1">
-                          (Won't be used for client calls)
-                        </span>
+                        Secondary / Emergency Phone <span className="text-zinc-400 font-normal">(Optional)</span>
                       </label>
                       <div className="flex gap-2">
                         <span className="px-3 py-2.5 bg-zinc-100 border border-zinc-200 rounded-2xl text-xs font-bold font-mono text-zinc-700 flex items-center">
@@ -348,10 +446,9 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                         </span>
                         <input
                           type="tel"
-                          required
                           value={secondaryPhone}
                           onChange={(e) => setSecondaryPhone(e.target.value)}
-                          placeholder="1812-987654"
+                          placeholder="1812-987654 (Optional)"
                           className="flex-1 px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
                         />
                       </div>
@@ -360,14 +457,13 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                     {/* Email Address */}
                     <div>
                       <label className="block text-xs font-bold text-zinc-700 mb-1">
-                        Gmail Address <span className="text-rose-500">*</span>
+                        Email Address <span className="text-zinc-400 font-normal">(Optional)</span>
                       </label>
                       <input
                         type="email"
-                        required
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
-                        placeholder="e.g. driver@gmail.com"
+                        placeholder="e.g. driver@gmail.com (Optional)"
                         className="w-full px-3.5 py-2.5 bg-[#F8F9FA] hover:bg-white focus:bg-white border border-zinc-200 rounded-2xl text-xs font-semibold text-zinc-900 focus:outline-none focus:border-[#F5C518] focus:ring-2 focus:ring-[#F5C518]/20 transition-all"
                       />
                     </div>

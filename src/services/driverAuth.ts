@@ -121,32 +121,41 @@ export async function registerNewDriver(params: {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      throw new Error(data.error || 'Failed to register driver.');
+      throw new Error(data.error || 'Failed to submit driver registration request.');
     }
     if (data.driver) {
       Object.assign(newDriver, data.driver);
     }
   } catch (err: any) {
-    if (err.message && !err.message.includes('fetch')) {
+    if (err.message && !err.message.includes('Failed to fetch')) {
       throw err;
     }
   }
 
-  // Update local storage
-  const drivers = getStoredDrivers();
-  const existingIdx = drivers.findIndex((d) => d.phone === newDriver.phone || d.email === newDriver.email);
-  if (existingIdx >= 0) {
-    drivers[existingIdx] = newDriver;
-  } else {
-    drivers.unshift(newDriver);
+  // Update local storage defensively
+  try {
+    const drivers = getStoredDrivers();
+    const last10 = newDriver.phone.replace(/[^0-9]/g, '').slice(-10);
+    const existingIdx = drivers.findIndex((d) => {
+      const dDigits = d.phone.replace(/[^0-9]/g, '');
+      return (last10 && dDigits.slice(-10) === last10) || (d.email && d.email === newDriver.email);
+    });
+    if (existingIdx >= 0) {
+      drivers[existingIdx] = newDriver;
+    } else {
+      drivers.unshift(newDriver);
+    }
+    saveStoredDrivers(drivers);
+  } catch (storageErr) {
+    console.warn('[Driver Storage] Quota or parse issue:', storageErr);
   }
-  saveStoredDrivers(drivers);
 
   return newDriver;
 }
 
 export async function loginDriver(phone: string, password?: string): Promise<DriverProfile> {
   const cleanPhone = phone.replace(/[^0-9]/g, '');
+  const last10 = cleanPhone.slice(-10);
 
   // Attempt backend login first
   try {
@@ -164,7 +173,7 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
       return data.driver;
     }
   } catch (err: any) {
-    if (err.message && !err.message.includes('fetch')) {
+    if (err.message && !err.message.includes('Failed to fetch')) {
       throw err;
     }
   }
@@ -172,20 +181,20 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
   // Fallback to local check
   const drivers = getStoredDrivers();
   const found = drivers.find((d) => {
-    const dPhone = d.phone.replace(/[^0-9]/g, '');
-    return dPhone.includes(cleanPhone) || cleanPhone.includes(dPhone);
+    const dDigits = d.phone.replace(/[^0-9]/g, '');
+    return last10 && dDigits.slice(-10) === last10;
   });
 
   if (!found) {
-    throw new Error('No driver account found with this phone number. Please register first.');
+    throw new Error('No driver account found with this phone number. Please submit a registration request first.');
   }
 
   if (found.verificationStatus === 'pending') {
-    throw new Error('Your driver application is under review. Our team will verify your details and approve your account shortly.');
+    throw new Error('Your driver registration is under manual review. The BeeGo operations admin will verify your details and approve your account from the Admin Panel before you can log in.');
   }
 
   if (found.verificationStatus === 'rejected') {
-    throw new Error(`Your driver application was rejected. ${found.rejectionReason || 'Please contact BeeGo support.'}`);
+    throw new Error(`Your driver application was rejected. ${found.rejectionReason || 'Please re-apply or contact BeeGo operations admin.'}`);
   }
 
   if (password && found.password && found.password !== password) {

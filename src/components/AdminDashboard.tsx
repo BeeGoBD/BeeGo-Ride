@@ -26,6 +26,7 @@ import {
   Trash2,
   CheckSquare,
   RotateCcw,
+  Plus,
 } from 'lucide-react';
 import {
   AdminDriverRecord,
@@ -36,6 +37,7 @@ import {
   fetchAdminStats,
   fetchAdminDrivers,
   updateDriverVerification,
+  createAdminDriver,
   fetchAdminPassengers,
   fetchRestrictedAccounts,
   addRestriction,
@@ -89,6 +91,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
     email?: string;
   } | null>(null);
   const [restrictionReason, setRestrictionReason] = useState('');
+
+  // Manual driver onboarding state
+  const [isAddDriverModalOpen, setIsAddDriverModalOpen] = useState(false);
+  const [newDriverName, setNewDriverName] = useState('');
+  const [newDriverPhone, setNewDriverPhone] = useState('');
+  const [newDriverAltPhone, setNewDriverAltPhone] = useState('');
+  const [newDriverEmail, setNewDriverEmail] = useState('');
+  const [newDriverPassword, setNewDriverPassword] = useState('driver123');
+  const [newDriverVehicle, setNewDriverVehicle] = useState('Voltx Eco Speed Bike (Electric)');
+  const [newDriverPlate, setNewDriverPlate] = useState('Dhaka Metro-Ha 45-8921');
+  const [newDriverNid, setNewDriverNid] = useState('');
+  const [newDriverStatus, setNewDriverStatus] = useState<'approved' | 'pending'>('approved');
+  const [isCreatingDriver, setIsCreatingDriver] = useState(false);
+  const [addDriverError, setAddDriverError] = useState<string | null>(null);
+
+  const handleManualCreateDriver = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newDriverName.trim() || !newDriverPhone.trim()) {
+      setAddDriverError('Name and primary phone number are required.');
+      return;
+    }
+    setIsCreatingDriver(true);
+    setAddDriverError(null);
+    try {
+      const created = await createAdminDriver({
+        name: newDriverName.trim(),
+        phone: newDriverPhone.trim(),
+        secondaryPhone: newDriverAltPhone.trim() || undefined,
+        email: newDriverEmail.trim().toLowerCase() || undefined,
+        password: newDriverPassword || 'driver123',
+        vehicleModel: newDriverVehicle,
+        plateNumber: newDriverPlate,
+        nidNumber: newDriverNid.trim(),
+        status: newDriverStatus,
+        notes: `Manually registered by admin (${newDriverStatus}).`,
+      });
+      setIsCreatingDriver(false);
+      setIsAddDriverModalOpen(false);
+      setNewDriverName('');
+      setNewDriverPhone('');
+      setNewDriverAltPhone('');
+      setNewDriverEmail('');
+      silentSync();
+      alert(`Driver ${created.name} registered successfully as ${newDriverStatus}! ${newDriverStatus === 'approved' ? 'They can now log in immediately with phone ' + newDriverPhone + ' and password ' + (newDriverPassword || 'driver123') : 'Awaiting review.'}`);
+    } catch (err: any) {
+      setIsCreatingDriver(false);
+      setAddDriverError(err.message || 'Failed to manually register driver.');
+    }
+  };
 
   // Silent background auto-refresh ref
   const isFetchingRef = useRef(false);
@@ -498,16 +549,26 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
             </button>
           </div>
 
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-xs">
-            <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3 pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search by phone or name..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#141720] border border-zinc-800 text-xs text-white placeholder:text-zinc-500 focus:border-[#F5C518] focus:outline-hidden transition-colors"
-            />
+          {/* Search Box & Quick Action */}
+          <div className="flex items-center gap-2 flex-1 max-w-md justify-end">
+            <div className="relative flex-1 max-w-xs">
+              <Search className="w-4 h-4 text-zinc-500 absolute left-3.5 top-3 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search by phone or name..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3.5 py-2 rounded-xl bg-[#141720] border border-zinc-800 text-xs text-white placeholder:text-zinc-500 focus:border-[#F5C518] focus:outline-hidden transition-colors"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsAddDriverModalOpen(true)}
+              className="px-3 py-2 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs flex items-center gap-1.5 transition-all shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 shrink-0"
+            >
+              <Plus className="w-4 h-4 stroke-[2.5]" />
+              <span>+ Onboard Driver</span>
+            </button>
           </div>
         </div>
 
@@ -516,6 +577,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
         {/* TAB 1: PENDING DRIVER REQUESTS */}
         {activeTab === 'pending' && (
           <div className="space-y-3">
+            {/* Explanatory Manual Verification Queue Banner */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0 font-black">
+                <ShieldCheck className="w-4 h-4" />
+              </div>
+              <div className="flex-1 text-xs">
+                <div className="font-black text-[#F5C518]">Manual Driver Verification & Approval Queue</div>
+                <div className="text-zinc-300 mt-0.5 leading-relaxed">
+                  Driver onboarding is strictly manual. When drivers submit a registration request, they appear below. Review their NID & photos, then click <span className="text-emerald-400 font-bold">Approve Driver</span>. Once approved, the driver can log in immediately.
+                </div>
+              </div>
+            </div>
             {pendingDrivers.length === 0 ? (
               <div className="p-8 rounded-3xl bg-[#141720] border border-zinc-800/80 text-center flex flex-col items-center justify-center gap-2">
                 <CheckCircle2 className="w-10 h-10 text-emerald-400" />
@@ -1394,6 +1467,187 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
                 Confirm Restriction
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 8. MANUAL DRIVER ONBOARDING MODAL */}
+      {isAddDriverModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 overflow-y-auto">
+          <div className="w-full max-w-md bg-[#141720] border border-amber-500/40 rounded-3xl p-6 shadow-2xl text-white space-y-4 my-8">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div className="flex items-center gap-2.5 text-[#F5C518]">
+                <Bike className="w-6 h-6 shrink-0" />
+                <div>
+                  <h3 className="text-base font-black text-white">Manual Driver Onboarding</h3>
+                  <p className="text-[11px] text-zinc-400">Directly register & activate driver from Admin Panel</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddDriverModalOpen(false)}
+                className="w-7 h-7 rounded-full bg-zinc-800 hover:bg-zinc-700 text-zinc-400 hover:text-white flex items-center justify-center cursor-pointer text-xs"
+              >
+                ✕
+              </button>
+            </div>
+
+            {addDriverError && (
+              <div className="p-3 rounded-xl bg-rose-950/60 border border-rose-800/80 text-rose-300 text-xs font-semibold">
+                {addDriverError}
+              </div>
+            )}
+
+            <form onSubmit={handleManualCreateDriver} className="space-y-3.5">
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                  Driver Full Name <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Md. Rafiqul Islam"
+                  value={newDriverName}
+                  onChange={(e) => setNewDriverName(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white focus:border-[#F5C518] focus:outline-hidden"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                  Primary Mobile Number <span className="text-rose-400">*</span>
+                </label>
+                <input
+                  type="tel"
+                  required
+                  placeholder="e.g. 01712345678"
+                  value={newDriverPhone}
+                  onChange={(e) => setNewDriverPhone(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white font-mono focus:border-[#F5C518] focus:outline-hidden"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    Emergency Phone (Optional)
+                  </label>
+                  <input
+                    type="tel"
+                    placeholder="e.g. 01812345678"
+                    value={newDriverAltPhone}
+                    onChange={(e) => setNewDriverAltPhone(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white font-mono focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    Email (Optional)
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="driver@gmail.com"
+                    value={newDriverEmail}
+                    onChange={(e) => setNewDriverEmail(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    Account Password <span className="text-rose-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="driver123"
+                    value={newDriverPassword}
+                    onChange={(e) => setNewDriverPassword(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white font-mono focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    NID Number (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 5918239012"
+                    value={newDriverNid}
+                    onChange={(e) => setNewDriverNid(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white font-mono focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    Vehicle Model
+                  </label>
+                  <input
+                    type="text"
+                    value={newDriverVehicle}
+                    onChange={(e) => setNewDriverVehicle(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+                <div>
+                  <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                    Plate Number
+                  </label>
+                  <input
+                    type="text"
+                    value={newDriverPlate}
+                    onChange={(e) => setNewDriverPlate(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white focus:border-[#F5C518] focus:outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold text-zinc-300 mb-1">
+                  Initial Account Status
+                </label>
+                <select
+                  value={newDriverStatus}
+                  onChange={(e) => setNewDriverStatus(e.target.value as any)}
+                  className="w-full px-3 py-2 rounded-xl bg-[#0E1015] border border-zinc-800 text-xs text-white focus:border-[#F5C518] focus:outline-hidden"
+                >
+                  <option value="approved">Approved Immediately (Can Log In Right Now)</option>
+                  <option value="pending">Pending Verification (Appears in Queue)</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-zinc-800">
+                <button
+                  type="button"
+                  onClick={() => setIsAddDriverModalOpen(false)}
+                  className="px-3.5 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-bold text-zinc-300 cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreatingDriver}
+                  className="px-4 py-2 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black text-xs font-black cursor-pointer shadow-md shadow-amber-500/20 disabled:opacity-50 flex items-center gap-1.5"
+                >
+                  {isCreatingDriver ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Registering...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                      <span>Confirm & Register Driver</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

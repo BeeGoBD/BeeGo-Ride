@@ -164,6 +164,34 @@ export async function updateDriverVerification(
   }
 }
 
+export async function createAdminDriver(params: {
+  name: string;
+  phone: string;
+  secondaryPhone?: string;
+  email?: string;
+  password?: string;
+  vehicleModel?: string;
+  plateNumber?: string;
+  nidNumber?: string;
+  status?: 'approved' | 'pending';
+  notes?: string;
+}): Promise<AdminDriverRecord> {
+  try {
+    const res = await fetch('/api/admin/drivers/create', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(params),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.error || 'Failed to manually register driver.');
+    }
+    return data.driver;
+  } catch (err: any) {
+    throw new Error(err.message || 'Failed to manually register driver.');
+  }
+}
+
 export async function fetchAdminPassengers(): Promise<AdminPassengerRecord[]> {
   try {
     const res = await fetch('/api/admin/passengers');

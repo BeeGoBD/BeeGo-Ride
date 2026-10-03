@@ -853,9 +853,11 @@ async function startServer() {
     }
   });
 
-  // Admin and Driver JSON parsing middleware
-  app.use('/api/admin', express.json({ limit: '15mb' }));
-  app.use('/api/driver', express.json({ limit: '15mb' }));
+  // Admin and Driver JSON & urlencoded parsing middleware (supports document photos)
+  app.use('/api/admin', express.json({ limit: '50mb' }));
+  app.use('/api/admin', express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use('/api/driver', express.json({ limit: '50mb' }));
+  app.use('/api/driver', express.urlencoded({ extended: true, limit: '50mb' }));
 
   // POST /api/admin/auth/login - Secret Admin Panel Authentication
   app.post('/api/admin/auth/login', (req, res) => {
@@ -1086,8 +1088,8 @@ async function startServer() {
     }
   });
 
-  // POST /api/driver/register - Driver sign-up with duplicate check
-  app.post('/api/driver/register', (req, res) => {
+  // POST /api/admin/drivers/create - Admin manually registers and onboards a driver directly
+  app.post('/api/admin/drivers/create', (req, res) => {
     try {
       const {
         name,
@@ -1095,55 +1097,49 @@ async function startServer() {
         secondaryPhone,
         email,
         password,
-        nidNumber,
-        nidFrontUrl,
-        nidBackUrl,
-        selfieUrl,
         vehicleModel,
         plateNumber,
+        nidNumber,
+        status = 'approved', // default approved when admin manually adds driver
+        notes,
       } = req.body || {};
 
       const cleanName = (name || '').trim();
       const cleanPhone = (phone || '').trim();
-      const cleanSecondaryPhone = (secondaryPhone || '').trim();
-      const cleanEmail = (email || '').trim().toLowerCase();
-
-      if (!cleanName || !cleanPhone || !cleanEmail) {
-        return res.status(400).json({ error: 'Full name, primary phone, and email are required.' });
-      }
-
-      // Check restriction
-      if (isTargetRestricted(cleanPhone, cleanEmail) || (cleanSecondaryPhone && isTargetRestricted(cleanSecondaryPhone))) {
-        return res.status(403).json({
-          error: 'This phone number or email is restricted. Please contact BeeGo admin.',
-        });
+      if (!cleanName || !cleanPhone) {
+        return res.status(400).json({ error: 'Driver full name and primary phone are required.' });
       }
 
       const drivers = loadDrivers();
-      const passengers = loadPassengers();
-
       const rawPhone = cleanPhone.replace(/[^0-9]/g, '');
+      const last10 = rawPhone.slice(-10);
 
-      // Duplicate phone check: 1 number for 1 account
-      for (const d of Object.values(drivers)) {
-        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
-        if (dPhone && (dPhone === rawPhone || rawPhone.includes(dPhone) || dPhone.includes(rawPhone))) {
-          return res.status(400).json({
-            error: 'A driver account already exists with this phone number. Multiple accounts are not allowed.',
-          });
-        }
-        if (d.email && d.email.trim().toLowerCase() === cleanEmail) {
-          return res.status(400).json({
-            error: 'A driver account already exists with this email address. Multiple accounts are not allowed.',
-          });
-        }
-      }
-
-      // Cross-role segregation check: Passenger cannot log in or register as driver
-      for (const p of Object.values(passengers)) {
-        if (p.email && p.email.trim().toLowerCase() === cleanEmail) {
-          return res.status(400).json({
-            error: 'This email is already registered as a Passenger. Passengers cannot register as drivers.',
+      // Check if driver with this phone already exists
+      for (const [key, d] of Object.entries(drivers)) {
+        const dDigits = (d.phone || '').replace(/[^0-9]/g, '');
+        if (last10 && dDigits.slice(-10) === last10) {
+          // Update existing driver
+          d.name = cleanName;
+          d.phone = cleanPhone;
+          if (secondaryPhone) d.secondaryPhone = secondaryPhone.trim();
+          if (email) d.email = email.trim().toLowerCase();
+          if (vehicleModel) d.vehicleModel = vehicleModel;
+          if (plateNumber) d.plateNumber = plateNumber;
+          if (nidNumber) d.nidNumber = nidNumber;
+          d.verificationStatus = status;
+          d.statusNotes = notes || (status === 'approved' ? 'Manually registered and approved by Admin.' : 'Under review.');
+          d.updatedAt = Date.now();
+          if (password) {
+            const pwInfo = hashPassword(password);
+            d.passwordHash = pwInfo.hash;
+            d.salt = pwInfo.salt;
+          }
+          drivers[key] = d;
+          saveDrivers(drivers);
+          return res.json({
+            success: true,
+            driver: d,
+            message: `Driver ${cleanName} updated and set to ${status}.`,
           });
         }
       }
@@ -1168,22 +1164,22 @@ async function startServer() {
         id: driverId,
         name: cleanName,
         phone: cleanPhone,
-        secondaryPhone: cleanSecondaryPhone,
-        email: cleanEmail,
+        secondaryPhone: (secondaryPhone || '').trim(),
+        email: (email || '').trim().toLowerCase(),
         passwordHash: pwInfo.hash,
         salt: pwInfo.salt,
         nidNumber: nidNumber || '',
-        nidFrontUrl: nidFrontUrl || '',
-        nidBackUrl: nidBackUrl || '',
-        selfieUrl: selfieUrl || '',
-        verificationStatus: 'pending', // Driver must wait for admin verification
+        nidFrontUrl: '',
+        nidBackUrl: '',
+        selfieUrl: '',
+        verificationStatus: status as any,
         vehicleModel: vehicleModel || 'Voltx Eco Speed Bike (Electric)',
         plateNumber: plateNumber || 'Dhaka Metro-Ha 45-8921',
         rating: 5.0,
         createdAt: now,
         submittedAtFormatted: dateStr,
         updatedAt: now,
-        statusNotes: 'Under review by BeeGo Operations Admin. Verification call pending.',
+        statusNotes: notes || (status === 'approved' ? 'Manually registered and approved by Admin.' : 'Manual registration pending review.'),
       };
 
       drivers[driverId] = newDriver;
@@ -1192,11 +1188,152 @@ async function startServer() {
       return res.json({
         success: true,
         driver: newDriver,
-        message: 'Driver application submitted successfully. Verification pending approval by admin.',
+        message: `Driver ${cleanName} successfully registered by Admin (${status}).`,
+      });
+    } catch (err: any) {
+      console.error('[Admin Create Driver Error]', err);
+      return res.status(500).json({ error: err.message || 'Failed to create driver.' });
+    }
+  });
+
+  // POST /api/driver/register - Driver sign-up / manual registration request
+  app.post('/api/driver/register', (req, res) => {
+    try {
+      const {
+        name,
+        phone,
+        secondaryPhone,
+        email,
+        password,
+        nidNumber,
+        nidFrontUrl,
+        nidBackUrl,
+        selfieUrl,
+        vehicleModel,
+        plateNumber,
+      } = req.body || {};
+
+      const cleanName = (name || '').trim();
+      const cleanPhone = (phone || '').trim();
+      const cleanSecondaryPhone = (secondaryPhone || '').trim();
+      const cleanEmail = (email || '').trim().toLowerCase();
+
+      if (!cleanName || !cleanPhone) {
+        return res.status(400).json({ error: 'Full name and primary mobile number are required.' });
+      }
+
+      // Check restriction
+      if (isTargetRestricted(cleanPhone, cleanEmail) || (cleanSecondaryPhone && isTargetRestricted(cleanSecondaryPhone))) {
+        return res.status(403).json({
+          error: 'This phone number is restricted. Please contact BeeGo admin.',
+        });
+      }
+
+      const drivers = loadDrivers();
+
+      // Normalize phone number for robust matching (last 10 digits)
+      const rawPhone = cleanPhone.replace(/[^0-9]/g, '');
+      const last10 = rawPhone.slice(-10);
+
+      // Check if driver with this phone already exists
+      let existingDriverKey: string | null = null;
+      for (const [key, d] of Object.entries(drivers)) {
+        const dDigits = (d.phone || '').replace(/[^0-9]/g, '');
+        if (last10 && dDigits.slice(-10) === last10) {
+          existingDriverKey = key;
+          break;
+        }
+      }
+
+      const now = Date.now();
+      const dateStr = new Date().toLocaleString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      let pwInfo: { hash?: string; salt?: string } = {};
+      if (password) {
+        pwInfo = hashPassword(password);
+      }
+
+      if (existingDriverKey) {
+        const existing = drivers[existingDriverKey];
+        if (existing.verificationStatus === 'approved') {
+          return res.json({
+            success: true,
+            driver: existing,
+            message: 'Your driver account has already been approved by Admin! You can log in directly.',
+            alreadyApproved: true,
+          });
+        }
+
+        // If pending or rejected, update their application for admin review
+        existing.name = cleanName;
+        existing.phone = cleanPhone;
+        if (cleanSecondaryPhone) existing.secondaryPhone = cleanSecondaryPhone;
+        if (cleanEmail) existing.email = cleanEmail;
+        if (pwInfo.hash) {
+          existing.passwordHash = pwInfo.hash;
+          existing.salt = pwInfo.salt;
+        }
+        if (nidNumber) existing.nidNumber = nidNumber;
+        if (nidFrontUrl) existing.nidFrontUrl = nidFrontUrl;
+        if (nidBackUrl) existing.nidBackUrl = nidBackUrl;
+        if (selfieUrl) existing.selfieUrl = selfieUrl;
+        existing.verificationStatus = 'pending'; // Reset to pending for admin manual review
+        existing.updatedAt = now;
+        existing.statusNotes = 'Application updated by applicant. Pending admin manual review.';
+        delete existing.rejectionReason;
+
+        drivers[existingDriverKey] = existing;
+        saveDrivers(drivers);
+
+        return res.json({
+          success: true,
+          driver: existing,
+          message: 'Your driver registration request has been updated. Awaiting manual admin review.',
+        });
+      }
+
+      // New driver registration request
+      const driverId = 'DRV-' + Math.floor(1000 + Math.random() * 9000);
+      const newDriver: StoredDriver = {
+        id: driverId,
+        name: cleanName,
+        phone: cleanPhone,
+        secondaryPhone: cleanSecondaryPhone,
+        email: cleanEmail || '',
+        passwordHash: pwInfo.hash,
+        salt: pwInfo.salt,
+        nidNumber: nidNumber || '',
+        nidFrontUrl: nidFrontUrl || '',
+        nidBackUrl: nidBackUrl || '',
+        selfieUrl: selfieUrl || '',
+        verificationStatus: 'pending', // Driver must be manually verified and approved by admin
+        vehicleModel: vehicleModel || 'Voltx Eco Speed Bike (Electric)',
+        plateNumber: plateNumber || 'Dhaka Metro-Ha 45-8921',
+        rating: 5.0,
+        createdAt: now,
+        submittedAtFormatted: dateStr,
+        updatedAt: now,
+        statusNotes: 'New registration request. Requires manual admin verification before login.',
+      };
+
+      drivers[driverId] = newDriver;
+      saveDrivers(drivers);
+
+      return res.json({
+        success: true,
+        driver: newDriver,
+        message: 'Driver registration request submitted successfully. Awaiting manual admin verification.',
       });
     } catch (err: any) {
       console.error('[Driver Register Error]', err);
-      return res.status(500).json({ error: 'Failed to submit driver application.' });
+      return res.status(500).json({ error: err.message || 'Failed to submit driver registration request.' });
     }
   });
 
@@ -1218,33 +1355,35 @@ async function startServer() {
       }
 
       const drivers = loadDrivers();
+      const last10 = cleanPhone.slice(-10);
+
       const driver = Object.values(drivers).find((d) => {
         const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
-        return dPhone && (dPhone === cleanPhone || dPhone.includes(cleanPhone) || cleanPhone.includes(dPhone));
+        return last10 && dPhone.slice(-10) === last10;
       });
 
       if (!driver) {
         return res.status(404).json({
-          error: 'No driver account found with this phone number. Please register first.',
+          error: 'No driver account found with this phone number. Please submit a registration request first.',
         });
       }
 
-      // Check verification status
+      // Check verification status: must be approved by admin
       if (driver.verificationStatus === 'pending') {
         return res.status(403).json({
-          error: 'Your driver application is under review. Our team will verify your details and call you to approve your account shortly.',
+          error: 'Your driver registration is under manual review. The BeeGo operations admin will verify your details and approve your account from the Admin Panel before you can log in.',
           status: 'pending',
         });
       }
 
       if (driver.verificationStatus === 'rejected') {
         return res.status(403).json({
-          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo support.'}`,
+          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo operations admin.'}`,
           status: 'rejected',
         });
       }
 
-      // Verify password if provided
+      // Verify password if provided and stored
       if (password && driver.passwordHash && driver.salt) {
         const isValid = verifyPassword(password, driver.passwordHash, driver.salt);
         if (!isValid) {
@@ -1682,6 +1821,19 @@ async function startServer() {
         details: err?.message,
       });
     }
+  });
+
+  // Error handling middleware to ensure all API errors return clean JSON
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    if (res.headersSent) {
+      return next(err);
+    }
+    console.error('[API Error]', err);
+    const status = err.status || err.statusCode || 500;
+    return res.status(status).json({
+      success: false,
+      error: err.message || 'Server error processing request.',
+    });
   });
 
   // Health check

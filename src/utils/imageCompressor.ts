@@ -1,7 +1,7 @@
 /**
  * Utility to compress images from camera or gallery upload before saving to state/localStorage.
  */
-export async function compressImageFile(file: File, maxWidth = 1200, maxHeight = 1200, quality = 0.82): Promise<string> {
+export async function compressImageFile(file: File, maxWidth = 800, maxHeight = 800, quality = 0.68): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (readerEvent) => {
