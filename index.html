@@ -20,9 +20,8 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
-    <meta http-equiv="Permissions-Policy" content="geolocation=(self '*'), camera=(self '*'), microphone=(self '*')" />
     <script>
-      // Immediately request real device location permission when app opens
+      // Seamless native device location access for web apps and WebViews
       (function() {
         function triggerGpsPrompt() {
           if (typeof navigator !== 'undefined' && 'geolocation' in navigator) {
@@ -34,19 +33,30 @@
                   accuracy: pos.coords.accuracy,
                   timestamp: Date.now()
                 };
+                try {
+                  localStorage.setItem(
+                    'beego_real_gps_coords',
+                    JSON.stringify(window.__BEEGO_LIVE_GPS__)
+                  );
+                } catch (e) {}
+                window.dispatchEvent(new CustomEvent('beego:location_detected', { detail: pos.coords }));
               },
               function(err) {
                 window.__BEEGO_LIVE_GPS_ERR__ = err;
               },
-              { enableHighAccuracy: true, timeout: 20000, maximumAge: 0 }
+              { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 }
             );
           }
         }
 
-        // 1. Initial attempt on launch
-        triggerGpsPrompt();
+        // 1. Trigger when document is loaded
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', triggerGpsPrompt);
+        } else {
+          triggerGpsPrompt();
+        }
 
-        // 2. Guaranteed user-gesture trigger on first tap (Crucial for Android WebView & Web2App wrappers)
+        // 2. Guaranteed user-gesture trigger on first tap (Mandatory for Android WebView & Web2App wrappers)
         function handleFirstUserTouch() {
           triggerGpsPrompt();
           window.removeEventListener('pointerdown', handleFirstUserTouch);

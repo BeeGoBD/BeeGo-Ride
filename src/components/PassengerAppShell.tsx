@@ -21,6 +21,8 @@ import { QrScannerSection } from './QrScannerSection';
 import { BatterySwapModal } from './BatterySwapModal';
 import { HourlyRentalModal } from './HourlyRentalModal';
 import { RideRequestForm } from './RideRequestForm';
+import { requestLiveCoordinates } from '../services/geolocation';
+import { reverseGeocode, getGeoapifyApiKey } from '../services/geoapify';
 
 interface PassengerAppShellProps {
   apiKey: string;
@@ -65,6 +67,22 @@ export const PassengerAppShell: React.FC<PassengerAppShellProps> = (props) => {
   const handleOpenBooking = (_suggestedDestination?: string) => {
     // Keep dropoff empty by default so nothing is chosen automatically
     setIsBookingOpen(true);
+
+    // Trigger real location permission prompt under user click/touch gesture
+    requestLiveCoordinates()
+      .then(async (res) => {
+        if (res.isRealGps && res.lat !== 0 && res.lon !== 0) {
+          try {
+            const keyToUse = props.apiKey.trim() || getGeoapifyApiKey();
+            const point = await reverseGeocode(res.lat, res.lon, keyToUse);
+            props.setPickup(point);
+            try {
+              localStorage.setItem('beego_real_gps_pickup', JSON.stringify(point));
+            } catch {}
+          } catch (e) {}
+        }
+      })
+      .catch(() => {});
   };
 
   const handleCloseBooking = () => {

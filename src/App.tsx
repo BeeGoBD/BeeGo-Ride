@@ -217,25 +217,17 @@ export default function App() {
   const [stage, setStage] = useState<RideStage>('request');
   const [apiKey, setApiKey] = useState<string>(() => getGeoapifyApiKey());
   
-  // Instantly auto-selected pickup location from live location or cached spot
+  // Pure real GPS location - NEVER pre-filled with random fake spots
   const [pickup, setPickup] = useState<LocationPoint | null>(() => {
     if (typeof window !== 'undefined') {
       try {
-        const cached = localStorage.getItem('beego_cached_pickup_spot');
+        localStorage.removeItem('beego_cached_pickup_spot'); // Purge stale demo fallback
+        const cached = localStorage.getItem('beego_real_gps_pickup');
         if (cached) {
           const parsed = JSON.parse(cached);
           if (parsed && parsed.lat && parsed.lon) return parsed;
         }
       } catch {}
-      const defaultSpot = getDefaultSpot();
-      return {
-        lat: defaultSpot.lat,
-        lon: defaultSpot.lon,
-        name: defaultSpot.name,
-        formatted: defaultSpot.formatted,
-        addressLine1: defaultSpot.name,
-        resultType: 'street',
-      };
     }
     return null;
   });
@@ -286,15 +278,17 @@ export default function App() {
     if (typeof window !== 'undefined') {
       requestLiveCoordinates()
         .then(async (res) => {
-          try {
-            const keyToUse = apiKey.trim() || getGeoapifyApiKey();
-            const point = await reverseGeocode(res.lat, res.lon, keyToUse);
-            setPickup(point);
+          if (res.isRealGps && res.lat !== 0 && res.lon !== 0) {
             try {
-              localStorage.setItem('beego_cached_pickup_spot', JSON.stringify(point));
-            } catch {}
-          } catch (e) {
-            console.warn('Initial reverse geocode notice:', e);
+              const keyToUse = apiKey.trim() || getGeoapifyApiKey();
+              const point = await reverseGeocode(res.lat, res.lon, keyToUse);
+              setPickup(point);
+              try {
+                localStorage.setItem('beego_real_gps_pickup', JSON.stringify(point));
+              } catch {}
+            } catch (e) {
+              console.warn('Initial reverse geocode notice:', e);
+            }
           }
         })
         .catch((err) => {

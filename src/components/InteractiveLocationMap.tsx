@@ -393,12 +393,9 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
       }
 
       if (pickup && !dropoff) {
-        const currentCenter = map.getCenter();
-        const dist = Math.hypot(currentCenter.lat - pickup.lat, currentCenter.lng - pickup.lon);
-        // Only set view if map center is significantly far (> 5km away), preserving user's pan/pinpoint spot
-        if (dist > 0.05) {
-          map.setView([pickup.lat, pickup.lon], Math.max(map.getZoom(), 15));
-        }
+        map.flyTo([pickup.lat, pickup.lon], Math.max(map.getZoom(), 16), {
+          duration: 0.8,
+        });
       }
     }
   }, [routeData, pickup, dropoff]);

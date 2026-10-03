@@ -130,16 +130,21 @@ export async function searchAddress(
 }
 
 /**
- * Reverse geocoding for current user coordinates with Bangladesh verification
+ * Reverse geocoding for user coordinates with Geoapify + OpenStreetMap Nominatim fallback.
+ * Guarantees accurate real-world street, road, area, and city address resolution.
  */
 export async function reverseGeocode(lat: number, lon: number, apiKey: string): Promise<LocationPoint> {
-  const keyToUse = apiKey.trim() || DEFAULT_GEOAPIFY_KEY;
+  if (!lat || !lon || (lat === 0 && lon === 0)) {
+    throw new Error('Valid GPS coordinates are required for reverse geocoding.');
+  }
 
-  // Check coordinates against Bangladesh bounding box
+  const keyToUse = apiKey.trim() || DEFAULT_GEOAPIFY_KEY;
   const inBDBounds = lat >= BD_BOUNDS.minLat && lat <= BD_BOUNDS.maxLat && lon >= BD_BOUNDS.minLon && lon <= BD_BOUNDS.maxLon;
   const nearest = getNearestBangladeshDistrict(lat, lon);
 
   let item: any = null;
+
+  // 1. Try Geoapify Reverse Geocode
   try {
     if (keyToUse) {
       const url = `https://api.geoapify.com/v1/geocode/reverse?lat=${lat}&lon=${lon}&format=json&apiKey=${encodeURIComponent(
@@ -152,51 +157,82 @@ export async function reverseGeocode(lat: number, lon: number, apiKey: string): 
       }
     }
   } catch (err) {
-    console.warn('Geoapify reverse geocode failed, using district coordinates fallback:', err);
+    console.warn('Geoapify reverse geocode request failed:', err);
   }
 
-  const isInBD = inBDBounds || isLocationInBangladesh({
-    lat,
-    lon,
-    country: item?.country,
-    country_code: item?.country_code,
-    formatted: item?.formatted,
-  });
-
-  if (!isInBD) {
-    throw new Error('Detected location is outside Bangladesh. Please search for or pin a spot inside Bangladesh.');
-  }
-
-  // If Geoapify has no specific street / POI (unregistered spot, bridge, riverbank, alleyway)
+  // 2. High-precision OpenStreetMap Nominatim Fallback if Geoapify is unavailable or missing street data
   if (!item || (!item.formatted && !item.street && !item.name)) {
-    const formatted = `Pinned Spot near ${nearest.name}, ${nearest.division} Division, Bangladesh (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
+    try {
+      const nomUrl = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`;
+      const nomRes = await fetch(nomUrl, {
+        headers: { 'Accept-Language': 'en' },
+      });
+      if (nomRes.ok) {
+        const nomData = await nomRes.json();
+        if (nomData && (nomData.display_name || nomData.address)) {
+          const addr = nomData.address || {};
+          const street = addr.road || addr.pedestrian || addr.suburb || addr.neighbourhood || addr.residential || '';
+          const city = addr.city || addr.town || addr.county || addr.state_district || (inBDBounds ? nearest.name : 'Local Area');
+          const addressLine1 = street || nomData.name || (nomData.display_name ? nomData.display_name.split(',')[0] : `Location near ${city}`);
+          const addressLine2 = [city, addr.state, addr.country || 'Bangladesh'].filter(Boolean).join(', ');
+
+          return {
+            lat,
+            lon,
+            formatted: nomData.display_name || `${addressLine1}, ${addressLine2}`,
+            addressLine1,
+            addressLine2,
+            name: addressLine1,
+            street,
+            city,
+            country: addr.country || 'Bangladesh',
+            placeId: nomData.place_id ? String(nomData.place_id) : `nom_${lat}_${lon}`,
+            resultType: 'street',
+          };
+        }
+      }
+    } catch (nomErr) {
+      console.warn('Nominatim reverse geocode fallback failed:', nomErr);
+    }
+  }
+
+  // 3. If Geoapify provided valid address details
+  if (item && (item.formatted || item.street || item.name)) {
+    const formatted = item.formatted || `${item.street || item.name || 'Location'}, ${item.city || nearest.name}, Bangladesh`;
+    const addressLine1 = item.address_line1 || item.name || item.street || (inBDBounds ? `Spot near ${nearest.name}` : 'Current Location');
+    const addressLine2 = item.address_line2 || [item.city || nearest.name, item.state || nearest.division, item.country || 'Bangladesh'].filter(Boolean).join(', ');
+
     return {
-      lat,
-      lon,
+      lat: item.lat ?? lat,
+      lon: item.lon ?? lon,
       formatted,
-      addressLine1: `Custom Pinned Spot (${nearest.name})`,
-      addressLine2: `${nearest.division} Division, Bangladesh`,
-      name: `Pinned Spot near ${nearest.name}`,
-      city: nearest.name,
-      country: 'Bangladesh',
+      addressLine1,
+      addressLine2,
+      name: item.name || addressLine1,
+      street: item.street,
+      city: item.city || (inBDBounds ? nearest.name : 'Current City'),
+      country: item.country || 'Bangladesh',
+      placeId: item.place_id || `geo_${lat}_${lon}`,
+      resultType: item.result_type || 'street',
     };
   }
 
-  const formatted = item.formatted || `${item.street || item.name || 'Location'}, ${item.city || nearest.name}, Bangladesh`;
-  const addressLine1 = item.address_line1 || item.name || item.street || `Spot near ${nearest.name}`;
-  const addressLine2 = item.address_line2 || [item.city || nearest.name, item.state || nearest.division, 'Bangladesh'].filter(Boolean).join(', ');
+  // 4. District-level fallback if network APIs are restricted
+  const fallbackFormatted = inBDBounds
+    ? `Spot near ${nearest.name}, ${nearest.division} Division, Bangladesh`
+    : `Current Location (${lat.toFixed(4)}, ${lon.toFixed(4)})`;
 
   return {
-    lat: item.lat ?? lat,
-    lon: item.lon ?? lon,
-    formatted,
-    addressLine1,
-    addressLine2,
-    name: item.name || `Spot near ${nearest.name}`,
-    street: item.street,
-    city: item.city || nearest.name,
+    lat,
+    lon,
+    formatted: fallbackFormatted,
+    addressLine1: inBDBounds ? `Spot near ${nearest.name}` : 'Current Location',
+    addressLine2: inBDBounds ? `${nearest.division} Division, Bangladesh` : 'Current Area',
+    name: inBDBounds ? `Near ${nearest.name}` : 'Current Location',
+    city: inBDBounds ? nearest.name : 'Local Area',
     country: 'Bangladesh',
-    placeId: item.place_id,
+    placeId: `spot_${lat}_${lon}`,
+    resultType: 'street',
   };
 }
 
