@@ -890,13 +890,13 @@ async function startServer() {
       const cleanId = (id || '').trim();
       const cleanPw = (password || '').trim();
 
-      // Easy default admin credentials (can be updated by admin)
-      if ((cleanId === 'admin' || cleanId === 'beego_admin') && (cleanPw === 'admin' || cleanPw === 'admin123')) {
+      // Authorized Admin Credentials: ID: 1234 | Pass: 4321
+      if (cleanId === '1234' && cleanPw === '4321') {
         const token = 'admin_sess_' + crypto.randomBytes(24).toString('hex');
         return res.json({
           success: true,
           token,
-          user: { id: 'admin', role: 'super_admin', name: 'BeeGo Master Admin' },
+          user: { id: '1234', role: 'super_admin', name: 'BeeGo Master Admin' },
         });
       }
 
