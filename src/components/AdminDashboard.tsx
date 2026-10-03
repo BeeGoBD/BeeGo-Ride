@@ -92,6 +92,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
   } | null>(null);
   const [restrictionReason, setRestrictionReason] = useState('');
 
+  // Floating Toast Notice
+  const [toastNotice, setToastNotice] = useState<string | null>(null);
+  useEffect(() => {
+    if (!toastNotice) return;
+    const t = setTimeout(() => setToastNotice(null), 3500);
+    return () => clearTimeout(t);
+  }, [toastNotice]);
+
   // Manual driver onboarding state
   const [isAddDriverModalOpen, setIsAddDriverModalOpen] = useState(false);
   const [newDriverName, setNewDriverName] = useState('');
@@ -127,6 +135,32 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
         status: newDriverStatus,
         notes: `Manually registered by admin (${newDriverStatus}).`,
       });
+
+      // Sync with browser localStorage beego_drivers_v1
+      try {
+        const raw = localStorage.getItem('beego_drivers_v1');
+        const list = raw ? JSON.parse(raw) : [];
+        if (Array.isArray(list)) {
+          list.unshift({
+            id: created.id,
+            name: created.name,
+            phone: created.phone,
+            secondaryPhone: created.secondaryPhone,
+            email: created.email,
+            password: newDriverPassword || 'driver123',
+            verificationStatus: newDriverStatus,
+            vehicleModel: created.vehicleModel,
+            plateNumber: created.plateNumber,
+            rating: created.rating,
+            createdAt: created.createdAt,
+            submittedAtFormatted: created.submittedAtFormatted,
+          });
+          localStorage.setItem('beego_drivers_v1', JSON.stringify(list));
+        }
+      } catch (storageErr) {
+        console.warn('Storage sync issue:', storageErr);
+      }
+
       setIsCreatingDriver(false);
       setIsAddDriverModalOpen(false);
       setNewDriverName('');
@@ -134,7 +168,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
       setNewDriverAltPhone('');
       setNewDriverEmail('');
       silentSync();
-      alert(`Driver ${created.name} registered successfully as ${newDriverStatus}! ${newDriverStatus === 'approved' ? 'They can now log in immediately with phone ' + newDriverPhone + ' and password ' + (newDriverPassword || 'driver123') : 'Awaiting review.'}`);
+      setToastNotice(`Driver ${created.name} onboarded as ${newDriverStatus}! ${newDriverStatus === 'approved' ? 'They can now log in immediately.' : 'Awaiting review.'}`);
     } catch (err: any) {
       setIsCreatingDriver(false);
       setAddDriverError(err.message || 'Failed to manually register driver.');
@@ -189,22 +223,58 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
     try {
       const updated = await updateDriverVerification(driverId, 'approved');
       setDrivers((prev) => prev.map((d) => (d.id === driverId ? updated : d)));
+
+      // Sync localStorage beego_drivers_v1 so local records match immediately
+      try {
+        const raw = localStorage.getItem('beego_drivers_v1');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const idx = list.findIndex((d: any) => d.id === driverId || (d.phone && updated.phone && d.phone.replace(/[^0-9]/g, '').slice(-10) === updated.phone.replace(/[^0-9]/g, '').slice(-10)));
+            if (idx >= 0) {
+              list[idx].verificationStatus = 'approved';
+              list[idx].statusNotes = 'Approved by BeeGo Operations Admin.';
+              localStorage.setItem('beego_drivers_v1', JSON.stringify(list));
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage sync issue:', storageErr);
+      }
+
+      setToastNotice(`Driver ${updated.name} approved! They can now log into the Captain portal.`);
       silentSync();
     } catch (err: any) {
-      alert(err.message || 'Failed to approve driver.');
+      setToastNotice(err.message || 'Failed to approve driver.');
     }
   };
 
   // Handle Reject Driver
   const handleRejectDriver = async (driverId: string) => {
-    const reason = window.prompt('Enter reason for driver rejection (optional):', 'Documents could not be verified.');
-    if (reason === null) return; // user cancelled prompt
     try {
-      const updated = await updateDriverVerification(driverId, 'rejected', reason);
+      const updated = await updateDriverVerification(driverId, 'rejected', 'Documentation could not be verified.');
       setDrivers((prev) => prev.map((d) => (d.id === driverId ? updated : d)));
+
+      try {
+        const raw = localStorage.getItem('beego_drivers_v1');
+        if (raw) {
+          const list = JSON.parse(raw);
+          if (Array.isArray(list)) {
+            const idx = list.findIndex((d: any) => d.id === driverId || (d.phone && updated.phone && d.phone.replace(/[^0-9]/g, '').slice(-10) === updated.phone.replace(/[^0-9]/g, '').slice(-10)));
+            if (idx >= 0) {
+              list[idx].verificationStatus = 'rejected';
+              localStorage.setItem('beego_drivers_v1', JSON.stringify(list));
+            }
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Storage sync issue:', storageErr);
+      }
+
+      setToastNotice(`Driver application rejected.`);
       silentSync();
     } catch (err: any) {
-      alert(err.message || 'Failed to reject driver.');
+      setToastNotice(err.message || 'Failed to reject driver.');
     }
   };
 
@@ -377,6 +447,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onExit }) => {
           </button>
         </div>
       </header>
+
+      {/* Floating Notification Toast */}
+      {toastNotice && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-zinc-900 border-2 border-[#F5C518] text-white text-xs font-bold shadow-2xl shadow-black/80 flex items-center gap-2 animate-in fade-in slide-in-from-top-4">
+          <CheckCircle2 className="w-4 h-4 text-[#F5C518] shrink-0" />
+          <span>{toastNotice}</span>
+        </div>
+      )}
 
       {/* 2. STATS OVERVIEW CARDS */}
       <div className="p-4 sm:p-5 max-w-4xl mx-auto w-full space-y-4">

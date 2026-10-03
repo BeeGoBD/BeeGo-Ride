@@ -13,6 +13,11 @@ async function startServer() {
   app.use((req, res, next) => {
     res.setHeader('Permissions-Policy', 'geolocation=(self "*"), camera=(self "*"), microphone=(self "*")');
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-requested-with');
+    if (req.method === 'OPTIONS') {
+      return res.sendStatus(200);
+    }
     next();
   });
 
@@ -122,7 +127,16 @@ async function startServer() {
     try {
       if (fs.existsSync(DRIVERS_FILE)) {
         const raw = fs.readFileSync(DRIVERS_FILE, 'utf-8');
-        return JSON.parse(raw);
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          const clean: Record<string, StoredDriver> = {};
+          for (const [k, v] of Object.entries(parsed)) {
+            if (v && typeof v === 'object') {
+              clean[k] = v as StoredDriver;
+            }
+          }
+          return clean;
+        }
       }
     } catch (e) {
       console.warn('[Storage] Error reading drivers file:', e);
@@ -163,13 +177,16 @@ async function startServer() {
   function isTargetRestricted(phone?: string, email?: string): boolean {
     const restrictions = loadRestrictions();
     const cleanPhone = phone ? phone.replace(/[^0-9]/g, '') : '';
+    const last10 = cleanPhone.length >= 8 ? cleanPhone.slice(-10) : '';
     const cleanEmail = email ? email.trim().toLowerCase() : '';
 
     for (const r of Object.values(restrictions)) {
+      if (!r) continue;
       const rPhone = (r.phone || '').replace(/[^0-9]/g, '');
+      const rLast10 = rPhone.length >= 8 ? rPhone.slice(-10) : '';
       const rEmail = (r.email || '').trim().toLowerCase();
 
-      if (cleanPhone && rPhone && (cleanPhone === rPhone || cleanPhone.includes(rPhone) || rPhone.includes(cleanPhone))) {
+      if (last10 && rLast10 && last10 === rLast10) {
         return true;
       }
       if (cleanEmail && rEmail && cleanEmail === rEmail) {
@@ -248,8 +265,15 @@ async function startServer() {
 
   function verifyPassword(password: string, hash?: string, salt?: string): boolean {
     if (!hash || !salt) return false;
-    const testHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
-    return crypto.timingSafeEqual(Buffer.from(testHash), Buffer.from(hash));
+    try {
+      const testHash = crypto.pbkdf2Sync(password, salt, 10000, 64, 'sha512').toString('hex');
+      const b1 = Buffer.from(testHash);
+      const b2 = Buffer.from(hash);
+      if (b1.length !== b2.length) return false;
+      return crypto.timingSafeEqual(b1, b2);
+    } catch {
+      return false;
+    }
   }
 
   // In-memory store for OTP verification tracking
@@ -1340,10 +1364,11 @@ async function startServer() {
   // POST /api/driver/login - Driver login with status and restriction check
   app.post('/api/driver/login', (req, res) => {
     try {
-      const { phone, password } = req.body || {};
-      const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+      const { phone, identifier, password } = req.body || {};
+      const input = (phone || identifier || '').trim();
+      const cleanPhone = input.replace(/[^0-9]/g, '');
 
-      if (!cleanPhone) {
+      if (!cleanPhone || cleanPhone.length < 8) {
         return res.status(400).json({ error: 'Please enter your registered phone number.' });
       }
 
@@ -1357,8 +1382,8 @@ async function startServer() {
       const drivers = loadDrivers();
       const last10 = cleanPhone.slice(-10);
 
-      const driver = Object.values(drivers).find((d) => {
-        const dPhone = (d.phone || '').replace(/[^0-9]/g, '');
+      const driver = Object.values(drivers).filter(Boolean).find((d) => {
+        const dPhone = (d?.phone || '').replace(/[^0-9]/g, '');
         return last10 && dPhone.slice(-10) === last10;
       });
 
@@ -1373,6 +1398,8 @@ async function startServer() {
         return res.status(403).json({
           error: 'Your driver registration is under manual review. The BeeGo operations admin will verify your details and approve your account from the Admin Panel before you can log in.',
           status: 'pending',
+          driverName: driver.name,
+          submittedAt: driver.submittedAtFormatted,
         });
       }
 
@@ -1387,7 +1414,7 @@ async function startServer() {
       if (password && driver.passwordHash && driver.salt) {
         const isValid = verifyPassword(password, driver.passwordHash, driver.salt);
         if (!isValid) {
-          return res.status(401).json({ error: 'Incorrect password. Please try again.' });
+          return res.status(401).json({ error: 'Incorrect password. Please verify your password and try again.' });
         }
       }
 
@@ -1397,7 +1424,8 @@ async function startServer() {
         message: 'Driver logged in successfully.',
       });
     } catch (err: any) {
-      return res.status(500).json({ error: 'Driver login failed.' });
+      console.error('[Driver Login Error]', err);
+      return res.status(500).json({ error: err.message || 'Driver login failed.' });
     }
   });
 

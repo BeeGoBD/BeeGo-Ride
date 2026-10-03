@@ -33,12 +33,14 @@ interface DriverAuthModalProps {
   initialMode?: 'register' | 'login';
   onAuthenticated: (driver: DriverProfile) => void;
   onCancel: () => void;
+  onOpenAdminGate?: () => void;
 }
 
 export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
   initialMode = 'register',
   onAuthenticated,
   onCancel,
+  onOpenAdminGate,
 }) => {
   const [mode, setMode] = useState<'register' | 'login'>(initialMode);
 
@@ -107,23 +109,8 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
     }
 
     const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-    if (!cleanPhone || cleanPhone.length < 9) {
+    if (!cleanPhone || cleanPhone.length < 8) {
       setErrorMessage('Please enter a valid Bangladesh mobile number (e.g. 017xxxxxxxx).');
-      return;
-    }
-
-    if (!nidFrontUrl) {
-      setErrorMessage('Please upload or take a photo of your NID Card (Front Side).');
-      return;
-    }
-
-    if (!nidBackUrl) {
-      setErrorMessage('Please upload or take a photo of your NID Card (Back Side).');
-      return;
-    }
-
-    if (!selfieUrl) {
-      setErrorMessage('Please take or upload a clear face selfie with eyes and ears visible.');
       return;
     }
 
@@ -341,13 +328,23 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                 </div>
               </div>
               <div className="w-full flex flex-col gap-2 mt-2">
+                {onOpenAdminGate && (
+                  <button
+                    type="button"
+                    onClick={onOpenAdminGate}
+                    className="w-full py-3 rounded-2xl bg-zinc-900 hover:bg-black text-[#F5C518] font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
+                  >
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Open Admin Panel to Approve Driver</span>
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => {
                     setIsSubmittedSuccess(false);
                     setMode('login');
                   }}
-                  className="w-full py-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2"
+                  className="w-full py-2.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs uppercase tracking-wider cursor-pointer shadow-md flex items-center justify-center gap-2 transition-all active:scale-[0.98]"
                 >
                   <span>Go to Driver Login</span>
                   <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -355,7 +352,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
                 <button
                   type="button"
                   onClick={onCancel}
-                  className="w-full py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
+                  className="w-full py-2 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-bold text-xs cursor-pointer transition-colors"
                 >
                   Close
                 </button>
@@ -363,11 +360,46 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
             </div>
           ) : (
             <>
-              {/* Error Banner */}
-              {errorMessage && (
-                <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2 animate-in fade-in">
+              {/* Informative Manual Verification or Error Banner */}
+              {errorMessage && (errorMessage.includes('manual verification') || errorMessage.includes('manual review') || errorMessage.includes('pending')) ? (
+                <div className="p-4 rounded-3xl bg-amber-500/10 border-2 border-[#F5C518] text-amber-950 text-xs space-y-2.5 shadow-sm animate-in fade-in">
+                  <div className="flex items-start gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0 shadow-xs">
+                      <Clock className="w-4 h-4 stroke-[2.5]" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="font-black text-xs text-zinc-900">Application Under Manual Review</div>
+                      <p className="text-zinc-700 text-[11px] mt-1 leading-relaxed">
+                        Driver registration is <strong>completely manual</strong>. The BeeGo operations admin must verify your National ID and approve your account from the Admin Panel before you can log in.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="pt-1 flex flex-col sm:flex-row items-center gap-2">
+                    {onOpenAdminGate && (
+                      <button
+                        type="button"
+                        onClick={onOpenAdminGate}
+                        className="w-full sm:flex-1 py-2 px-3 rounded-xl bg-zinc-900 hover:bg-black text-[#F5C518] font-black text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm transition-all"
+                      >
+                        <ShieldCheck className="w-3.5 h-3.5" />
+                        <span>Open Admin Panel to Approve</span>
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleLoginSubmit}
+                      className="w-full sm:w-auto py-2 px-3 rounded-xl bg-amber-200/80 hover:bg-amber-300 text-amber-950 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                    >
+                      <RefreshCw className="w-3 h-3" />
+                      <span>Re-Check Status</span>
+                    </button>
+                  </div>
+                </div>
+              ) : errorMessage && (
+                <div className="p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5 animate-in fade-in">
                   <AlertCircle className="w-4 h-4 text-rose-500 shrink-0 mt-0.5" />
-                  <div className="flex-1 font-semibold">{errorMessage}</div>
+                  <div className="flex-1 font-semibold leading-relaxed">{errorMessage}</div>
                 </div>
               )}
 
