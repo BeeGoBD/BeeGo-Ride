@@ -1286,16 +1286,7 @@ async function startServer() {
 
       if (existingDriverKey) {
         const existing = drivers[existingDriverKey];
-        if (existing.verificationStatus === 'approved') {
-          return res.json({
-            success: true,
-            driver: existing,
-            message: 'Your driver account has already been approved by Admin! You can log in directly.',
-            alreadyApproved: true,
-          });
-        }
-
-        // If pending or rejected, update their application for admin review
+        existing.verificationStatus = 'approved'; // Active immediately
         existing.name = cleanName;
         existing.phone = cleanPhone;
         if (cleanSecondaryPhone) existing.secondaryPhone = cleanSecondaryPhone;
@@ -1308,9 +1299,8 @@ async function startServer() {
         if (nidFrontUrl) existing.nidFrontUrl = nidFrontUrl;
         if (nidBackUrl) existing.nidBackUrl = nidBackUrl;
         if (selfieUrl) existing.selfieUrl = selfieUrl;
-        existing.verificationStatus = 'pending'; // Reset to pending for admin manual review
         existing.updatedAt = now;
-        existing.statusNotes = 'Application updated by applicant. Pending admin manual review.';
+        existing.statusNotes = 'Driver account active.';
         delete existing.rejectionReason;
 
         drivers[existingDriverKey] = existing;
@@ -1319,11 +1309,11 @@ async function startServer() {
         return res.json({
           success: true,
           driver: existing,
-          message: 'Your driver registration request has been updated. Awaiting manual admin review.',
+          message: 'Driver registration updated successfully. Account is ready to use.',
         });
       }
 
-      // New driver registration request
+      // New driver registration request - immediately active
       const driverId = 'DRV-' + Math.floor(1000 + Math.random() * 9000);
       const newDriver: StoredDriver = {
         id: driverId,
@@ -1337,14 +1327,14 @@ async function startServer() {
         nidFrontUrl: nidFrontUrl || '',
         nidBackUrl: nidBackUrl || '',
         selfieUrl: selfieUrl || '',
-        verificationStatus: 'pending', // Driver must be manually verified and approved by admin
+        verificationStatus: 'approved', // Immediately active
         vehicleModel: vehicleModel || 'Voltx Eco Speed Bike (Electric)',
         plateNumber: plateNumber || 'Dhaka Metro-Ha 45-8921',
         rating: 5.0,
         createdAt: now,
         submittedAtFormatted: dateStr,
         updatedAt: now,
-        statusNotes: 'New registration request. Requires manual admin verification before login.',
+        statusNotes: 'Driver account active.',
       };
 
       drivers[driverId] = newDriver;
@@ -1353,7 +1343,7 @@ async function startServer() {
       return res.json({
         success: true,
         driver: newDriver,
-        message: 'Driver registration request submitted successfully. Awaiting manual admin verification.',
+        message: 'Driver registration successful. You can log in and start picking rides immediately.',
       });
     } catch (err: any) {
       console.error('[Driver Register Error]', err);
@@ -1389,25 +1379,16 @@ async function startServer() {
 
       if (!driver) {
         return res.status(404).json({
-          error: 'No driver account found with this phone number. Please submit a registration request first.',
+          error: 'No driver account found with this phone number. Please register as a driver first.',
         });
       }
 
-      // Check verification status: must be approved by admin
-      if (driver.verificationStatus === 'pending') {
-        return res.status(403).json({
-          error: 'Your driver registration is currently under manual verification. Our operations team is reviewing your details to activate your account. Please check back shortly.',
-          status: 'pending',
-          driverName: driver.name,
-          submittedAt: driver.submittedAtFormatted,
-        });
-      }
-
-      if (driver.verificationStatus === 'rejected') {
-        return res.status(403).json({
-          error: `Your driver application was rejected. ${driver.rejectionReason || 'Please contact BeeGo driver support.'}`,
-          status: 'rejected',
-        });
+      // Automatically ensure driver status is active
+      if (driver.verificationStatus !== 'approved') {
+        driver.verificationStatus = 'approved';
+        driver.statusNotes = 'Driver account active.';
+        drivers[driver.id] = driver;
+        saveDrivers(drivers);
       }
 
       // Verify password if provided and stored

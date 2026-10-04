@@ -147,7 +147,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
           ctx.fillStyle = '#cbd5e1';
           ctx.font = '12px sans-serif';
           ctx.fillText(sub, 24, 165);
-          ctx.fillText('BeeGo Operations Manual Verification Required', 24, 195);
+          ctx.fillText('BeeGo Captain Identity Record', 24, 195);
         }
         return canvas.toDataURL('image/jpeg', 0.7);
       };
@@ -156,7 +156,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
       const finalBack = nidBackUrl || generateDocCanvas('NID CARD (BACK SIDE)', 'Official Verification Record', '#0f172a');
       const finalSelfie = selfieUrl || generateDocCanvas('DRIVER LIVE PORTRAIT', 'Biometric Portrait Record', '#064e3b');
 
-      await registerNewDriver({
+      const createdDriver = await registerNewDriver({
         name: fullName.trim(),
         phone: fullPhone,
         secondaryPhone: fullSecondary,
@@ -168,7 +168,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
       });
 
       setIsSubmitting(false);
-      setIsSubmittedSuccess(true);
+      onAuthenticated(createdDriver);
     } catch (err: any) {
       setIsSubmitting(false);
       setErrorMessage(err.message || 'Registration failed. Please check your information.');
@@ -202,7 +202,7 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
         ctx.fillStyle = '#cbd5e1';
         ctx.font = '12px sans-serif';
         ctx.fillText(sub, 24, 165);
-        ctx.fillText('BeeGo Operations Manual Verification Required', 24, 195);
+        ctx.fillText('BeeGo Captain Identity Record', 24, 195);
       }
       return canvas.toDataURL('image/jpeg', 0.7);
     };

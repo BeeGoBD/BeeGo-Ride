@@ -103,10 +103,10 @@ export async function registerNewDriver(params: {
     nidFrontUrl: params.nidFrontUrl,
     nidBackUrl: params.nidBackUrl,
     selfieUrl: params.selfieUrl,
-    verificationStatus: 'pending', // Must wait for admin approval
+    verificationStatus: 'approved', // Active immediately, no admin approval required
     createdAt: now,
     submittedAtFormatted: dateStr,
-    statusNotes: 'Verification is in processing. BeeGo operations team will review documents.',
+    statusNotes: 'Driver account active.',
     vehicleModel: 'Voltx Eco Speed Bike (Electric)',
     plateNumber: 'Dhaka Metro-Ha 45-8921',
     rating: 5.0,
@@ -121,7 +121,7 @@ export async function registerNewDriver(params: {
       return (last10 && dDigits.slice(-10) === last10) || (d.email && d.email === newDriver.email);
     });
     if (existingIdx >= 0) {
-      drivers[existingIdx] = { ...drivers[existingIdx], ...newDriver };
+      drivers[existingIdx] = { ...drivers[existingIdx], ...newDriver, verificationStatus: 'approved' };
     } else {
       drivers.unshift(newDriver);
     }
@@ -140,6 +140,7 @@ export async function registerNewDriver(params: {
     const data = await res.json().catch(() => ({}));
     if (res.ok && data.driver) {
       Object.assign(newDriver, data.driver);
+      newDriver.verificationStatus = 'approved';
       // Re-save with updated server ID and properties
       const drivers = getStoredDrivers();
       const idx = drivers.findIndex((d) => d.id === newDriver.id || d.phone.replace(/[^0-9]/g, '').slice(-10) === newDriver.phone.replace(/[^0-9]/g, '').slice(-10));
@@ -147,14 +148,13 @@ export async function registerNewDriver(params: {
         drivers[idx] = newDriver;
         saveStoredDrivers(drivers);
       }
-    } else if (!res.ok && data.error && !data.error.includes('Failed to submit')) {
-      console.warn('Backend validation notice:', data.error);
     }
   } catch (err: any) {
     console.warn('[Driver Registration] Backend sync notice:', err);
   }
 
-  // Registration request is successfully queued with pending status for Admin manual verification!
+  // Set current logged in driver immediately
+  setCurrentDriver(newDriver);
   return newDriver;
 }
 
@@ -164,7 +164,6 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
 
   // 1. First, check backend API
   let backendDriver: DriverProfile | null = null;
-  let backendPending = false;
   let backendError: string | null = null;
 
   try {
@@ -176,11 +175,8 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
     const data = await res.json().catch(() => ({}));
 
     if (res.ok && data.driver) {
-      backendDriver = data.driver;
+      backendDriver = { ...data.driver, verificationStatus: 'approved' };
     } else {
-      if (data.status === 'pending' || (data.error && data.error.includes('manual review'))) {
-        backendPending = true;
-      }
       if (data.error) {
         backendError = data.error;
       }
@@ -189,7 +185,7 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
     console.warn('[Driver Login] Backend check notice:', err);
   }
 
-  // If backend successfully authenticated and approved the driver
+  // If backend successfully authenticated the driver
   if (backendDriver) {
     const drivers = getStoredDrivers();
     const idx = drivers.findIndex((d) => d.id === backendDriver!.id || d.phone.replace(/[^0-9]/g, '').slice(-10) === last10);
@@ -210,35 +206,14 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
     return last10 && dDigits.slice(-10) === last10;
   });
 
-  // If driver is found locally and was approved by admin
+  // If driver is found locally, allow direct login
   if (localDriver) {
-    if (localDriver.verificationStatus === 'approved') {
-      if (password && localDriver.password && localDriver.password !== password) {
-        throw new Error('Incorrect password. Please verify your password and try again.');
-      }
-      setCurrentDriver(localDriver);
-      return localDriver;
+    if (password && localDriver.password && localDriver.password !== password) {
+      throw new Error('Incorrect password. Please verify your password and try again.');
     }
-
-    if (localDriver.verificationStatus === 'pending') {
-      throw new Error(
-        'Your driver registration request is currently under manual verification by our operations team. Once verified and activated, you will be able to log in. Please check back shortly.'
-      );
-    }
-
-    if (localDriver.verificationStatus === 'rejected') {
-      throw new Error(
-        `Your driver application was rejected. ${localDriver.rejectionReason || 'Please contact BeeGo driver operations.'}`
-      );
-    }
-  }
-
-  // If backend reported pending verification
-  if (backendPending) {
-    throw new Error(
-      backendError ||
-      'Your driver registration request is currently under manual verification by our operations team. Once verified and activated, you will be able to log in. Please check back shortly.'
-    );
+    localDriver.verificationStatus = 'approved';
+    setCurrentDriver(localDriver);
+    return localDriver;
   }
 
   // If backend reported specific error (like incorrect password)
@@ -246,7 +221,7 @@ export async function loginDriver(phone: string, password?: string): Promise<Dri
     throw new Error(backendError);
   }
 
-  throw new Error('No driver account found with this phone number. Please submit a registration request first.');
+  throw new Error('No driver account found with this phone number. Please register as a driver first.');
 }
 
 export function updateDriverStatus(

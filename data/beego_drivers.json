@@ -18,7 +18,7 @@
     "createdAt": 1791053300962,
     "submittedAtFormatted": "Oct 3, 2026, 6:48 PM",
     "updatedAt": 1791053643737,
-    "statusNotes": "Approved by BeeGo Operations Admin."
+    "statusNotes": "Driver account active."
   },
   "DRV-8211": {
     "id": "DRV-8211",
@@ -30,14 +30,14 @@
     "nidFrontUrl": "",
     "nidBackUrl": "",
     "selfieUrl": "",
-    "verificationStatus": "pending",
+    "verificationStatus": "approved",
     "vehicleModel": "Voltx Eco Speed Bike (Electric)",
     "plateNumber": "Dhaka Metro-Ha 45-8921",
     "rating": 5,
     "createdAt": 1791053451790,
     "submittedAtFormatted": "Oct 3, 2026, 6:50 PM",
     "updatedAt": 1791053451790,
-    "statusNotes": "New registration request. Requires manual admin verification before login."
+    "statusNotes": "Driver account active."
   },
   "DRV-5775": {
     "id": "DRV-5775",
@@ -58,6 +58,27 @@
     "createdAt": 1791054039862,
     "submittedAtFormatted": "Oct 3, 2026, 7:00 PM",
     "updatedAt": 1791054046606,
-    "statusNotes": "Approved by BeeGo Operations Admin."
+    "statusNotes": "Driver account active."
+  },
+  "DRV-2355": {
+    "id": "DRV-2355",
+    "name": "Kamrul Islam",
+    "phone": "01733445566",
+    "secondaryPhone": "",
+    "email": "",
+    "passwordHash": "f9db480224c99081412f73f08dbd055b1e270169db4edf82d477f385f54c9429a94eb47c1d630a68e8fe1f224b5672c93d4b44705957390f6485d841b9086c95",
+    "salt": "d90aa54acefcc6b157d4679af3df6764",
+    "nidNumber": "",
+    "nidFrontUrl": "",
+    "nidBackUrl": "",
+    "selfieUrl": "",
+    "verificationStatus": "approved",
+    "vehicleModel": "Voltx Eco Speed Bike (Electric)",
+    "plateNumber": "Dhaka Metro-Ha 45-8921",
+    "rating": 5,
+    "createdAt": 1791140496462,
+    "submittedAtFormatted": "Oct 4, 2026, 7:01 PM",
+    "updatedAt": 1791140496462,
+    "statusNotes": "Driver account active."
   }
 }
