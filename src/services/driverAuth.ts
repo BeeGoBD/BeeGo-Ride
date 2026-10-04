@@ -154,54 +154,61 @@ export async function sendDriverOtp(
   }
 
   // 2. Try server backend endpoint first (active in preview and full-stack environments)
-  try {
-    const res = await fetch('/api/driver/otp/send', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: cleanEmail, type, phone, name }),
-    });
+  const isStaticHost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('github.io') ||
+      window.location.protocol === 'file:');
 
-    const text = await res.text().catch(() => '');
-    let data: any = {};
+  if (!isStaticHost) {
     try {
-      data = JSON.parse(text);
-    } catch {
-      // Returned HTML (e.g. 404 from GitHub Pages)
-    }
+      const res = await fetch('/api/driver/otp/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: cleanEmail, type, phone, name }),
+      });
 
-    if (res.ok && data.success) {
-      return {
-        success: true,
-        message: data.message || `Verification code sent to ${cleanEmail}`,
-        devOtp: data.devOtp,
-      };
-    }
-
-    // Only re-throw genuine user restriction or duplicate account conflicts from backend
-    if (data && data.error) {
-      if (
-        data.error.includes('already registered') ||
-        data.error.includes('restricted') ||
-        data.error.includes('cannot share the same email') ||
-        data.error.includes('Passenger account') ||
-        (type === 'login' && data.error.includes('No rider account found'))
-      ) {
-        throw new Error(data.error);
+      const text = await res.text().catch(() => '');
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        // Returned HTML (e.g. 404 from static host)
       }
+
+      if (res.ok && data.success) {
+        return {
+          success: true,
+          message: data.message || `Verification code sent to ${cleanEmail}`,
+          devOtp: data.devOtp,
+        };
+      }
+
+      // Only re-throw genuine user restriction or duplicate account conflicts from backend
+      if (data && data.error) {
+        if (
+          data.error.includes('already registered') ||
+          data.error.includes('restricted') ||
+          data.error.includes('cannot share the same email') ||
+          data.error.includes('Passenger account') ||
+          (type === 'login' && data.error.includes('No rider account found'))
+        ) {
+          throw new Error(data.error);
+        }
+      }
+    } catch (err: any) {
+      // If it's a specific validation error from the backend, re-throw it!
+      if (
+        err.message &&
+        (err.message.includes('already registered') ||
+          err.message.includes('restricted') ||
+          err.message.includes('cannot share the same email') ||
+          err.message.includes('Passenger account') ||
+          (type === 'login' && err.message.includes('No rider account found')))
+      ) {
+        throw err;
+      }
+      console.log('[Driver Auth] Backend server endpoint not available on this host. Activating direct Descope Cloud API fallback...');
     }
-  } catch (err: any) {
-    // If it's a specific validation error from the backend, re-throw it!
-    if (
-      err.message &&
-      (err.message.includes('already registered') ||
-        err.message.includes('restricted') ||
-        err.message.includes('cannot share the same email') ||
-        err.message.includes('Passenger account') ||
-        (type === 'login' && err.message.includes('No rider account found')))
-    ) {
-      throw err;
-    }
-    console.log('[Driver Auth] Backend server endpoint not available on this host (GitHub Pages). Activating direct Descope Cloud API fallback...');
   }
 
   // 3. GitHub Pages / Static Hosting Fallback:
@@ -265,61 +272,68 @@ export async function verifyDriverOtp(
   }
 
   // 1. Try server backend verification first (preview and full-stack environments)
-  try {
-    const res = await fetch('/api/driver/otp/verify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        email: cleanEmail,
-        otp: cleanOtp,
-        type,
-        registrationData,
-      }),
-    });
+  const isStaticHost =
+    typeof window !== 'undefined' &&
+    (window.location.hostname.endsWith('github.io') ||
+      window.location.protocol === 'file:');
 
-    const text = await res.text().catch(() => '');
-    let data: any = {};
+  if (!isStaticHost) {
     try {
-      data = JSON.parse(text);
-    } catch {}
+      const res = await fetch('/api/driver/otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: cleanEmail,
+          otp: cleanOtp,
+          type,
+          registrationData,
+        }),
+      });
 
-    if (res.ok && data.driver) {
-      const driver: DriverProfile = {
-        ...data.driver,
-        verificationStatus: 'approved',
-      };
-      const drivers = getStoredDrivers();
-      const idx = drivers.findIndex((d) => d.id === driver.id || (d.email && d.email === driver.email));
-      if (idx >= 0) {
-        drivers[idx] = driver;
-      } else {
-        drivers.unshift(driver);
+      const text = await res.text().catch(() => '');
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch {}
+
+      if (res.ok && data.driver) {
+        const driver: DriverProfile = {
+          ...data.driver,
+          verificationStatus: 'approved',
+        };
+        const drivers = getStoredDrivers();
+        const idx = drivers.findIndex((d) => d.id === driver.id || (d.email && d.email === driver.email));
+        if (idx >= 0) {
+          drivers[idx] = driver;
+        } else {
+          drivers.unshift(driver);
+        }
+        saveStoredDrivers(drivers);
+        setCurrentDriver(driver);
+        return driver;
       }
-      saveStoredDrivers(drivers);
-      setCurrentDriver(driver);
-      return driver;
-    }
 
-    // If server returned a genuine JSON validation error
-    if (data && data.error) {
+      // If server returned a genuine JSON validation error
+      if (data && data.error) {
+        if (
+          data.error.includes('already registered') ||
+          data.error.includes('Passenger account') ||
+          data.error.includes('restricted')
+        ) {
+          throw new Error(data.error);
+        }
+      }
+    } catch (err: any) {
       if (
-        data.error.includes('already registered') ||
-        data.error.includes('Passenger account') ||
-        data.error.includes('restricted')
+        err.message &&
+        (err.message.includes('already registered') ||
+          err.message.includes('Passenger account') ||
+          err.message.includes('restricted'))
       ) {
-        throw new Error(data.error);
+        throw err;
       }
+      console.log('[Driver Auth] Backend verification endpoint unavailable, using static fallback...');
     }
-  } catch (err: any) {
-    if (
-      err.message &&
-      (err.message.includes('already registered') ||
-        err.message.includes('Passenger account') ||
-        err.message.includes('restricted'))
-    ) {
-      throw err;
-    }
-    console.log('[Driver Auth] Backend verification endpoint unavailable, using static fallback...');
   }
 
   // 2. Direct Descope Cloud API verify (GitHub Pages / Static Hosting)

@@ -81,21 +81,30 @@ async function syncActiveRideFromServer() {
         }
         notifyListeners(serverRide);
       }
-    } else if (localRide && localRide.status === 'requested') {
-      // If local ride was requested recently, make sure server receives it rather than wiping it!
-      const ageMs = Date.now() - (localRide.createdAt || 0);
-      if (ageMs < 180000) { // Within 3 minutes, re-sync to backend so riders on all tabs/devices receive it
-        fetch('/api/rides/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(localRide),
-        }).catch(() => {});
+    } else if (localRide && (localRide as any)._syncedToBackend) {
+      // Server has cleared or finished this ride
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
       }
+      notifyListeners(null);
+    } else if (localRide && localRide.status === 'requested') {
+      // Initial sync of locally requested ride to server
+      (localRide as any)._syncedToBackend = true;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localRide));
+      }
+      fetch('/api/rides/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(localRide),
+      }).catch(() => {});
     } else if (localRide && ['completed', 'cancelled', 'declined'].includes(localRide.status)) {
       // Completed or cancelled ride cleared after 15 seconds
       const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
       if (ageMs > 15000) {
-        localStorage.removeItem(STORAGE_KEY);
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEY);
+        }
         notifyListeners(null);
       }
     }
@@ -243,6 +252,7 @@ export function requestNewRide(
     createdAt: Date.now(),
     routeData,
   };
+  (newRide as any)._syncedToBackend = true;
 
   saveAndBroadcastRide(newRide);
 

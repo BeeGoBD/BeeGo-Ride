@@ -1919,15 +1919,12 @@ async function startServer() {
       const rides = loadRides();
 
       if (rideId && rides[rideId]) {
-        rides[rideId].status = 'completed';
-        rides[rideId].updatedAt = Date.now();
+        delete rides[rideId];
         saveRides(rides);
       } else {
         const active = getActiveRideRecord();
         if (active) {
-          active.status = 'completed';
-          active.updatedAt = Date.now();
-          rides[active.id] = active;
+          delete rides[active.id];
           saveRides(rides);
         }
       }
