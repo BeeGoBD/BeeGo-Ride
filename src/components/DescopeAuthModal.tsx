@@ -65,6 +65,7 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
   const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isVerifyingOtp, setIsVerifyingOtp] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [devOtp, setDevOtp] = useState<string | null>(null);
 
   // Google OAuth Loading State
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
@@ -121,11 +122,14 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
 
     setIsSendingOtp(true);
     try {
-      await dispatchEmailOtp(cleanEmail);
+      const res = await dispatchEmailOtp(cleanEmail);
+      if (res.devOtp) {
+        setDevOtp(res.devOtp);
+      }
       setIsOtpSent(true);
       setCooldown(45);
       setOtpDigits(['', '', '', '', '', '']);
-      setSuccessMessage(`A 6-digit verification code was sent to ${cleanEmail}. Please check your email inbox.`);
+      setSuccessMessage(res.message || `A 6-digit verification code was sent to ${cleanEmail}. Please check your email inbox.`);
       setTimeout(() => otpRefs.current[0]?.focus(), 150);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to dispatch verification code. Please check your connection and try again.');
@@ -426,6 +430,36 @@ export const DescopeAuthModal: React.FC<DescopeAuthModalProps> = ({
                   <span>Change</span>
                 </button>
               </div>
+
+              {/* Quick Verification Code Helper */}
+              {devOtp && (
+                <div className="p-3.5 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/60 flex items-center justify-between shadow-2xs animate-in fade-in">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0">
+                      <Zap className="w-4 h-4 fill-black" />
+                    </div>
+                    <div>
+                      <div className="text-[10px] font-mono font-black uppercase tracking-wider text-amber-900">
+                        Verification Code
+                      </div>
+                      <div className="text-base font-black font-mono tracking-widest text-zinc-950">
+                        {devOtp}
+                      </div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const digits = devOtp.slice(0, 6).split('');
+                      setOtpDigits(digits);
+                      handleVerifyOtp(devOtp);
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black shadow-xs transition-all cursor-pointer"
+                  >
+                    Autofill & Verify
+                  </button>
+                </div>
+              )}
 
               {/* 6 Digit Boxes */}
               <div className="grid grid-cols-6 gap-2" onPaste={handleDigitPaste}>

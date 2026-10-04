@@ -666,6 +666,33 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           </div>
         )}
 
+        {/* Offline Banner when Trip Request is Waiting */}
+        {!isOnline && activeRide && status === 'requested' && (
+          <div className="p-4 rounded-3xl bg-[#FFF9E6] border-2 border-[#F5C518] shadow-md flex items-center justify-between gap-3 animate-in fade-in">
+            <div className="flex items-center gap-2.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#E6A800] animate-ping shrink-0" />
+              <div>
+                <div className="text-xs font-black text-zinc-950 flex items-center gap-1.5">
+                  <span>Passenger Request Available!</span>
+                  <span className="text-[10px] bg-[#F5C518] text-black px-1.5 py-0.5 rounded-md font-mono font-bold">
+                    ৳{activeRide.fareTaka}
+                  </span>
+                </div>
+                <div className="text-[11px] text-zinc-600 font-medium mt-0.5">
+                  {activeRide.distanceKm} km trip nearby. Switch online to view & accept.
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setIsOnline(true)}
+              className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black shadow-xs cursor-pointer shrink-0 transition-transform"
+            >
+              Go Online
+            </button>
+          </div>
+        )}
+
         {/* C. CASE: INCOMING TRIP REQUEST (Accept / Decline) */}
         {hasIncomingRequest && (
           <div

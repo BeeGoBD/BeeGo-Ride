@@ -81,11 +81,20 @@ async function syncActiveRideFromServer() {
         }
         notifyListeners(serverRide);
       }
-    } else if (localRide && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(localRide.status)) {
-      // Server active ride was cleared or completed
-      const checkRes = await fetch('/api/rides/active');
-      const checkData = await checkRes.json().catch(() => ({}));
-      if (!checkData.ride) {
+    } else if (localRide && localRide.status === 'requested') {
+      // If local ride was requested recently, make sure server receives it rather than wiping it!
+      const ageMs = Date.now() - (localRide.createdAt || 0);
+      if (ageMs < 180000) { // Within 3 minutes, re-sync to backend so riders on all tabs/devices receive it
+        fetch('/api/rides/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localRide),
+        }).catch(() => {});
+      }
+    } else if (localRide && ['completed', 'cancelled', 'declined'].includes(localRide.status)) {
+      // Completed or cancelled ride cleared after 15 seconds
+      const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
+      if (ageMs > 15000) {
         localStorage.removeItem(STORAGE_KEY);
         notifyListeners(null);
       }
