@@ -1,5 +1,6 @@
 import { RideRequest, RideStatus, LocationPoint, RouteData, LiveTrackingData, PaymentMethod, ChatMessage } from '../types';
 import { getCurrentDriver } from './driverAuth';
+import { cloudRealtime } from './cloudRealtime';
 
 export const RATE_PER_KM_TAKA = 25; // Flat ৳25/km guaranteed fair price
 const STORAGE_KEY = 'geoapify_active_ride';
@@ -147,6 +148,9 @@ export function saveAndBroadcastRide(ride: RideRequest | null) {
     } catch {}
   }
 
+  // Realtime Cloud Broadcast (Cross-device, mobile 4G/WiFi, GitHub Pages)
+  cloudRealtime.publishRide(ride);
+
   notifyListeners(ride);
 }
 
@@ -156,8 +160,30 @@ export function subscribeToRideUpdates(callback: RideListener): () => void {
   callback(getStoredRide());
   // immediately trigger server sync
   syncActiveRideFromServer();
+
+  // Cloud Realtime Subscription (Cross-device across static hosts & mobile networks)
+  const unsubCloud = cloudRealtime.subscribeRide((cloudRide) => {
+    const current = getStoredRide();
+    if (cloudRide) {
+      const cloudUpdated = (cloudRide as any).updatedAt || cloudRide.createdAt || 0;
+      const currentUpdated = (current as any)?.updatedAt || current?.createdAt || 0;
+      if (!current || current.id !== cloudRide.id || current.status !== cloudRide.status || cloudUpdated > currentUpdated) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudRide));
+        }
+        notifyListeners(cloudRide);
+      }
+    } else if (current && ['completed', 'cancelled', 'declined'].includes(current.status)) {
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      notifyListeners(null);
+    }
+  });
+
   return () => {
     listeners.delete(callback);
+    unsubCloud();
   };
 }
 

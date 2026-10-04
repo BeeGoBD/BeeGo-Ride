@@ -73,13 +73,26 @@ export default function App() {
   // PERSISTENT LOGIN SESSION:
   // Once logged in (as passenger, driver, or admin), refreshing the app keeps the user logged in
   // until they explicitly log out by themselves!
+  // Tab-isolated testing: ?role=rider or ?role=passenger allows running both simultaneously on the same machine!
   const [role, setRole] = useState<UserRole | null>(() => {
     if (typeof window !== 'undefined') {
       const params = new URLSearchParams(window.location.search);
       const paramRole = params.get('role') as UserRole | null;
-      const storedRole = localStorage.getItem('beego_user_role') as UserRole | null;
 
-      // 1. Explicitly stored role has top priority to prevent refreshing from kicking users out
+      // 1. Explicit URL search param has top priority (crucial for multi-tab testing)
+      if (paramRole === 'rider' || paramRole === 'passenger' || paramRole === 'admin') {
+        sessionStorage.setItem('beego_tab_role', paramRole);
+        return paramRole;
+      }
+
+      // 2. Tab-specific role from sessionStorage
+      const tabRole = sessionStorage.getItem('beego_tab_role') as UserRole | null;
+      if (tabRole === 'rider' || tabRole === 'passenger' || tabRole === 'admin') {
+        return tabRole;
+      }
+
+      // 3. Stored role from localStorage
+      const storedRole = localStorage.getItem('beego_user_role') as UserRole | null;
       if (storedRole === 'rider') {
         return 'rider';
       }
@@ -93,13 +106,7 @@ export default function App() {
         return 'admin';
       }
 
-      // 2. URL search param fallback
-      if (paramRole === 'rider' || paramRole === 'passenger' || paramRole === 'admin') {
-        localStorage.setItem('beego_user_role', paramRole);
-        return paramRole;
-      }
-
-      // 3. Check existing persistent sessions
+      // 4. Check existing persistent sessions
       const activeDriver = getCurrentDriver();
       if (activeDriver) {
         localStorage.setItem('beego_user_role', 'rider');
@@ -395,6 +402,7 @@ export default function App() {
       setDriverProfile(activeDriver);
       setRole('rider');
       if (typeof window !== 'undefined') {
+        sessionStorage.setItem('beego_tab_role', 'rider');
         localStorage.setItem('beego_user_role', 'rider');
       }
       setErrorMessage(null);
@@ -407,6 +415,7 @@ export default function App() {
     }
     setRole(selectedRole);
     if (typeof window !== 'undefined') {
+      sessionStorage.setItem('beego_tab_role', selectedRole);
       localStorage.setItem('beego_user_role', selectedRole);
     }
     setErrorMessage(null);
@@ -421,6 +430,7 @@ export default function App() {
     setRole(null);
     setErrorMessage(null);
     if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('beego_tab_role');
       localStorage.removeItem('beego_user_role');
       localStorage.removeItem('beego_active_passenger');
       localStorage.removeItem('beego_descope_user');

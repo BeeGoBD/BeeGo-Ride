@@ -21,6 +21,9 @@ export function getAppwriteEndpoint(): string {
     return APPWRITE_ENDPOINT_REMOTE;
   }
   if (typeof window !== 'undefined' && window.location?.origin) {
+    if (window.location.hostname.endsWith('github.io') || window.location.protocol === 'file:') {
+      return APPWRITE_ENDPOINT_REMOTE;
+    }
     return `${window.location.origin}/api/appwrite`;
   }
   return APPWRITE_ENDPOINT_REMOTE;

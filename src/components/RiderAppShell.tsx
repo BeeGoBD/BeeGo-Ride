@@ -41,6 +41,13 @@ export const RiderAppShell: React.FC<RiderAppShellProps> = ({
   const [activeTab, setActiveTab] = useState<RiderNavTab>('dashboard');
   const [isPowerStationsOpen, setIsPowerStationsOpen] = useState(false);
 
+  // Automatically switch driver back to dashboard if an incoming request arrives
+  React.useEffect(() => {
+    if (activeRide?.status === 'requested') {
+      setActiveTab('dashboard');
+    }
+  }, [activeRide?.status]);
+
   return (
     <div className="w-full h-full bg-white text-[#1A1A1A] flex flex-col justify-between overflow-hidden relative select-none max-w-[430px] mx-auto shadow-2xl">
       {/* 1. STICKY TOP APPBAR */}
