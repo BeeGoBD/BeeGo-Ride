@@ -1,1 +1,11 @@
-{}
+{
+  "passenger.arif@gmail.com": {
+    "id": "pax-muu7fc7znhrb",
+    "email": "passenger.arif@gmail.com",
+    "name": "Arif Hasan",
+    "role": "passenger",
+    "isEmailVerified": true,
+    "createdAt": 1791141538463,
+    "updatedAt": 1791141538463
+  }
+}

@@ -620,6 +620,7 @@ export default function App() {
           setRole('rider');
           if (typeof window !== 'undefined') {
             localStorage.setItem('beego_user_role', 'rider');
+            localStorage.setItem('beego_current_driver', JSON.stringify(driver));
           }
         }}
         onCancel={() => setDriverAuthModalMode(null)}

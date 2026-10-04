@@ -80,5 +80,24 @@
     "submittedAtFormatted": "Oct 4, 2026, 7:01 PM",
     "updatedAt": 1791140496462,
     "statusNotes": "Driver account active."
+  },
+  "DRV-9073": {
+    "id": "DRV-9073",
+    "name": "Tanvir Hossain",
+    "phone": "+880 1711223344",
+    "secondaryPhone": "",
+    "email": "captain.tanvir@gmail.com",
+    "nidNumber": "",
+    "nidFrontUrl": "",
+    "nidBackUrl": "",
+    "selfieUrl": "",
+    "verificationStatus": "approved",
+    "vehicleModel": "Voltx Eco Speed Bike (Electric)",
+    "plateNumber": "Dhaka Metro-Ha 45-8921",
+    "rating": 5,
+    "createdAt": 1791141523458,
+    "submittedAtFormatted": "Oct 4, 2026, 7:18 PM",
+    "updatedAt": 1791141523458,
+    "statusNotes": "Driver account verified and active."
   }
 }

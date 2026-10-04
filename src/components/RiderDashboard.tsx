@@ -139,13 +139,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
   // Driver profile & verification status
   const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => getCurrentDriver());
-  const isUnderReview =
-    !driverProfile ||
-    driverProfile.verificationStatus === 'under_review' ||
-    driverProfile.verificationStatus === 'pending';
+  const isUnderReview = false; // Account is active immediately upon OTP verification
 
-  // Big Yellow Switch: Online / Offline (locked if under review)
-  const [isOnline, setIsOnline] = useState<boolean>(() => !isUnderReview);
+  // Big Yellow Switch: Online / Offline (default ONLINE so requests are received immediately)
+  const [isOnline, setIsOnline] = useState<boolean>(true);
   const [isReportModalOpen, setIsReportModalOpen] = useState<boolean>(false);
 
   // In-Ride Chat drawer state
@@ -390,11 +387,6 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
   // Handle Accept incoming ride request
   const handleAccept = async () => {
-    if (isUnderReview) {
-      setActionError('Verification in Progress: You cannot accept rides until your account is approved by admin.');
-      return;
-    }
-
     if (!activeRide) return;
     setIsAccepting(true);
     setActionError(null);
@@ -439,6 +431,28 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   const isAtPickup = isOnline && activeRide && status === 'arrived_at_pickup';
   const isInTransit = isOnline && activeRide && status === 'in_transit';
   const isCompleted = isOnline && activeRide && status === 'completed';
+
+  // Play audio chime when a new ride request arrives
+  useEffect(() => {
+    if (hasIncomingRequest) {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioCtx) {
+          const ctx = new AudioCtx();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+          osc.frequency.setValueAtTime(880, ctx.currentTime + 0.15); // A5
+          gain.gain.setValueAtTime(0.2, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.35);
+          osc.start(ctx.currentTime);
+          osc.stop(ctx.currentTime + 0.35);
+        }
+      } catch (e) {}
+    }
+  }, [hasIncomingRequest]);
 
   const passengerName = activeRide?.passengerName || activeRide?.passengerId || 'Passenger';
   const passengerPhone = activeRide?.passengerPhone || '';
@@ -521,23 +535,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           <button
             type="button"
             id="rider-online-toggle-switch"
-            onClick={() => {
-              if (isUnderReview) {
-                setActionError(
-                  'Your driver verification is still in processing. Please wait. Review usually takes 1–24 hours.'
-                );
-                return;
-              }
-              setIsOnline(!isOnline);
-            }}
+            onClick={() => setIsOnline(!isOnline)}
             className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 shadow-inner ${
               isOnline ? 'bg-[#F5C518]' : 'bg-zinc-300'
-            } ${isUnderReview ? 'opacity-60 cursor-not-allowed' : ''}`}
-            title={
-              isUnderReview
-                ? 'Your verification is in processing. Review takes 1-24 hours.'
-                : 'Toggle Online Status'
-            }
+            }`}
+            title="Toggle Online Status"
           >
             <div
               className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 flex items-center justify-center text-[10px] font-bold ${

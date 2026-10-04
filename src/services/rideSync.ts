@@ -56,6 +56,54 @@ function notifyListeners(ride: RideRequest | null) {
   });
 }
 
+// Background sync with server API to ensure cross-device, cross-tab, cross-browser ride dispatch
+let isSyncingWithServer = false;
+async function syncActiveRideFromServer() {
+  if (isSyncingWithServer || typeof window === 'undefined') return;
+  isSyncingWithServer = true;
+  try {
+    const res = await fetch('/api/rides/active');
+    if (!res.ok) return;
+    const data = await res.json().catch(() => ({}));
+    const serverRide: RideRequest | null = data.ride || null;
+    const localRide = getStoredRide();
+
+    // Check if server ride has updates
+    if (serverRide) {
+      const serverUpdated = (serverRide as any).updatedAt || serverRide.createdAt || 0;
+      const localUpdated = (localRide as any)?.updatedAt || localRide?.createdAt || 0;
+      const serverMsgs = serverRide.chatMessages?.length || 0;
+      const localMsgs = localRide?.chatMessages?.length || 0;
+
+      if (!localRide || localRide.id !== serverRide.id || localRide.status !== serverRide.status || serverUpdated > localUpdated || serverMsgs !== localMsgs) {
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverRide));
+        }
+        notifyListeners(serverRide);
+      }
+    } else if (localRide && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(localRide.status)) {
+      // Server active ride was cleared or completed
+      const checkRes = await fetch('/api/rides/active');
+      const checkData = await checkRes.json().catch(() => ({}));
+      if (!checkData.ride) {
+        localStorage.removeItem(STORAGE_KEY);
+        notifyListeners(null);
+      }
+    }
+  } catch (err) {
+    // Network delay or offline
+  } finally {
+    isSyncingWithServer = false;
+  }
+}
+
+// Start polling interval
+if (typeof window !== 'undefined') {
+  setInterval(syncActiveRideFromServer, 1200);
+  // Also run on window focus
+  window.addEventListener('focus', syncActiveRideFromServer);
+}
+
 export function getStoredRide(): RideRequest | null {
   if (typeof window === 'undefined') return null;
   try {
@@ -76,7 +124,9 @@ export function saveAndBroadcastRide(ride: RideRequest | null) {
   }
 
   if (broadcastChannel) {
-    broadcastChannel.postMessage(ride);
+    try {
+      broadcastChannel.postMessage(ride);
+    } catch {}
   }
 
   notifyListeners(ride);
@@ -86,6 +136,8 @@ export function subscribeToRideUpdates(callback: RideListener): () => void {
   listeners.add(callback);
   // initial invoke with current state
   callback(getStoredRide());
+  // immediately trigger server sync
+  syncActiveRideFromServer();
   return () => {
     listeners.delete(callback);
   };
@@ -184,6 +236,14 @@ export function requestNewRide(
   };
 
   saveAndBroadcastRide(newRide);
+
+  // Sync to server API
+  fetch('/api/rides/request', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(newRide),
+  }).catch((err) => console.warn('[Rides Sync] Backend request error:', err));
+
   return newRide;
 }
 
@@ -245,6 +305,19 @@ export function acceptRide(
   };
 
   saveAndBroadcastRide(updated);
+
+  // Sync to server API
+  fetch('/api/rides/accept', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rideId: updated.id,
+      riderId,
+      driverDetails: assignedDriver,
+      pickupRouteData,
+    }),
+  }).catch((err) => console.warn('[Rides Sync] Backend accept error:', err));
+
   return updated;
 }
 
@@ -261,6 +334,16 @@ export function updateLiveTracking(tracking: LiveTrackingData): void {
   };
 
   saveAndBroadcastRide(updated);
+
+  // Sync to server API periodically
+  fetch('/api/rides/tracking', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rideId: current.id,
+      liveTracking: tracking,
+    }),
+  }).catch(() => {});
 }
 
 /**
@@ -276,6 +359,13 @@ export function arriveAtPickupSpot(): RideRequest | null {
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rideId: updated.id, status: 'arrived_at_pickup' }),
+  }).catch(() => {});
+
   return updated;
 }
 
@@ -292,6 +382,13 @@ export function startTripToDestination(): RideRequest | null {
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rideId: updated.id, status: 'in_transit' }),
+  }).catch(() => {});
+
   return updated;
 }
 
@@ -317,6 +414,17 @@ export function completeTrip(actualTraveledKm?: number): RideRequest | null {
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rideId: updated.id,
+      status: 'completed',
+      actualTraveledKm: traveled,
+      finalFareTaka: finalFare,
+    }),
+  }).catch(() => {});
 
   // Save to Real Trip History (no mock data)
   const now = new Date();
@@ -363,6 +471,12 @@ export function declineRide(): void {
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rideId: updated.id, status: 'declined' }),
+  }).catch(() => {});
 }
 
 /**
@@ -378,12 +492,26 @@ export function cancelRide(): void {
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/status', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rideId: updated.id, status: 'cancelled' }),
+  }).catch(() => {});
 }
 
 /**
  * Reset / Dismiss ride
  */
 export function clearCurrentRide(): void {
+  const current = getStoredRide();
+  if (current) {
+    fetch('/api/rides/clear', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ rideId: current.id }),
+    }).catch(() => {});
+  }
   saveAndBroadcastRide(null);
 }
 
@@ -413,5 +541,17 @@ export function sendInRideChatMessage(
   };
 
   saveAndBroadcastRide(updated);
+
+  fetch('/api/rides/chat', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      rideId: current.id,
+      sender,
+      senderName,
+      text: text.trim(),
+    }),
+  }).catch(() => {});
+
   return updated;
 }

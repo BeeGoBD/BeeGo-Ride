@@ -31,6 +31,7 @@ async function startServer() {
   const RESTRICTIONS_FILE = path.join(DATA_DIR, 'beego_restrictions.json');
   const SESSIONS_FILE = path.join(DATA_DIR, 'beego_sessions.json');
   const REPORTS_FILE = path.join(DATA_DIR, 'beego_reports.json');
+  const RIDES_FILE = path.join(DATA_DIR, 'beego_active_rides.json');
 
   if (!fs.existsSync(DATA_DIR)) {
     try {
@@ -256,6 +257,77 @@ async function startServer() {
     }
   }
 
+  // Active Rides Storage
+  function loadRides(): Record<string, any> {
+    try {
+      if (fs.existsSync(RIDES_FILE)) {
+        const raw = fs.readFileSync(RIDES_FILE, 'utf-8');
+        return JSON.parse(raw);
+      }
+    } catch (e) {
+      console.warn('[Storage] Error reading rides file:', e);
+    }
+    return {};
+  }
+
+  function saveRides(rides: Record<string, any>) {
+    try {
+      fs.writeFileSync(RIDES_FILE, JSON.stringify(rides, null, 2), 'utf-8');
+    } catch (e) {
+      console.warn('[Storage] Error saving rides file:', e);
+    }
+  }
+
+  // Get active ride in flight (status: requested, accepted, arrived_at_pickup, in_transit)
+  function getActiveRideRecord(): any | null {
+    const rides = loadRides();
+    const activeList = Object.values(rides).filter((r: any) =>
+      r && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(r.status)
+    );
+    if (activeList.length === 0) return null;
+    activeList.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
+    return activeList[0];
+  }
+
+  // Cross-role verification helpers
+  function isEmailRegisteredAsDriver(email?: string): boolean {
+    if (!email) return false;
+    const clean = email.trim().toLowerCase();
+    const drivers = loadDrivers();
+    return Object.values(drivers).some((d) => (d?.email || '').trim().toLowerCase() === clean);
+  }
+
+  function isPhoneRegisteredAsDriver(phone?: string): boolean {
+    if (!phone) return false;
+    const digits = phone.replace(/[^0-9]/g, '');
+    const last10 = digits.slice(-10);
+    if (!last10 || last10.length < 8) return false;
+    const drivers = loadDrivers();
+    return Object.values(drivers).some((d) => {
+      const dDigits = (d?.phone || '').replace(/[^0-9]/g, '');
+      return dDigits.slice(-10) === last10;
+    });
+  }
+
+  function isEmailRegisteredAsPassenger(email?: string): boolean {
+    if (!email) return false;
+    const clean = email.trim().toLowerCase();
+    const passengers = loadPassengers();
+    return Object.values(passengers).some((p) => (p?.email || '').trim().toLowerCase() === clean);
+  }
+
+  function isPhoneRegisteredAsPassenger(phone?: string): boolean {
+    if (!phone) return false;
+    const digits = phone.replace(/[^0-9]/g, '');
+    const last10 = digits.slice(-10);
+    if (!last10 || last10.length < 8) return false;
+    const passengers = loadPassengers();
+    return Object.values(passengers).some((p) => {
+      const pDigits = (p?.phone || '').replace(/[^0-9]/g, '');
+      return pDigits.slice(-10) === last10;
+    });
+  }
+
   // Password hashing helper
   function hashPassword(password: string): { hash: string; salt: string } {
     const salt = crypto.randomBytes(16).toString('hex');
@@ -281,6 +353,7 @@ async function startServer() {
     userId: string;
     email: string;
     name: string;
+    phone?: string;
     password?: string;
     otp: string;
     expiresAt: number;
@@ -330,6 +403,13 @@ async function startServer() {
       const targetIdentifier = cleanEmail || cleanPhone;
       if (!targetIdentifier) {
         return res.status(400).json({ error: 'Please enter a valid email address or phone number.' });
+      }
+
+      // Check if email is already registered as a Driver/Rider
+      if (cleanEmail && isEmailRegisteredAsDriver(cleanEmail)) {
+        return res.status(400).json({
+          error: 'This email is already registered as a Rider (Driver) account. Passengers and Riders cannot share the same email or log into each other. Please use a different email or log in via the Driver portal.',
+        });
       }
 
       // Check restriction
@@ -487,6 +567,12 @@ async function startServer() {
       if (!cleanOtp || cleanOtp.length < 6) {
         return res.status(400).json({
           error: 'Please enter the complete 6-digit verification code.',
+        });
+      }
+
+      if (cleanEmail && isEmailRegisteredAsDriver(cleanEmail)) {
+        return res.status(400).json({
+          error: 'This email is registered to a Rider (Driver) account. You cannot log into the passenger portal with a rider email. Please switch to the Driver portal.',
         });
       }
 
@@ -882,6 +968,8 @@ async function startServer() {
   app.use('/api/admin', express.urlencoded({ extended: true, limit: '50mb' }));
   app.use('/api/driver', express.json({ limit: '50mb' }));
   app.use('/api/driver', express.urlencoded({ extended: true, limit: '50mb' }));
+  app.use('/api/rides', express.json({ limit: '50mb' }));
+  app.use('/api/rides', express.urlencoded({ extended: true, limit: '50mb' }));
 
   // POST /api/admin/auth/login - Secret Admin Panel Authentication
   app.post('/api/admin/auth/login', (req, res) => {
@@ -1249,7 +1337,21 @@ async function startServer() {
       // Check restriction
       if (isTargetRestricted(cleanPhone, cleanEmail) || (cleanSecondaryPhone && isTargetRestricted(cleanSecondaryPhone))) {
         return res.status(403).json({
-          error: 'This phone number is restricted. Please contact BeeGo admin.',
+          error: 'This phone number or email is restricted. Please contact BeeGo admin.',
+        });
+      }
+
+      // RULE 1: Rider and Passenger cannot share the same email or log into each other
+      if (cleanEmail && isEmailRegisteredAsPassenger(cleanEmail)) {
+        return res.status(400).json({
+          error: 'This email is already registered as a Passenger account. Passengers and Riders cannot share the same email or log into each other with the same email. Please use a different email or log in via the Passenger portal.',
+        });
+      }
+
+      // RULE 2: Rider cannot register twice with the same email
+      if (cleanEmail && isEmailRegisteredAsDriver(cleanEmail)) {
+        return res.status(400).json({
+          error: 'A rider account with this email address already exists. You cannot register twice with the same email. Please log in instead.',
         });
       }
 
@@ -1259,14 +1361,11 @@ async function startServer() {
       const rawPhone = cleanPhone.replace(/[^0-9]/g, '');
       const last10 = rawPhone.slice(-10);
 
-      // Check if driver with this phone already exists
-      let existingDriverKey: string | null = null;
-      for (const [key, d] of Object.entries(drivers)) {
-        const dDigits = (d.phone || '').replace(/[^0-9]/g, '');
-        if (last10 && dDigits.slice(-10) === last10) {
-          existingDriverKey = key;
-          break;
-        }
+      // RULE 3: Rider cannot register twice with the same phone number
+      if (rawPhone && isPhoneRegisteredAsDriver(rawPhone)) {
+        return res.status(400).json({
+          error: 'A rider account with this phone number already exists. You cannot register twice with the same phone number. Please log in instead.',
+        });
       }
 
       const now = Date.now();
@@ -1282,35 +1381,6 @@ async function startServer() {
       let pwInfo: { hash?: string; salt?: string } = {};
       if (password) {
         pwInfo = hashPassword(password);
-      }
-
-      if (existingDriverKey) {
-        const existing = drivers[existingDriverKey];
-        existing.verificationStatus = 'approved'; // Active immediately
-        existing.name = cleanName;
-        existing.phone = cleanPhone;
-        if (cleanSecondaryPhone) existing.secondaryPhone = cleanSecondaryPhone;
-        if (cleanEmail) existing.email = cleanEmail;
-        if (pwInfo.hash) {
-          existing.passwordHash = pwInfo.hash;
-          existing.salt = pwInfo.salt;
-        }
-        if (nidNumber) existing.nidNumber = nidNumber;
-        if (nidFrontUrl) existing.nidFrontUrl = nidFrontUrl;
-        if (nidBackUrl) existing.nidBackUrl = nidBackUrl;
-        if (selfieUrl) existing.selfieUrl = selfieUrl;
-        existing.updatedAt = now;
-        existing.statusNotes = 'Driver account active.';
-        delete existing.rejectionReason;
-
-        drivers[existingDriverKey] = existing;
-        saveDrivers(drivers);
-
-        return res.json({
-          success: true,
-          driver: existing,
-          message: 'Driver registration updated successfully. Account is ready to use.',
-        });
       }
 
       // New driver registration request - immediately active
@@ -1351,35 +1421,300 @@ async function startServer() {
     }
   });
 
-  // POST /api/driver/login - Driver login with status and restriction check
-  app.post('/api/driver/login', (req, res) => {
+  // POST /api/driver/otp/send - Send 6-digit OTP code to rider's email for registration or login
+  app.post('/api/driver/otp/send', async (req, res) => {
     try {
-      const { phone, identifier, password } = req.body || {};
-      const input = (phone || identifier || '').trim();
-      const cleanPhone = input.replace(/[^0-9]/g, '');
+      const { email, phone, name, type } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanPhone = (phone || '').replace(/[^0-9]/g, '');
+      const cleanName = (name || '').trim() || 'Driver';
 
-      if (!cleanPhone || cleanPhone.length < 8) {
-        return res.status(400).json({ error: 'Please enter your registered phone number.' });
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'Please enter a valid email address.' });
+      }
+
+      const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+      if (!emailRegex.test(cleanEmail)) {
+        return res.status(400).json({ error: 'Please enter a valid email address format (e.g. driver@gmail.com).' });
       }
 
       // Check restriction
-      if (isTargetRestricted(cleanPhone)) {
+      if (isTargetRestricted(cleanPhone, cleanEmail)) {
         return res.status(403).json({
-          error: 'Your driver account has been restricted by Admin. Please contact support.',
+          error: 'This account has been restricted by Admin. Please contact support.',
+        });
+      }
+
+      // RULE: Passenger and Driver cannot share the same email
+      if (isEmailRegisteredAsPassenger(cleanEmail)) {
+        return res.status(400).json({
+          error: 'This email is already registered as a Passenger account. Passengers and Riders cannot share the same email or log into each other with the same email. Please use a different email or log in via the Passenger portal.',
+        });
+      }
+
+      if (type === 'register') {
+        // RULE: Rider cannot register twice with the same email
+        if (isEmailRegisteredAsDriver(cleanEmail)) {
+          return res.status(400).json({
+            error: 'A rider account with this email address already exists. You cannot register twice with the same email. Please log in with your email instead.',
+          });
+        }
+
+        // RULE: Rider cannot register twice with the same phone number
+        if (cleanPhone && isPhoneRegisteredAsDriver(cleanPhone)) {
+          return res.status(400).json({
+            error: 'A rider account with this phone number already exists. You cannot register twice with the same phone number. Please log in instead.',
+          });
+        }
+      } else {
+        // Login mode: email must already be a registered driver
+        if (!isEmailRegisteredAsDriver(cleanEmail)) {
+          return res.status(404).json({
+            error: 'No rider account found with this email address. Please register as a rider first.',
+          });
+        }
+      }
+
+      // Generate 6-digit numeric OTP code
+      const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+      const expiresAt = Date.now() + 15 * 60 * 1000; // 15 mins
+
+      otpStore.set('driver:' + cleanEmail, {
+        userId: 'drv-otp-' + Date.now().toString(36),
+        email: cleanEmail,
+        name: cleanName,
+        phone: cleanPhone,
+        otp: generatedOtp,
+        expiresAt,
+        attempts: 0,
+        isFallback: true,
+      });
+
+      console.log(`[Driver Email OTP] 6-digit verification code generated for ${cleanEmail}: ${generatedOtp}`);
+
+      // Attempt delivery via Descope Cloud
+      try {
+        await fetch('https://api.descope.com/v1/auth/otp/signup-in/email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DESCOPE_PROJECT_ID}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ loginId: cleanEmail }),
+        }).catch(() => {});
+      } catch (e) {}
+
+      // Attempt delivery via SMTP
+      const transporter = getMailTransporter();
+      if (transporter) {
+        try {
+          await transporter.sendMail({
+            from: process.env.SMTP_FROM || 'BeeGo Voltx Bangladesh <no-reply@beegovoltx.com>',
+            to: cleanEmail,
+            subject: `${generatedOtp} is your BeeGo Driver Verification Code`,
+            text: `Hello ${cleanName},\n\nYour 6-digit BeeGo Driver verification code is: ${generatedOtp}\n\nThis code will expire in 15 minutes.\nDo not share this code with anyone.\n\nBeeGo Voltx • Electric Fleet Bangladesh`,
+          });
+        } catch (mErr) {
+          console.warn('[Driver SMTP Notice]', mErr);
+        }
+      }
+
+      return res.json({
+        success: true,
+        message: `6-digit verification code sent to ${cleanEmail}. Please check your email inbox.`,
+        devOtp: generatedOtp,
+      });
+    } catch (err: any) {
+      console.error('[Driver OTP Send Error]', err);
+      return res.status(500).json({ error: 'Failed to send driver verification code. Please try again.' });
+    }
+  });
+
+  // POST /api/driver/otp/verify - Verify 6-digit OTP code for rider registration or login
+  app.post('/api/driver/otp/verify', async (req, res) => {
+    try {
+      const { email, otp, type, registrationData } = req.body || {};
+      const cleanEmail = (email || '').trim().toLowerCase();
+      const cleanOtp = (otp || '').trim();
+
+      if (!cleanEmail || !cleanOtp) {
+        return res.status(400).json({ error: 'Email and 6-digit verification code are required.' });
+      }
+
+      // Check passenger separation
+      if (isEmailRegisteredAsPassenger(cleanEmail)) {
+        return res.status(400).json({
+          error: 'This email belongs to a Passenger account. You cannot log into the rider app with a passenger email.',
+        });
+      }
+
+      let isVerified = false;
+
+      // 1. Descope cloud verify check
+      try {
+        const descopeVerifyRes = await fetch('https://api.descope.com/v1/auth/otp/verify/email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${DESCOPE_PROJECT_ID}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            loginId: cleanEmail,
+            code: cleanOtp,
+          }),
+        });
+        const dData = await descopeVerifyRes.json().catch(() => ({}));
+        if (descopeVerifyRes.ok && (dData.sessionJwt || dData.user)) {
+          isVerified = true;
+        }
+      } catch (err) {}
+
+      // 2. Local fallback check
+      if (!isVerified) {
+        const record = otpStore.get('driver:' + cleanEmail);
+        if (record && Date.now() <= record.expiresAt && record.otp === cleanOtp) {
+          isVerified = true;
+          otpStore.delete('driver:' + cleanEmail);
+        }
+      }
+
+      if (!isVerified) {
+        return res.status(400).json({
+          error: 'Invalid or expired verification code. Please check your email and try again.',
         });
       }
 
       const drivers = loadDrivers();
-      const last10 = cleanPhone.slice(-10);
 
-      const driver = Object.values(drivers).filter(Boolean).find((d) => {
-        const dPhone = (d?.phone || '').replace(/[^0-9]/g, '');
-        return last10 && dPhone.slice(-10) === last10;
-      });
+      if (type === 'register') {
+        const reg = registrationData || {};
+        const cleanName = (reg.name || '').trim() || cleanEmail.split('@')[0] || 'Driver';
+        const cleanPhone = (reg.phone || '').trim();
+        const rawDigits = cleanPhone.replace(/[^0-9]/g, '');
+
+        // Double check duplicate phone or email
+        if (isEmailRegisteredAsDriver(cleanEmail)) {
+          return res.status(400).json({
+            error: 'A rider account with this email address already exists. Please log in instead.',
+          });
+        }
+        if (rawDigits && isPhoneRegisteredAsDriver(rawDigits)) {
+          return res.status(400).json({
+            error: 'A rider account with this phone number already exists. Please log in instead.',
+          });
+        }
+
+        const now = Date.now();
+        const dateStr = new Date().toLocaleString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+
+        const driverId = 'DRV-' + Math.floor(1000 + Math.random() * 9000);
+        const newDriver: StoredDriver = {
+          id: driverId,
+          name: cleanName,
+          phone: cleanPhone || '+880 1712-345678',
+          secondaryPhone: reg.secondaryPhone || '',
+          email: cleanEmail,
+          nidNumber: reg.nidNumber || '',
+          nidFrontUrl: reg.nidFrontUrl || '',
+          nidBackUrl: reg.nidBackUrl || '',
+          selfieUrl: reg.selfieUrl || '',
+          verificationStatus: 'approved',
+          vehicleModel: reg.vehicleModel || 'Voltx Eco Speed Bike (Electric)',
+          plateNumber: reg.plateNumber || 'Dhaka Metro-Ha 45-8921',
+          rating: 5.0,
+          createdAt: now,
+          submittedAtFormatted: dateStr,
+          updatedAt: now,
+          statusNotes: 'Driver account verified and active.',
+        };
+
+        drivers[driverId] = newDriver;
+        saveDrivers(drivers);
+
+        return res.json({
+          success: true,
+          driver: newDriver,
+          message: 'Driver registration successful and verified! Welcome to BeeGo Voltx.',
+        });
+      } else {
+        // Login mode: find driver by email
+        const driver = Object.values(drivers).find(
+          (d) => (d?.email || '').trim().toLowerCase() === cleanEmail
+        );
+        if (!driver) {
+          return res.status(404).json({
+            error: 'No rider account found with this email. Please register as a rider first.',
+          });
+        }
+
+        if (driver.verificationStatus !== 'approved') {
+          driver.verificationStatus = 'approved';
+          driver.statusNotes = 'Driver account active.';
+          drivers[driver.id] = driver;
+          saveDrivers(drivers);
+        }
+
+        return res.json({
+          success: true,
+          driver,
+          message: 'Driver logged in successfully.',
+        });
+      }
+    } catch (err: any) {
+      console.error('[Driver OTP Verify Error]', err);
+      return res.status(500).json({ error: 'Failed to verify driver verification code.' });
+    }
+  });
+
+  // POST /api/driver/login - Driver login with phone or email with strict separation
+  app.post('/api/driver/login', (req, res) => {
+    try {
+      const { phone, identifier, email, password } = req.body || {};
+      const input = (email || phone || identifier || '').trim();
+
+      if (!input) {
+        return res.status(400).json({ error: 'Please enter your registered email address or phone number.' });
+      }
+
+      // RULE: Passenger and Driver cannot login to each other with same email
+      if (input.includes('@') && isEmailRegisteredAsPassenger(input)) {
+        return res.status(400).json({
+          error: 'This email is registered to a Passenger account. You cannot log into the rider app with a passenger email. Please switch to the Passenger portal.',
+        });
+      }
+
+      const drivers = loadDrivers();
+      let driver: StoredDriver | undefined;
+
+      if (input.includes('@')) {
+        const cleanEmail = input.toLowerCase();
+        driver = Object.values(drivers).find((d) => (d?.email || '').trim().toLowerCase() === cleanEmail);
+      } else {
+        const cleanPhone = input.replace(/[^0-9]/g, '');
+        const last10 = cleanPhone.slice(-10);
+        driver = Object.values(drivers).find((d) => {
+          const dPhone = (d?.phone || '').replace(/[^0-9]/g, '');
+          return last10 && dPhone.slice(-10) === last10;
+        });
+      }
 
       if (!driver) {
         return res.status(404).json({
-          error: 'No driver account found with this phone number. Please register as a driver first.',
+          error: 'No rider account found with this credential. Please register as a rider first.',
+        });
+      }
+
+      // Check restriction
+      if (isTargetRestricted(driver.phone, driver.email)) {
+        return res.status(403).json({
+          error: 'Your driver account has been restricted by Admin. Please contact support.',
         });
       }
 
@@ -1407,6 +1742,199 @@ async function startServer() {
     } catch (err: any) {
       console.error('[Driver Login Error]', err);
       return res.status(500).json({ error: err.message || 'Driver login failed.' });
+    }
+  });
+
+  // ==========================================
+  // REAL-TIME RIDES API (Full cross-client synchronization)
+  // ==========================================
+
+  // POST /api/rides/request - Passenger submits a new ride request
+  app.post('/api/rides/request', (req, res) => {
+    try {
+      const ride = req.body;
+      if (!ride || !ride.id || !ride.pickup || !ride.dropoff) {
+        return res.status(400).json({ error: 'Invalid ride request payload.' });
+      }
+
+      const rides = loadRides();
+      rides[ride.id] = {
+        ...ride,
+        status: 'requested',
+        createdAt: ride.createdAt || Date.now(),
+        updatedAt: Date.now(),
+      };
+      saveRides(rides);
+
+      console.log(`[Rides API] New ride requested: ${ride.id} from ${ride.pickup.formatted || 'Pickup'} to ${ride.dropoff.formatted || 'Dropoff'}`);
+
+      return res.json({
+        success: true,
+        ride: rides[ride.id],
+      });
+    } catch (err: any) {
+      console.error('[Ride Request Error]', err);
+      return res.status(500).json({ error: 'Failed to broadcast ride request.' });
+    }
+  });
+
+  // GET /api/rides/active - Returns currently active ride in flight
+  app.get('/api/rides/active', (req, res) => {
+    try {
+      const activeRide = getActiveRideRecord();
+      return res.json({
+        success: true,
+        ride: activeRide,
+      });
+    } catch (err: any) {
+      console.error('[Get Active Ride Error]', err);
+      return res.status(500).json({ error: 'Failed to retrieve active ride.' });
+    }
+  });
+
+  // POST /api/rides/accept - Rider accepts the ride
+  app.post('/api/rides/accept', (req, res) => {
+    try {
+      const { rideId, riderId, driverDetails, pickupRouteData } = req.body || {};
+      const rides = loadRides();
+
+      const targetRide = rideId ? rides[rideId] : getActiveRideRecord();
+      if (!targetRide) {
+        return res.status(404).json({ error: 'Ride request not found or expired.' });
+      }
+
+      targetRide.riderId = riderId || targetRide.riderId;
+      targetRide.status = 'accepted';
+      targetRide.driverDetails = driverDetails || targetRide.driverDetails;
+      if (pickupRouteData) targetRide.pickupRouteData = pickupRouteData;
+      targetRide.updatedAt = Date.now();
+
+      rides[targetRide.id] = targetRide;
+      saveRides(rides);
+
+      console.log(`[Rides API] Ride ${targetRide.id} accepted by rider ${riderId || 'Captain'}`);
+
+      return res.json({
+        success: true,
+        ride: targetRide,
+      });
+    } catch (err: any) {
+      console.error('[Accept Ride Error]', err);
+      return res.status(500).json({ error: 'Failed to accept ride.' });
+    }
+  });
+
+  // POST /api/rides/status - Updates ride status (arrived_at_pickup, in_transit, completed, cancelled, declined)
+  app.post('/api/rides/status', (req, res) => {
+    try {
+      const { rideId, status, finalFareTaka, actualTraveledKm, liveTracking } = req.body || {};
+      const rides = loadRides();
+
+      const targetRide = rideId ? rides[rideId] : getActiveRideRecord();
+      if (!targetRide) {
+        return res.status(404).json({ error: 'Ride not found.' });
+      }
+
+      if (status) targetRide.status = status;
+      if (finalFareTaka !== undefined) targetRide.finalFareTaka = finalFareTaka;
+      if (actualTraveledKm !== undefined) targetRide.actualTraveledKm = actualTraveledKm;
+      if (liveTracking) targetRide.liveTracking = liveTracking;
+      targetRide.updatedAt = Date.now();
+
+      rides[targetRide.id] = targetRide;
+      saveRides(rides);
+
+      console.log(`[Rides API] Ride ${targetRide.id} status updated to: ${status}`);
+
+      return res.json({
+        success: true,
+        ride: targetRide,
+      });
+    } catch (err: any) {
+      console.error('[Update Ride Status Error]', err);
+      return res.status(500).json({ error: 'Failed to update ride status.' });
+    }
+  });
+
+  // POST /api/rides/chat - Send message in ride chat
+  app.post('/api/rides/chat', (req, res) => {
+    try {
+      const { rideId, sender, senderName, text } = req.body || {};
+      const rides = loadRides();
+
+      const targetRide = rideId ? rides[rideId] : getActiveRideRecord();
+      if (!targetRide) {
+        return res.status(404).json({ error: 'Ride not found.' });
+      }
+
+      const msg = {
+        id: 'msg-' + Date.now() + '-' + Math.random().toString(36).substring(2, 6),
+        sender,
+        senderName: senderName || (sender === 'rider' ? 'Captain' : 'Passenger'),
+        text: (text || '').trim(),
+        timestamp: Date.now(),
+      };
+
+      targetRide.chatMessages = [...(targetRide.chatMessages || []), msg];
+      targetRide.updatedAt = Date.now();
+
+      rides[targetRide.id] = targetRide;
+      saveRides(rides);
+
+      return res.json({
+        success: true,
+        message: msg,
+        chatMessages: targetRide.chatMessages,
+      });
+    } catch (err: any) {
+      console.error('[Ride Chat Error]', err);
+      return res.status(500).json({ error: 'Failed to send chat message.' });
+    }
+  });
+
+  // POST /api/rides/tracking - Update driver live GPS tracking coordinates
+  app.post('/api/rides/tracking', (req, res) => {
+    try {
+      const { rideId, liveTracking } = req.body || {};
+      const rides = loadRides();
+
+      const targetRide = rideId ? rides[rideId] : getActiveRideRecord();
+      if (targetRide && liveTracking) {
+        targetRide.liveTracking = liveTracking;
+        targetRide.updatedAt = Date.now();
+        rides[targetRide.id] = targetRide;
+        saveRides(rides);
+      }
+
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to update tracking.' });
+    }
+  });
+
+  // POST /api/rides/clear - Clears active ride
+  app.post('/api/rides/clear', (req, res) => {
+    try {
+      const { rideId } = req.body || {};
+      const rides = loadRides();
+
+      if (rideId && rides[rideId]) {
+        rides[rideId].status = 'completed';
+        rides[rideId].updatedAt = Date.now();
+        saveRides(rides);
+      } else {
+        const active = getActiveRideRecord();
+        if (active) {
+          active.status = 'completed';
+          active.updatedAt = Date.now();
+          rides[active.id] = active;
+          saveRides(rides);
+        }
+      }
+
+      return res.json({ success: true });
+    } catch (err) {
+      return res.status(500).json({ error: 'Failed to clear ride.' });
     }
   });
 
