@@ -21,7 +21,7 @@ import {
   Flag,
 } from 'lucide-react';
 import { RideRequest } from '../types';
-import { RATE_PER_KM_TAKA, getRealTripHistory, StoredRealTrip } from '../services/rideSync';
+import { RATE_PER_KM_TAKA, getRealTripHistory, fetchAndSyncTripHistory, StoredRealTrip } from '../services/rideSync';
 import { ReportIssueModal } from './ReportIssueModal';
 
 export interface HistoryRideItem {
@@ -39,6 +39,7 @@ export interface HistoryRideItem {
   plateNumber: string;
   driverName: string;
   driverRating: number;
+  driverPhone?: string;
   paymentMethod: string;
   status: 'completed';
 }
@@ -60,8 +61,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryRideItem | null>(null);
   const [reportingTrip, setReportingTrip] = useState<HistoryRideItem | null>(null);
 
-  const loadRealTrips = (): HistoryRideItem[] => {
-    const realHistory = getRealTripHistory();
+  const formatStoredTrips = (realHistory: StoredRealTrip[]): HistoryRideItem[] => {
     if (!realHistory || realHistory.length === 0) return [];
     return realHistory.map((h, i) => ({
       id: h.id || `real-${i}`,
@@ -78,16 +78,37 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
       plateNumber: h.plateNumber || 'Dhaka Metro 45-8921',
       driverName: h.driverName || 'Captain Tanvir',
       driverRating: h.driverRating || 4.9,
+      driverPhone: h.driverPhone,
       paymentMethod: h.paymentMethod ? h.paymentMethod.toUpperCase() : 'Cash',
       status: 'completed',
     }));
   };
 
-  const [trips, setTrips] = useState<HistoryRideItem[]>(() => loadRealTrips());
+  const [trips, setTrips] = useState<HistoryRideItem[]>(() => formatStoredTrips(getRealTripHistory()));
   const [copiedReceipt, setCopiedReceipt] = useState(false);
 
   useEffect(() => {
-    setTrips(loadRealTrips());
+    // Initial sync with backend server
+    setTrips(formatStoredTrips(getRealTripHistory()));
+    fetchAndSyncTripHistory().then((synced) => {
+      if (synced && synced.length > 0) {
+        setTrips(formatStoredTrips(synced));
+      }
+    });
+
+    const handleUpdate = () => {
+      fetchAndSyncTripHistory().then((synced) => {
+        setTrips(formatStoredTrips(synced));
+      });
+    };
+
+    window.addEventListener('beego:trip_history_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('beego:trip_history_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, [activeRide?.status]);
 
   const filteredTrips = trips.filter(

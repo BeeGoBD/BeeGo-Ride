@@ -33,8 +33,13 @@ import {
   Flag,
   ShieldAlert,
   User,
+  Plus,
+  Minus,
+  X,
 } from 'lucide-react';
 import { ReportIssueModal } from './ReportIssueModal';
+import { SwipeActionSlider } from './SwipeActionSlider';
+import { CancelRideModal } from './CancelRideModal';
 import { LocationPoint, RideRequest, RouteData, UserRole, LiveTrackingData } from '../types';
 import {
   arriveAtPickupSpot,
@@ -64,67 +69,6 @@ interface UberLiveTrackingProps {
   onResetRide?: () => void;
 }
 
-// Interactive Swipe to Confirm Slider (Pathao / Uber style for drivers)
-const SwipeActionSlider: React.FC<{
-  label: string;
-  onConfirm: () => void;
-  icon?: React.ReactNode;
-}> = ({ label, onConfirm, icon }) => {
-  const [sliderX, setSliderX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const startDrag = () => setIsDragging(true);
-
-  const onDrag = (clientX: number) => {
-    if (!isDragging || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxDrag = rect.width - 56;
-    const currentDrag = Math.max(0, Math.min(clientX - rect.left - 24, maxDrag));
-    setSliderX(currentDrag);
-
-    if (currentDrag >= maxDrag * 0.85) {
-      setIsDragging(false);
-      setSliderX(0);
-      onConfirm();
-    }
-  };
-
-  const stopDrag = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    setSliderX(0);
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      onMouseMove={(e) => onDrag(e.clientX)}
-      onMouseUp={stopDrag}
-      onMouseLeave={stopDrag}
-      onTouchMove={(e) => onDrag(e.touches[0].clientX)}
-      onTouchEnd={stopDrag}
-      className="relative w-full h-14 rounded-2xl bg-zinc-900 border-2 border-[#F5C518]/50 overflow-hidden flex items-center p-1.5 select-none shadow-xl cursor-grab active:cursor-grabbing"
-    >
-      <div
-        style={{ width: `${sliderX + 50}px` }}
-        className="absolute left-0 top-0 bottom-0 bg-[#F5C518]/20 transition-all pointer-events-none"
-      />
-      <div className="w-full text-center text-xs font-black uppercase tracking-wider text-zinc-200 pointer-events-none z-10 flex items-center justify-center gap-1.5 px-12">
-        <span>{label}</span>
-      </div>
-      <div
-        style={{ transform: `translateX(${sliderX}px)` }}
-        onMouseDown={startDrag}
-        onTouchStart={startDrag}
-        className="absolute left-1.5 w-11 h-11 rounded-xl bg-[#F5C518] text-black shadow-md flex items-center justify-center z-20 cursor-pointer active:scale-95 transition-transform"
-      >
-        {icon || <ArrowRight className="w-5 h-5 stroke-[2.5]" />}
-      </div>
-    </div>
-  );
-};
-
 export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   role,
   activeRide,
@@ -143,6 +87,12 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
   const activeRoutePolylineRef = useRef<L.Polyline | null>(null);
   const traveledPolylineRef = useRef<L.Polyline | null>(null);
   const animFrameRef = useRef<number | null>(null);
+
+  // Camera lock state: when true, camera follows the driver. When user pans/zooms map, camera unlocks smoothly!
+  const [isCameraLocked, setIsCameraLocked] = useState<boolean>(true);
+
+  // Cancel ride modal state for passenger
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
 
   // Simulation speed: 1x, 2x, 4x
   const [simSpeed, setSimSpeed] = useState<number>(1);
@@ -271,7 +221,22 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       center: initialCenter,
       zoom: 16,
       zoomControl: false,
+      scrollWheelZoom: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      dragging: true,
+      preferCanvas: true,
     });
+
+    // Detect user pan, drag, or pinch zoom to unlock camera follow smoothly
+    const unlockCamera = () => setIsCameraLocked(false);
+    map.on('dragstart', unlockCamera);
+    map.on('zoomstart', unlockCamera);
+    map.on('movestart', (e: any) => {
+      if (e.originalEvent) unlockCamera();
+    });
+    map.on('wheel', unlockCamera);
+    map.on('touchstart', unlockCamera);
 
     const tileUrl = activeKey
       ? `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(
@@ -458,9 +423,9 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
             traveledPolylineRef.current.setLatLngs(activeRouteCoords.slice(0, index + 1));
           }
 
-          // Camera follow in Navigation Mode
-          if (viewMode === 'follow' && mapInstanceRef.current) {
-            mapInstanceRef.current.panTo(currentCoord, { animate: true, duration: 0.3 });
+          // Camera follow in Navigation Mode (ONLY when camera is locked to vehicle)
+          if (isCameraLocked && viewMode === 'follow' && mapInstanceRef.current) {
+            mapInstanceRef.current.panTo(currentCoord, { animate: false });
           }
 
           // Calculate traveled & remaining distance
@@ -561,10 +526,11 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
   // Re-center on vehicle
   const handleRecenter = () => {
+    setIsCameraLocked(true);
+    setViewMode('follow');
     if (vehicleMarkerRef.current && mapInstanceRef.current) {
       const pos = vehicleMarkerRef.current.getLatLng();
       mapInstanceRef.current.flyTo(pos, 17, { duration: 0.6 });
-      setViewMode('follow');
     }
   };
 
@@ -678,6 +644,19 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
               </div>
             </div>
           )}
+
+          {/* Passenger Instant Cancel Button in Header */}
+          {role === 'passenger' && !isCompleted && (
+            <button
+              type="button"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="px-2.5 py-1.5 rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 hover:text-white border border-rose-500/40 text-[10px] font-bold uppercase tracking-wider transition-colors cursor-pointer active:scale-95 shrink-0 flex items-center gap-1"
+              title="Cancel Ride Request"
+            >
+              <X className="w-3.5 h-3.5 stroke-[2.5]" />
+              <span>Cancel</span>
+            </button>
+          )}
         </div>
 
         {/* Dynamic Route Recalculation Toast */}
@@ -714,7 +693,12 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
       </div>
 
       {/* 2. LEAFLET MAP CANVAS */}
-      <div ref={mapContainerRef} className="w-full h-full" />
+      <div
+        ref={mapContainerRef}
+        onPointerDown={() => setIsCameraLocked(false)}
+        onTouchStart={() => setIsCameraLocked(false)}
+        className="w-full h-full touch-pan-x touch-pan-y"
+      />
 
       {/* 3. FLOATING MAP CONTROLS (Right Side) */}
       <div className="absolute right-3.5 top-28 z-[1000] flex flex-col gap-2 pointer-events-auto">
@@ -732,14 +716,38 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
           <Layers className="w-4 h-4" />
         </button>
 
+        {/* Zoom In Button */}
+        <button
+          type="button"
+          onClick={() => mapInstanceRef.current?.zoomIn()}
+          title="Zoom In"
+          className="w-10 h-10 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95"
+        >
+          <Plus className="w-4 h-4 stroke-[2.8]" />
+        </button>
+
+        {/* Zoom Out Button */}
+        <button
+          type="button"
+          onClick={() => mapInstanceRef.current?.zoomOut()}
+          title="Zoom Out"
+          className="w-10 h-10 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95"
+        >
+          <Minus className="w-4 h-4 stroke-[2.8]" />
+        </button>
+
         {/* Re-center Camera */}
         <button
           type="button"
           onClick={handleRecenter}
-          title="Recenter on live location"
-          className="w-10 h-10 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-800 flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95"
+          title={isCameraLocked ? 'Camera following vehicle' : 'Click to Recenter on vehicle'}
+          className={`w-10 h-10 rounded-2xl border flex items-center justify-center shadow-lg transition-all cursor-pointer active:scale-95 ${
+            !isCameraLocked
+              ? 'bg-zinc-950 text-[#F5C518] border-[#F5C518] ring-4 ring-amber-400/30'
+              : 'bg-white hover:bg-zinc-50 border-zinc-200 text-zinc-800'
+          }`}
         >
-          <LocateFixed className="w-4 h-4 text-[#E6A800]" />
+          <LocateFixed className={`w-4 h-4 ${!isCameraLocked ? 'text-[#F5C518] animate-pulse' : 'text-[#E6A800]'}`} />
         </button>
 
         {/* Reroute / Shortcut simulation button */}
@@ -937,82 +945,137 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
 
           {/* ACTION BUTTONS & SLIDERS BASED ON STAGE & ROLE */}
           <div className="pt-1">
-            {/* Rider: Slide to confirm Arrived at Pickup */}
-            {role === 'rider' && isEnRouteToPickup && (
-              <SwipeActionSlider
-                label="Slide: Reached Pickup Spot"
-                onConfirm={() => arriveAtPickupSpot()}
-                icon={<CheckCircle className="w-5 h-5 text-black" />}
-              />
-            )}
-
-            {/* Passenger: En route to pickup notice */}
-            {role === 'passenger' && isEnRouteToPickup && (
-              <div className="flex items-center justify-between text-xs px-1 text-zinc-600 font-semibold">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  Captain is riding to your pickup spot
-                </span>
-                <span className="text-[11px] font-mono text-zinc-500">ETA: {etaMinutes}m</span>
-              </div>
-            )}
-
-            {/* Rider: Slide to confirm Passenger Picked Up */}
-            {role === 'rider' && isAtPickup && (
-              <SwipeActionSlider
-                label="Slide: Picked Up Passenger"
-                onConfirm={() => startTripToDestination()}
-                icon={<Navigation className="w-5 h-5 fill-black" />}
-              />
-            )}
-
-            {/* Passenger Alert at Pickup */}
-            {role === 'passenger' && isAtPickup && (
+            {/* 1. RIDER ACTIONS (Strict 3 Sequential Steps for Captain) */}
+            {role === 'rider' && (
               <div className="space-y-2">
-                <div className="p-3 bg-[#FFF9E6] border border-[#F5C518]/50 rounded-2xl text-center">
-                  <div className="text-xs font-black text-amber-900 flex items-center justify-center gap-1.5">
-                    <CheckCircle className="w-4 h-4 text-[#E6A800]" />
-                    <span>Your captain has arrived at the pickup spot!</span>
-                  </div>
-                  <div className="text-[11px] text-zinc-500 mt-0.5">
-                    Look for {driver.vehicleModel} ({driver.plateNumber}).
-                  </div>
-                </div>
+                {/* Step 1: Rider en route to pickup spot */}
+                {isEnRouteToPickup && (
+                  <SwipeActionSlider
+                    key="uber-step-1-arrived"
+                    label="Slide: I Have Arrived at Pickup Spot"
+                    onConfirm={() => arriveAtPickupSpot()}
+                    stepNumber={1}
+                    totalSteps={3}
+                    icon={<CheckCircle className="w-5 h-5 text-black stroke-[3]" />}
+                  />
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => startTripToDestination()}
-                  className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.99] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
-                >
-                  <Navigation className="w-4 h-4 fill-black" />
-                  <span>I Have Boarded • Start Trip to Destination</span>
-                </button>
+                {/* Step 2: Rider arrived at pickup spot, waiting to board passenger */}
+                {isAtPickup && (
+                  <SwipeActionSlider
+                    key="uber-step-2-start-trip"
+                    label="Slide: Passenger On Board (Start Trip)"
+                    onConfirm={() => startTripToDestination()}
+                    stepNumber={2}
+                    totalSteps={3}
+                    icon={<Navigation className="w-5 h-5 fill-black" />}
+                  />
+                )}
+
+                {/* Step 3: Rider driving to destination, finishing the ride */}
+                {isInTransit && (
+                  <SwipeActionSlider
+                    key="uber-step-3-complete-ride"
+                    label="Slide: Reached Destination (Complete Ride)"
+                    onConfirm={() => completeTrip(traveledKm)}
+                    stepNumber={3}
+                    totalSteps={3}
+                    icon={<CheckCircle className="w-5 h-5 text-black stroke-[3]" />}
+                  />
+                )}
               </div>
             )}
 
-            {/* Rider: Slide to Complete Ride at Destination */}
-            {role === 'rider' && isInTransit && (
-              <SwipeActionSlider
-                label="Slide: Complete Ride (Destination Reached)"
-                onConfirm={() => completeTrip(traveledKm)}
-                icon={<CheckCircle className="w-5 h-5 text-black" />}
-              />
-            )}
+            {/* 2. PASSENGER ACTIONS (Informational Live Tracking + Cancel Ride with Reasons) */}
+            {role === 'passenger' && (
+              <div className="space-y-2.5">
+                {/* Step 1: Captain on the way */}
+                {isEnRouteToPickup && (
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between text-xs px-3 py-2 bg-amber-50/80 border border-amber-200/90 rounded-2xl text-zinc-800 font-semibold shadow-2xs">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                        Captain is riding to your pickup spot
+                      </span>
+                      <span className="text-[11px] font-mono font-bold text-amber-950 bg-amber-100/90 px-2 py-0.5 rounded-lg border border-amber-300/60">
+                        ETA: {etaMinutes}m
+                      </span>
+                    </div>
 
-            {/* Passenger In Transit notice */}
-            {role === 'passenger' && isInTransit && (
-              <div className="flex items-center justify-between text-xs px-1 text-zinc-600 font-semibold">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  Live Navigation Active
-                </span>
-                <span>To: {activeRide.dropoff.addressLine1 || activeRide.dropoff.formatted.split(',')[0]}</span>
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelModalOpen(true)}
+                      className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-2xl border border-rose-200 shadow-sm transition-all text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <X className="w-4 h-4 stroke-[2.5]" />
+                      <span>Cancel Ride Request</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 2: Captain arrived at pickup */}
+                {isAtPickup && (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-[#FFF9E6] border border-[#F5C518]/60 rounded-2xl text-center shadow-xs">
+                      <div className="text-xs font-black text-amber-950 flex items-center justify-center gap-1.5">
+                        <CheckCircle className="w-4 h-4 text-[#E6A800]" />
+                        <span>Your Captain has arrived at the pickup spot!</span>
+                      </div>
+                      <div className="text-[11px] text-zinc-600 mt-1 font-medium">
+                        Look for <strong>{driver.vehicleModel}</strong> ({driver.plateNumber}). Meet your captain outside.
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelModalOpen(true)}
+                      className="w-full py-3 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-2xl border border-rose-200 shadow-sm transition-all text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <X className="w-4 h-4 stroke-[2.5]" />
+                      <span>Cancel Ride Request</span>
+                    </button>
+                  </div>
+                )}
+
+                {/* Step 3: In Transit to destination */}
+                {isInTransit && (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs px-3 py-2 bg-emerald-50 rounded-2xl border border-emerald-200/90 text-emerald-950 font-semibold shadow-2xs">
+                      <span className="flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                        Live Navigation to Destination Active
+                      </span>
+                      <span className="font-mono text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-lg border border-emerald-300/50">
+                        {remainingKm < 1 ? `${Math.round(remainingKm * 1000)}m` : `${remainingKm}km`}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsCancelModalOpen(true)}
+                      className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-2xl border border-rose-200 shadow-sm transition-all text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+                    >
+                      <X className="w-4 h-4 stroke-[2.5]" />
+                      <span>Cancel Ride</span>
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
             {/* Completed: Finish Ride */}
             {isCompleted && (
               <div className="flex flex-col gap-2">
+                <div className="p-2.5 rounded-2xl bg-emerald-50 border border-emerald-300 flex items-center justify-between text-xs">
+                  <span className="font-black text-emerald-950 flex items-center gap-1.5">
+                    <CheckCircle className="w-4 h-4 text-emerald-600" />
+                    Trip Completed & Saved!
+                  </span>
+                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">
+                    Archived to History
+                  </span>
+                </div>
+
                 <button
                   type="button"
                   onClick={() => setIsReportModalOpen(true)}
@@ -1155,6 +1218,19 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
         reportedName={role === 'rider' ? passengerName : driver.name}
         reportedPhone={role === 'rider' ? passengerPhone : driver.phone}
         rideId={activeRide.id}
+      />
+
+      {/* 7. PASSENGER CANCEL RIDE MODAL (With Pathao/Uber authentic cancellation reasons) */}
+      <CancelRideModal
+        isOpen={isCancelModalOpen}
+        onClose={() => setIsCancelModalOpen(false)}
+        onConfirmCancel={(reason) => {
+          setIsCancelModalOpen(false);
+          cancelRide(reason);
+          onResetRide?.();
+        }}
+        driverName={driver.name}
+        vehicleModel={driver.vehicleModel}
       />
     </div>
   );

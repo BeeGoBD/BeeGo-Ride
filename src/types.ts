@@ -108,6 +108,9 @@ export interface RideRequest {
   };
   status: RideStatus;
   createdAt: number;
+  updatedAt?: number;
+  completedAt?: number;
+  cancellationReason?: string;
   routeData?: RouteData;
   pickupRouteData?: RouteData; // route from rider to pickup
   liveTracking?: LiveTrackingData;

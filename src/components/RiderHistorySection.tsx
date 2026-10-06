@@ -18,7 +18,7 @@ import {
   Calendar,
   Flag,
 } from 'lucide-react';
-import { RATE_PER_KM_TAKA, getRealTripHistory } from '../services/rideSync';
+import { RATE_PER_KM_TAKA, getRealTripHistory, fetchAndSyncTripHistory, StoredRealTrip } from '../services/rideSync';
 import { ReportIssueModal } from './ReportIssueModal';
 
 export interface RiderHistoryTrip {
@@ -27,6 +27,7 @@ export interface RiderHistoryTrip {
   time: string;
   passengerName: string;
   passengerId: string;
+  passengerPhone?: string;
   pickup: string;
   dropoff: string;
   distanceKm: number;
@@ -40,21 +41,21 @@ export interface RiderHistoryTrip {
 }
 
 export const RiderHistorySection: React.FC = () => {
-  const loadDriverTrips = (): RiderHistoryTrip[] => {
-    const realHistory = getRealTripHistory();
+  const formatDriverTrips = (realHistory: StoredRealTrip[]): RiderHistoryTrip[] => {
     if (!realHistory || realHistory.length === 0) return [];
     return realHistory.map((h, i) => {
-      const grossFare = h.fareTaka || Math.round((h.distanceKm || 1) * RATE_PER_KM_TAKA);
-      const earnings = Math.round(grossFare * 0.85); // 85% driver earnings
+      const grossFare = h.finalFareTaka || h.fareTaka || Math.round((h.distanceKm || 1) * RATE_PER_KM_TAKA);
+      const earnings = h.riderEarningsTaka || Math.round(grossFare * 0.85); // 85% driver earnings
       return {
         id: h.id || `TRIP-${i + 1}`,
         date: h.date || new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
         time: h.time || new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
         passengerName: h.passengerName || 'Passenger',
         passengerId: h.passengerId || 'PAX-USER',
+        passengerPhone: h.passengerPhone,
         pickup: h.pickup,
         dropoff: h.dropoff,
-        distanceKm: h.distanceKm,
+        distanceKm: h.actualTraveledKm || h.distanceKm,
         grossFareTaka: grossFare,
         riderEarningsTaka: earnings,
         tipTaka: 0,
@@ -66,13 +67,33 @@ export const RiderHistorySection: React.FC = () => {
     });
   };
 
-  const [trips, setTrips] = useState<RiderHistoryTrip[]>(() => loadDriverTrips());
+  const [trips, setTrips] = useState<RiderHistoryTrip[]>(() => formatDriverTrips(getRealTripHistory()));
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTrip, setSelectedTrip] = useState<RiderHistoryTrip | null>(null);
   const [reportingTrip, setReportingTrip] = useState<RiderHistoryTrip | null>(null);
 
   useEffect(() => {
-    setTrips(loadDriverTrips());
+    // Initial sync from backend
+    setTrips(formatDriverTrips(getRealTripHistory()));
+    fetchAndSyncTripHistory().then((synced) => {
+      if (synced && synced.length > 0) {
+        setTrips(formatDriverTrips(synced));
+      }
+    });
+
+    const handleUpdate = () => {
+      fetchAndSyncTripHistory().then((synced) => {
+        setTrips(formatDriverTrips(synced));
+      });
+    };
+
+    window.addEventListener('beego:trip_history_updated', handleUpdate);
+    window.addEventListener('storage', handleUpdate);
+
+    return () => {
+      window.removeEventListener('beego:trip_history_updated', handleUpdate);
+      window.removeEventListener('storage', handleUpdate);
+    };
   }, []);
 
   const filteredTrips = trips.filter((t) => {
@@ -235,6 +256,9 @@ export const RiderHistorySection: React.FC = () => {
               <div className="p-2 rounded-xl bg-[#F8F9FA] border border-zinc-200">
                 <span className="text-[10px] uppercase font-bold text-zinc-400 block">Passenger</span>
                 <span className="font-bold text-[#1A1A1A] block">{selectedTrip.passengerName}</span>
+                {selectedTrip.passengerPhone && (
+                  <span className="text-[11px] text-zinc-500 font-mono block mt-0.5">{selectedTrip.passengerPhone}</span>
+                )}
               </div>
               <div className="p-2 rounded-xl bg-[#F8F9FA] border border-zinc-200">
                 <span className="text-[10px] uppercase font-bold text-zinc-400 block">Pickup</span>

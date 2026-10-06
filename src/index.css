@@ -31,6 +31,13 @@ html, body, #root {
   font-family: inherit;
   width: 100%;
   height: 100%;
+  touch-action: pan-x pan-y !important;
+  -webkit-tap-highlight-color: transparent;
+  transform: translateZ(0);
+}
+
+.leaflet-tile {
+  will-change: transform;
 }
 
 .leaflet-bar a {

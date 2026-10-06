@@ -95,7 +95,16 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
       zoom: initialZoom,
       zoomControl: false,
       attributionControl: false,
+      scrollWheelZoom: true,
+      touchZoom: true,
+      doubleClickZoom: true,
+      dragging: true,
+      preferCanvas: true,
     });
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 200);
 
     const tileUrl = activeKey
       ? `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${encodeURIComponent(
@@ -454,7 +463,7 @@ export const InteractiveLocationMap: React.FC<InteractiveLocationMapProps> = ({
       className="relative w-full h-full min-h-[460px] overflow-hidden bg-zinc-100"
     >
       {/* Leaflet Map Canvas */}
-      <div ref={mapContainerRef} className="w-full h-full min-h-[460px] relative z-0" />
+      <div ref={mapContainerRef} className="w-full h-full min-h-[460px] relative z-0 touch-pan-x touch-pan-y" />
 
       {/* FLOATING NOTIFICATION TOAST (Map Tap Geocoding Feedback) */}
       {(isClickGeocoding || statusNotification) && (

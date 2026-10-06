@@ -278,15 +278,96 @@ async function startServer() {
     }
   }
 
-  // Get active ride in flight (status: requested, accepted, arrived_at_pickup, in_transit)
+  // Save completed trip record to beego_trips_history.json for both passenger and rider
+  function saveTripToHistoryFile(rideOrTrip: any) {
+    if (!rideOrTrip || !rideOrTrip.id) return null;
+    try {
+      const tripsHistoryFile = path.join(DATA_DIR, 'beego_trips_history.json');
+      let trips: any[] = [];
+      if (fs.existsSync(tripsHistoryFile)) {
+        try {
+          trips = JSON.parse(fs.readFileSync(tripsHistoryFile, 'utf-8') || '[]');
+        } catch {}
+      }
+
+      const now = new Date(rideOrTrip.completedAt || rideOrTrip.updatedAt || Date.now());
+      const dateStr = now.toLocaleDateString('en-US', { day: '2-digit', month: 'short', year: 'numeric' });
+      const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      const distanceKm = Number((rideOrTrip.actualTraveledKm || rideOrTrip.distanceKm || 1).toFixed(2));
+      const finalFare = rideOrTrip.finalFareTaka || rideOrTrip.fareTaka || Math.max(70, Math.round(distanceKm * 70));
+      const driverEarnings = Math.round(finalFare * 0.85);
+
+      const tripRecord = {
+        id: rideOrTrip.id,
+        date: rideOrTrip.date || dateStr,
+        time: rideOrTrip.time || timeStr,
+        timestamp: rideOrTrip.timestamp || now.getTime(),
+        pickup: typeof rideOrTrip.pickup === 'string' ? rideOrTrip.pickup : (rideOrTrip.pickup?.formatted || rideOrTrip.pickup?.addressLine1 || 'Pickup Spot'),
+        dropoff: typeof rideOrTrip.dropoff === 'string' ? rideOrTrip.dropoff : (rideOrTrip.dropoff?.formatted || rideOrTrip.dropoff?.addressLine1 || 'Destination Spot'),
+        pickupCoords: rideOrTrip.pickup && typeof rideOrTrip.pickup === 'object' ? { lat: rideOrTrip.pickup.lat, lon: rideOrTrip.pickup.lon } : rideOrTrip.pickupCoords,
+        dropoffCoords: rideOrTrip.dropoff && typeof rideOrTrip.dropoff === 'object' ? { lat: rideOrTrip.dropoff.lat, lon: rideOrTrip.dropoff.lon } : rideOrTrip.dropoffCoords,
+        distanceKm: distanceKm,
+        actualTraveledKm: distanceKm,
+        fareTaka: finalFare,
+        finalFareTaka: finalFare,
+        ratePerKm: 70,
+        riderEarningsTaka: driverEarnings,
+        vehicleType: rideOrTrip.vehicleType || 'bike',
+        tier: 'moto',
+        tierName: 'BeeGo Moto',
+        vehicleModel: rideOrTrip.driverDetails?.vehicleModel || rideOrTrip.vehicleModel || 'Voltx Eco Electric',
+        plateNumber: rideOrTrip.driverDetails?.plateNumber || rideOrTrip.plateNumber || 'Dhaka Metro 45-8921',
+        driverId: rideOrTrip.riderId || rideOrTrip.driverId || 'DRV-9073',
+        driverName: rideOrTrip.driverDetails?.name || rideOrTrip.driverName || 'Captain Tanvir',
+        driverRating: rideOrTrip.driverDetails?.rating || rideOrTrip.driverRating || 4.9,
+        driverPhone: rideOrTrip.driverDetails?.phone || rideOrTrip.driverPhone || '',
+        passengerId: rideOrTrip.passengerId || 'PAX-USER',
+        passengerName: rideOrTrip.passengerName || 'Passenger',
+        passengerPhone: rideOrTrip.passengerPhone || '',
+        paymentMethod: rideOrTrip.paymentMethod || 'cash',
+        transactionRef: rideOrTrip.transactionRef || `TXN-BD-${rideOrTrip.id.replace('RIDE-', '')}-${finalFare}`,
+        status: 'completed',
+        completedAt: rideOrTrip.completedAt || now.getTime(),
+      };
+
+      const filtered = trips.filter((t: any) => t.id !== tripRecord.id);
+      filtered.unshift(tripRecord);
+      fs.writeFileSync(tripsHistoryFile, JSON.stringify(filtered, null, 2), 'utf-8');
+      console.log(`[Trip History] Successfully saved completed trip ${tripRecord.id} to history.`);
+      return tripRecord;
+    } catch (err) {
+      console.error('[Trip History] Failed to save trip to history file:', err);
+      return null;
+    }
+  }
+
+  // Get active ride in flight (status: requested, accepted, arrived_at_pickup, in_transit, or recent completed)
   function getActiveRideRecord(): any | null {
     const rides = loadRides();
     const activeList = Object.values(rides).filter((r: any) =>
-      r && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(r.status)
+      r && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit', 'completed'].includes(r.status)
     );
     if (activeList.length === 0) return null;
-    activeList.sort((a: any, b: any) => (b.createdAt || 0) - (a.createdAt || 0));
-    return activeList[0];
+
+    // Prefer in-flight rides, then sort by latest update
+    activeList.sort((a: any, b: any) => {
+      const aInFlight = ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(a.status);
+      const bInFlight = ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(b.status);
+      if (aInFlight && !bInFlight) return -1;
+      if (!aInFlight && bInFlight) return 1;
+      return (b.updatedAt || b.createdAt || 0) - (a.updatedAt || a.createdAt || 0);
+    });
+
+    const top = activeList[0];
+    // If top is completed, retain it active for 60 seconds so both passenger & rider apps capture completion
+    if (top.status === 'completed') {
+      const age = Date.now() - (top.updatedAt || top.createdAt || 0);
+      if (age > 60000) {
+        return null;
+      }
+    }
+
+    return top;
   }
 
   // Cross-role verification helpers
@@ -1827,7 +1908,7 @@ async function startServer() {
   // POST /api/rides/status - Updates ride status (arrived_at_pickup, in_transit, completed, cancelled, declined)
   app.post('/api/rides/status', (req, res) => {
     try {
-      const { rideId, status, finalFareTaka, actualTraveledKm, liveTracking } = req.body || {};
+      const { rideId, status, finalFareTaka, actualTraveledKm, liveTracking, cancellationReason } = req.body || {};
       const rides = loadRides();
 
       const targetRide = rideId ? rides[rideId] : getActiveRideRecord();
@@ -1836,10 +1917,17 @@ async function startServer() {
       }
 
       if (status) targetRide.status = status;
+      if (cancellationReason) targetRide.cancellationReason = cancellationReason;
       if (finalFareTaka !== undefined) targetRide.finalFareTaka = finalFareTaka;
       if (actualTraveledKm !== undefined) targetRide.actualTraveledKm = actualTraveledKm;
       if (liveTracking) targetRide.liveTracking = liveTracking;
       targetRide.updatedAt = Date.now();
+
+      // If ride is completed, automatically save to trip history for both passenger & driver!
+      if (status === 'completed' || targetRide.status === 'completed') {
+        targetRide.completedAt = targetRide.completedAt || Date.now();
+        saveTripToHistoryFile(targetRide);
+      }
 
       rides[targetRide.id] = targetRide;
       saveRides(rides);
@@ -1918,20 +2006,68 @@ async function startServer() {
       const { rideId } = req.body || {};
       const rides = loadRides();
 
+      let targetToClear: any = null;
       if (rideId && rides[rideId]) {
+        targetToClear = rides[rideId];
         delete rides[rideId];
         saveRides(rides);
       } else {
         const active = getActiveRideRecord();
         if (active) {
+          targetToClear = rides[active.id];
           delete rides[active.id];
           saveRides(rides);
         }
       }
 
+      // Preserve completed rides in history
+      if (targetToClear && targetToClear.status === 'completed') {
+        saveTripToHistoryFile(targetToClear);
+      }
+
       return res.json({ success: true });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to clear ride.' });
+    }
+  });
+
+  // GET /api/rides/history - Returns trips history for both passenger & driver
+  app.get('/api/rides/history', (req, res) => {
+    try {
+      const tripsHistoryFile = path.join(DATA_DIR, 'beego_trips_history.json');
+      let trips: any[] = [];
+      if (fs.existsSync(tripsHistoryFile)) {
+        try {
+          trips = JSON.parse(fs.readFileSync(tripsHistoryFile, 'utf-8') || '[]');
+        } catch {}
+      }
+
+      // Also ensure any completed ride currently in active rides is indexed into history
+      const activeRides = loadRides();
+      Object.values(activeRides).forEach((r: any) => {
+        if (r && r.status === 'completed' && !trips.some((t: any) => t.id === r.id)) {
+          const saved = saveTripToHistoryFile(r);
+          if (saved) trips.unshift(saved);
+        }
+      });
+
+      return res.json({ success: true, trips });
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to retrieve trip history.' });
+    }
+  });
+
+  // POST /api/rides/history - Save completed trip to history
+  app.post('/api/rides/history', (req, res) => {
+    try {
+      const trip = req.body;
+      if (!trip || !trip.id) {
+        return res.status(400).json({ error: 'Invalid trip payload.' });
+      }
+      const saved = saveTripToHistoryFile(trip);
+      return res.json({ success: true, trip: saved || trip });
+    } catch (e) {
+      return res.status(500).json({ error: 'Failed to save trip history.' });
     }
   });
 

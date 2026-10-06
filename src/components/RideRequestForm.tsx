@@ -27,11 +27,12 @@ import {
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, PaymentMethod } from '../types';
 import { searchAddress, reverseGeocode, calculateRoute, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
-import { RATE_PER_KM_TAKA, updatePassengerLiveLocation } from '../services/rideSync';
+import { RATE_PER_KM_TAKA, updatePassengerLiveLocation, cancelRide } from '../services/rideSync';
 import { searchBangladeshDistricts, isLocationInBangladesh } from '../data/bangladeshDistricts';
 import { requestLiveCoordinates, watchLiveCoordinates, getPreferredCity, setPreferredCity, getDefaultSpot } from '../services/geolocation';
 import { InteractiveLocationMap, PinMode } from './InteractiveLocationMap';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { CancelRideModal } from './CancelRideModal';
 import {
   getStoredDescopeUser,
   saveStoredDescopeUser,
@@ -89,6 +90,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
   const [isPickupFocused, setIsPickupFocused] = useState(false);
   const [isDropoffFocused, setIsDropoffFocused] = useState(false);
   const [isSearchCardCollapsed, setIsSearchCardCollapsed] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
 
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState<PaymentMethod>('cash');
   const [userLiveGps, setUserLiveGps] = useState<{ lat: number; lon: number; accuracy?: number } | null>(null);
@@ -535,18 +537,11 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
 
               <button
                 type="button"
-                onClick={() => {
-                  setPickup(null);
-                  setPickupInput('');
-                  setDropoff(null);
-                  setDropoffInput('');
-                  setAutoRouteData(null);
-                  setIsSearchCardCollapsed(false);
-                  onCancelRide();
-                }}
-                className="w-full max-w-sm mx-auto py-3 px-5 rounded-2xl text-xs font-bold text-zinc-600 hover:text-black bg-zinc-100 hover:bg-zinc-200 border border-zinc-200 transition-all cursor-pointer active:scale-95 block"
+                onClick={() => setIsCancelModalOpen(true)}
+                className="w-full max-w-sm mx-auto py-3 px-5 rounded-2xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
               >
-                Cancel Ride Request
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span>Cancel Ride Request</span>
               </button>
             </div>
           )}
@@ -581,10 +576,20 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 </div>
               </div>
 
-              <div className="text-xs text-zinc-600 flex items-center justify-center gap-2 font-medium">
+              <div className="text-xs text-zinc-600 flex items-center justify-center gap-2 font-medium mb-4">
                 <Loader2 className="w-3.5 h-3.5 animate-spin text-[#E6A800]" />
                 <span>Live route sync active • Fare: ৳{activeRide.fareTaka} Cash</span>
               </div>
+
+              {/* Cancel Button during Accepted Stage */}
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(true)}
+                className="w-full max-w-sm mx-auto py-3 px-5 rounded-2xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span>Cancel Ride Request</span>
+              </button>
             </div>
           )}
 
@@ -618,12 +623,37 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                 </div>
               </div>
 
-              <p className="text-xs text-zinc-400 font-medium">
-                Trip navigation will begin as soon as the captain starts driving.
-              </p>
+              {/* Cancel Button during Arrived Stage */}
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(true)}
+                className="w-full max-w-sm mx-auto py-3 px-5 rounded-2xl text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 transition-all cursor-pointer active:scale-95 flex items-center justify-center gap-1.5"
+              >
+                <X className="w-4 h-4 stroke-[2.5]" />
+                <span>Cancel Ride Request</span>
+              </button>
             </div>
           )}
         </div>
+
+        {/* Modal: Uber/Pathao Cancellation Reasons */}
+        <CancelRideModal
+          isOpen={isCancelModalOpen}
+          onClose={() => setIsCancelModalOpen(false)}
+          onConfirmCancel={(reason) => {
+            cancelRide(reason);
+            setPickup(null);
+            setPickupInput('');
+            setDropoff(null);
+            setDropoffInput('');
+            setAutoRouteData(null);
+            setIsSearchCardCollapsed(false);
+            setIsCancelModalOpen(false);
+            onCancelRide();
+          }}
+          driverName={activeRide?.driverDetails?.name || 'Captain'}
+          vehicleModel={activeRide?.driverDetails?.vehicleModel}
+        />
       </div>
     );
   }

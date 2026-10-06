@@ -48,6 +48,14 @@ if (typeof window !== 'undefined') {
 }
 
 function notifyListeners(ride: RideRequest | null) {
+  if (ride && ride.status === 'completed') {
+    try {
+      saveCompletedRideToHistory(ride);
+    } catch (e) {
+      console.warn('Error auto-saving completed ride to history:', e);
+    }
+  }
+
   listeners.forEach((listener) => {
     try {
       listener(ride);
@@ -210,21 +218,31 @@ export interface StoredRealTrip {
   timestamp: number;
   pickup: string;
   dropoff: string;
+  pickupCoords?: { lat: number; lon: number };
+  dropoffCoords?: { lat: number; lon: number };
   distanceKm: number;
+  actualTraveledKm?: number;
   fareTaka: number;
+  finalFareTaka?: number;
+  riderEarningsTaka?: number;
   vehicleType: 'bike' | 'car';
   tier: 'moto' | 'select' | 'sedan';
   tierName: string;
   ratePerKm: number;
   vehicleModel: string;
   plateNumber: string;
+  driverId?: string;
   driverName: string;
   driverRating: number;
+  driverPhone?: string;
   passengerId: string;
   passengerName?: string;
+  passengerPhone?: string;
   paymentMethod: PaymentMethod;
   transactionRef: string;
   status: 'completed';
+  completedAt?: number;
+  durationMinutes?: number;
 }
 
 export function getRealTripHistory(): StoredRealTrip[] {
@@ -243,9 +261,107 @@ export function saveRealTrip(trip: StoredRealTrip) {
     const current = getRealTripHistory();
     const updated = [trip, ...current.filter((t) => t.id !== trip.id)];
     localStorage.setItem(REAL_TRIP_HISTORY_KEY, JSON.stringify(updated));
+    localStorage.setItem('beego_passenger_activity_history', JSON.stringify(updated));
+    localStorage.setItem('beego_driver_activity_history', JSON.stringify(updated));
+    window.dispatchEvent(new CustomEvent('beego:trip_history_updated', { detail: trip }));
   } catch (e) {
     console.error('Failed to save real trip history', e);
   }
+}
+
+/**
+ * Automatically converts a completed ride into a history trip and saves it
+ * for both passenger and driver across devices.
+ */
+export function saveCompletedRideToHistory(ride: RideRequest): StoredRealTrip | null {
+  if (!ride || !ride.id) return null;
+
+  const now = new Date(ride.updatedAt || Date.now());
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+  const traveled = ride.actualTraveledKm && ride.actualTraveledKm > 0
+    ? Number(ride.actualTraveledKm.toFixed(2))
+    : ride.distanceKm || 1;
+  const finalFare = ride.finalFareTaka || ride.fareTaka || Math.max(RATE_PER_KM_TAKA, Math.round(traveled * RATE_PER_KM_TAKA));
+  const driverEarnings = Math.round(finalFare * 0.85);
+
+  const tripRecord: StoredRealTrip = {
+    id: ride.id,
+    date: dateStr,
+    time: timeStr,
+    timestamp: now.getTime(),
+    pickup: ride.pickup?.formatted || ride.pickup?.addressLine1 || 'Pickup Spot',
+    dropoff: ride.dropoff?.formatted || ride.dropoff?.addressLine1 || 'Destination',
+    pickupCoords: ride.pickup ? { lat: ride.pickup.lat, lon: ride.pickup.lon } : undefined,
+    dropoffCoords: ride.dropoff ? { lat: ride.dropoff.lat, lon: ride.dropoff.lon } : undefined,
+    distanceKm: traveled,
+    actualTraveledKm: traveled,
+    fareTaka: finalFare,
+    finalFareTaka: finalFare,
+    riderEarningsTaka: driverEarnings,
+    vehicleType: ride.vehicleType || 'bike',
+    tier: 'moto',
+    tierName: 'BeeGo Moto',
+    ratePerKm: RATE_PER_KM_TAKA,
+    vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
+    plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
+    driverId: ride.riderId || 'DRV-9073',
+    driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
+    driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
+    driverPhone: ride.driverDetails?.phone,
+    passengerId: ride.passengerId,
+    passengerName: ride.passengerName || 'Passenger',
+    passengerPhone: ride.passengerPhone,
+    paymentMethod: ride.paymentMethod || 'cash',
+    transactionRef: `TXN-BD-${ride.id.replace('RIDE-', '')}-${finalFare}`,
+    status: 'completed',
+    completedAt: now.getTime(),
+    durationMinutes: ride.durationMinutes,
+  };
+
+  saveRealTrip(tripRecord);
+
+  // Sync to server history endpoint
+  fetch('/api/rides/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tripRecord),
+  }).catch(() => {});
+
+  return tripRecord;
+}
+
+/**
+ * Fetches trip history from backend server and merges with local storage
+ * to guarantee passenger and driver both have full history across devices.
+ */
+export async function fetchAndSyncTripHistory(): Promise<StoredRealTrip[]> {
+  const localTrips = getRealTripHistory();
+  if (typeof window === 'undefined') return localTrips;
+
+  try {
+    const res = await fetch('/api/rides/history');
+    if (res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const serverTrips: StoredRealTrip[] = Array.isArray(data?.trips) ? data.trips : [];
+      if (serverTrips.length > 0) {
+        const tripMap = new Map<string, StoredRealTrip>();
+        localTrips.forEach((t) => tripMap.set(t.id, t));
+        serverTrips.forEach((t) => tripMap.set(t.id, { ...tripMap.get(t.id), ...t }));
+        const merged = Array.from(tripMap.values()).sort(
+          (a, b) => (b.timestamp || b.completedAt || 0) - (a.timestamp || a.completedAt || 0)
+        );
+        localStorage.setItem(REAL_TRIP_HISTORY_KEY, JSON.stringify(merged));
+        localStorage.setItem('beego_passenger_activity_history', JSON.stringify(merged));
+        localStorage.setItem('beego_driver_activity_history', JSON.stringify(merged));
+        window.dispatchEvent(new CustomEvent('beego:trip_history_updated', { detail: merged[0] }));
+        return merged;
+      }
+    }
+  } catch (err) {
+    // Offline or server unreachable
+  }
+  return localTrips;
 }
 
 /**
@@ -456,6 +572,7 @@ export function completeTrip(actualTraveledKm?: number): RideRequest | null {
     status: 'completed',
     actualTraveledKm: traveled,
     finalFareTaka: finalFare,
+    updatedAt: Date.now(),
   };
 
   saveAndBroadcastRide(updated);
@@ -471,34 +588,8 @@ export function completeTrip(actualTraveledKm?: number): RideRequest | null {
     }),
   }).catch(() => {});
 
-  // Save to Real Trip History (no mock data)
-  const now = new Date();
-  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStr = now.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
-
-  saveRealTrip({
-    id: current.id,
-    date: dateStr,
-    time: timeStr,
-    timestamp: Date.now(),
-    pickup: current.pickup.formatted,
-    dropoff: current.dropoff.formatted,
-    distanceKm: traveled,
-    fareTaka: finalFare,
-    vehicleType: 'bike',
-    tier: 'moto',
-    tierName: 'Beego Moto',
-    ratePerKm: RATE_PER_KM_TAKA,
-    vehicleModel: current.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
-    plateNumber: current.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
-    driverName: current.driverDetails?.name || DEFAULT_DRIVER.name,
-    driverRating: current.driverDetails?.rating || DEFAULT_DRIVER.rating,
-    passengerId: current.passengerId,
-    passengerName: current.passengerName,
-    paymentMethod: current.paymentMethod || 'cash',
-    transactionRef: `TXN-BD-${current.id.replace('RIDE-', '')}-${finalFare}`,
-    status: 'completed',
-  });
+  // Save to Real Trip History and sync across devices & server
+  saveCompletedRideToHistory(updated);
 
   return updated;
 }
@@ -525,15 +616,17 @@ export function declineRide(): void {
 }
 
 /**
- * Passenger cancels request
+ * Passenger cancels request with optional reason
  */
-export function cancelRide(): void {
+export function cancelRide(reason?: string): void {
   const current = getStoredRide();
   if (!current) return;
 
   const updated: RideRequest = {
     ...current,
     status: 'cancelled',
+    cancellationReason: reason || 'Cancelled by passenger',
+    updatedAt: Date.now(),
   };
 
   saveAndBroadcastRide(updated);
@@ -541,7 +634,11 @@ export function cancelRide(): void {
   fetch('/api/rides/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ rideId: updated.id, status: 'cancelled' }),
+    body: JSON.stringify({
+      rideId: updated.id,
+      status: 'cancelled',
+      cancellationReason: reason || 'Cancelled by passenger',
+    }),
   }).catch(() => {});
 }
 
@@ -551,6 +648,11 @@ export function cancelRide(): void {
 export function clearCurrentRide(): void {
   const current = getStoredRide();
   if (current) {
+    if (current.status === 'completed') {
+      try {
+        saveCompletedRideToHistory(current);
+      } catch {}
+    }
     fetch('/api/rides/clear', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

@@ -23,8 +23,12 @@ import {
   Radio,
   Clock,
   ChevronRight,
+  Receipt,
+  Plus,
+  Minus,
 } from 'lucide-react';
 import { LocationPoint, RideRequest, RouteData, DriverProfile, DriverVerificationStatus } from '../types';
+import { SwipeActionSlider } from './SwipeActionSlider';
 import {
   acceptRide,
   arriveAtPickupSpot,
@@ -59,67 +63,6 @@ interface RiderDashboardProps {
   hideHeader?: boolean;
 }
 
-// Interactive Swipe to Confirm Slider (Pathao / Uber style for drivers)
-const SwipeActionSlider: React.FC<{
-  label: string;
-  onConfirm: () => void;
-  icon?: React.ReactNode;
-}> = ({ label, onConfirm, icon }) => {
-  const [sliderX, setSliderX] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  const startDrag = () => setIsDragging(true);
-
-  const onDrag = (clientX: number) => {
-    if (!isDragging || !containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    const maxDrag = rect.width - 56;
-    const currentDrag = Math.max(0, Math.min(clientX - rect.left - 24, maxDrag));
-    setSliderX(currentDrag);
-
-    if (currentDrag >= maxDrag * 0.85) {
-      setIsDragging(false);
-      setSliderX(0);
-      onConfirm();
-    }
-  };
-
-  const stopDrag = () => {
-    if (!isDragging) return;
-    setIsDragging(false);
-    setSliderX(0);
-  };
-
-  return (
-    <div
-      ref={containerRef}
-      onMouseMove={(e) => onDrag(e.clientX)}
-      onMouseUp={stopDrag}
-      onMouseLeave={stopDrag}
-      onTouchMove={(e) => onDrag(e.touches[0].clientX)}
-      onTouchEnd={stopDrag}
-      className="relative w-full h-14 rounded-2xl bg-zinc-900 border-2 border-[#F5C518]/60 overflow-hidden flex items-center p-1.5 select-none shadow-xl cursor-grab active:cursor-grabbing"
-    >
-      <div
-        style={{ width: `${sliderX + 50}px` }}
-        className="absolute left-0 top-0 bottom-0 bg-[#F5C518]/25 transition-all pointer-events-none"
-      />
-      <div className="w-full text-center text-xs font-black uppercase tracking-wider text-zinc-200 pointer-events-none z-10 flex items-center justify-center gap-1.5 px-12">
-        <span>{label}</span>
-      </div>
-      <div
-        style={{ transform: `translateX(${sliderX}px)` }}
-        onMouseDown={startDrag}
-        onTouchStart={startDrag}
-        className="absolute left-1.5 w-11 h-11 rounded-xl bg-[#F5C518] text-black shadow-md flex items-center justify-center z-20 cursor-pointer active:scale-95 transition-transform"
-      >
-        {icon || <ArrowRight className="w-5 h-5 stroke-[2.5]" />}
-      </div>
-    </div>
-  );
-};
-
 export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   riderId,
   activeRide,
@@ -136,6 +79,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   const mapInstanceRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.Polyline | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const hasFittedRouteRef = useRef<string | null>(null);
+
+  // Camera lock state: when true, camera follows GPS/route. When user pans/zooms map, camera unlocks smoothly!
+  const [isCameraLocked, setIsCameraLocked] = useState<boolean>(true);
 
   // Driver profile & verification status
   const [driverProfile, setDriverProfile] = useState<DriverProfile | null>(() => getCurrentDriver());
@@ -277,7 +224,22 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         zoom: 14,
         zoomControl: false,
         attributionControl: false,
+        scrollWheelZoom: true,
+        touchZoom: true,
+        doubleClickZoom: true,
+        dragging: true,
+        preferCanvas: true,
       });
+
+      // Detect user pan, drag, or pinch zoom to unlock camera follow
+      const unlockCamera = () => setIsCameraLocked(false);
+      map.on('dragstart', unlockCamera);
+      map.on('zoomstart', unlockCamera);
+      map.on('movestart', (e: any) => {
+        if (e.originalEvent) unlockCamera();
+      });
+      map.on('wheel', unlockCamera);
+      map.on('touchstart', unlockCamera);
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         maxZoom: 19,
@@ -364,6 +326,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
           ? activeRide.routeData.coordinates
           : null;
 
+      // Only fit bounds ONCE per stage or ride id to let driver freely zoom & pan without interruption
+      const stageKey = `${activeRide.id}-${activeRide.status}`;
+      const shouldFitBounds = hasFittedRouteRef.current !== stageKey;
+
       if (currentCoords && currentCoords.length > 0) {
         const poly = L.polyline(currentCoords, {
           color: '#E6A800',
@@ -373,14 +339,20 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         }).addTo(map);
 
         routeLayerRef.current = poly;
-        map.fitBounds(poly.getBounds(), { padding: [35, 35] });
+        if (shouldFitBounds) {
+          hasFittedRouteRef.current = stageKey;
+          map.fitBounds(poly.getBounds(), { padding: [35, 35] });
+        }
       } else {
-        const bounds = L.latLngBounds([
-          riderPos,
-          [activeRide.pickup.lat, activeRide.pickup.lon],
-          [activeRide.dropoff.lat, activeRide.dropoff.lon],
-        ]);
-        map.fitBounds(bounds, { padding: [35, 35] });
+        if (shouldFitBounds) {
+          hasFittedRouteRef.current = stageKey;
+          const bounds = L.latLngBounds([
+            riderPos,
+            [activeRide.pickup.lat, activeRide.pickup.lon],
+            [activeRide.dropoff.lat, activeRide.dropoff.lon],
+          ]);
+          map.fitBounds(bounds, { padding: [35, 35] });
+        }
       }
     }
   }, [riderLiveGps, activeRide]);
@@ -609,7 +581,42 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
         {/* Leaflet Map Frame (Prominent height occupying the top space) */}
         <div className="w-full h-72 sm:h-80 relative overflow-hidden">
-          <div ref={mapContainerRef} className="w-full h-full" />
+          <div
+            ref={mapContainerRef}
+            onPointerDown={() => setIsCameraLocked(false)}
+            className="w-full h-full touch-pan-x touch-pan-y"
+          />
+
+          {/* Floating Zoom & Map Controls for Rider */}
+          <div className="absolute right-3 bottom-3 z-[400] flex flex-col gap-1.5 pointer-events-auto">
+            <div className="flex flex-col bg-white/95 backdrop-blur-md rounded-2xl border border-zinc-200/90 shadow-md overflow-hidden divide-y divide-zinc-200">
+              <button
+                type="button"
+                onClick={() => mapInstanceRef.current?.zoomIn()}
+                title="Zoom in"
+                className="w-9 h-9 hover:bg-zinc-100 active:bg-zinc-200 flex items-center justify-center text-zinc-800 transition-colors cursor-pointer"
+              >
+                <Plus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+              <button
+                type="button"
+                onClick={() => mapInstanceRef.current?.zoomOut()}
+                title="Zoom out"
+                className="w-9 h-9 hover:bg-zinc-100 active:bg-zinc-200 flex items-center justify-center text-zinc-800 transition-colors cursor-pointer"
+              >
+                <Minus className="w-4 h-4 stroke-[2.5]" />
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRecenterGps}
+              title="Recenter GPS"
+              className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-800 hover:text-amber-500 cursor-pointer transition-colors active:scale-95"
+            >
+              <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-[#E6A800]' : 'text-[#E6A800]'}`} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -916,8 +923,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
             {/* Swipe Action: Slide to Confirm Reached Pickup Spot */}
             <SwipeActionSlider
-              label="Slide: Reached Pickup Spot"
+              key="rider-step-1-arrived"
+              label="Slide: I Have Arrived at Pickup Spot"
               onConfirm={() => arriveAtPickupSpot()}
+              stepNumber={1}
+              totalSteps={3}
               icon={<CheckCircle2 className="w-5 h-5 text-black" />}
             />
           </div>
@@ -993,8 +1003,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
             {/* Swipe Action: Slide to Start Trip to Destination */}
             <SwipeActionSlider
-              label="Slide: Picked Up Passenger (Start Trip)"
+              key="rider-step-2-start-trip"
+              label="Slide: Passenger On Board (Start Trip)"
               onConfirm={() => startTripToDestination()}
+              stepNumber={2}
+              totalSteps={3}
               icon={<Navigation className="w-5 h-5 fill-black" />}
             />
           </div>
@@ -1065,8 +1078,11 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
             {/* Swipe Action: Slide to Complete Ride at Destination */}
             <SwipeActionSlider
-              label="Slide: Complete Ride (Destination Reached)"
+              key="rider-step-3-complete-ride"
+              label="Slide: Reached Destination (Complete Ride)"
               onConfirm={() => completeTrip(activeRide.distanceKm)}
+              stepNumber={3}
+              totalSteps={3}
               icon={<CheckCircle2 className="w-5 h-5 text-black" />}
             />
           </div>
@@ -1102,20 +1118,34 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
               <button
                 type="button"
                 onClick={() => setIsReportModalOpen(true)}
-                className="w-full py-2.5 px-4 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 text-xs shadow-2xs"
+                className="w-full py-2 px-4 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-700 font-bold rounded-2xl transition-all flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 text-xs shadow-2xs"
               >
                 <Flag className="w-3.5 h-3.5 text-rose-600 fill-rose-600" />
                 <span>Report Passenger Incident / Dispute</span>
               </button>
+
+              {onOpenMyTrips && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    clearCurrentRide();
+                    onOpenMyTrips();
+                  }}
+                  className="w-full py-2.5 bg-white hover:bg-zinc-50 border border-zinc-200 text-zinc-900 font-bold rounded-2xl transition-all flex items-center justify-center gap-2 cursor-pointer text-xs shadow-2xs"
+                >
+                  <Receipt className="w-4 h-4 text-[#E6A800]" />
+                  <span>View in My Trips & Earnings</span>
+                </button>
+              )}
 
               <button
                 type="button"
                 onClick={() => {
                   clearCurrentRide();
                 }}
-                className="w-full py-3.5 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 bg-[#F5C518] hover:bg-[#E6A800] text-black font-black rounded-2xl transition-all shadow-lg shadow-amber-400/25 flex items-center justify-center gap-2 cursor-pointer"
               >
-                <span>Complete Trip & Back to Radar</span>
+                <span>Back to Radar (Ready for New Rides)</span>
               </button>
             </div>
           </div>
