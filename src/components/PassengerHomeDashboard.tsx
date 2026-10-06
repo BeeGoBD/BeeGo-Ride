@@ -80,9 +80,10 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       subtitle: 'Never pay peak or rain surge pricing anywhere in Bangladesh',
       tag: 'HONEST FARE',
       badgeBg: 'bg-[#F5C518] text-black',
-      bgGradient: 'from-zinc-900 via-zinc-800 to-zinc-950',
+      bgGradient: 'from-zinc-950 via-zinc-900 to-black',
+      bgImage: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?auto=format&fit=crop&w=800&q=80',
       textColor: 'text-white',
-      subTextColor: 'text-zinc-300',
+      subTextColor: 'text-zinc-200',
       action: () => onTakeRide(),
       actionText: 'Book Ride',
     },
@@ -92,9 +93,10 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       subtitle: 'Unlimited fast battery swaps at 12+ city hubs',
       tag: 'NEW LAUNCH',
       badgeBg: 'bg-emerald-500 text-white',
-      bgGradient: 'from-[#1A1A1A] via-zinc-900 to-emerald-950',
+      bgGradient: 'from-[#0a1811] via-zinc-950 to-emerald-950',
+      bgImage: 'https://images.unsplash.com/photo-1593941707882-a5bba14938c7?auto=format&fit=crop&w=800&q=80',
       textColor: 'text-white',
-      subTextColor: 'text-zinc-300',
+      subTextColor: 'text-zinc-200',
       action: onOpenPowerStations,
       actionText: 'Find Stations',
     },
@@ -104,9 +106,10 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       subtitle: 'Earn 10 points per kilometer to redeem free electric rides',
       tag: 'REWARDS',
       badgeBg: 'bg-amber-400 text-black',
-      bgGradient: 'from-amber-950 via-zinc-900 to-black',
+      bgGradient: 'from-amber-950 via-zinc-950 to-black',
+      bgImage: 'https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=800&q=80',
       textColor: 'text-white',
-      subTextColor: 'text-zinc-300',
+      subTextColor: 'text-zinc-200',
       action: onOpenOffers,
       actionText: 'View Offers',
     },
@@ -605,9 +608,20 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               }}
               onMouseEnter={() => setIsSpotlightPaused(true)}
               onMouseLeave={() => setIsSpotlightPaused(false)}
-              className={`p-4 rounded-3xl bg-gradient-to-r ${card.bgGradient} border border-zinc-800 shadow-xl flex flex-col justify-between gap-3.5 transition-all duration-300 relative overflow-hidden select-none`}
+              className={`p-4 rounded-3xl bg-zinc-950 border border-zinc-800 shadow-xl flex flex-col justify-between gap-3.5 transition-all duration-300 relative overflow-hidden select-none`}
             >
-              <div className="flex items-start justify-between">
+              {/* Background Image with Layered Gradient Overlay */}
+              <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
+                <img
+                  src={card.bgImage}
+                  alt=""
+                  className="w-full h-full object-cover object-center scale-105 opacity-35 filter brightness-90 contrast-125 transition-transform duration-700 ease-out"
+                />
+                <div className={`absolute inset-0 bg-gradient-to-r ${card.bgGradient} opacity-80 mix-blend-multiply`} />
+                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-black/20 opacity-90" />
+              </div>
+
+              <div className="flex items-start justify-between relative z-10">
                 <div>
                   <span className={`text-[9px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs ${card.badgeBg}`}>
                     {card.tag}
@@ -621,7 +635,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="flex items-center justify-between pt-1 border-t border-white/10">
+              <div className="flex items-center justify-between pt-1 border-t border-white/10 relative z-10">
                 <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-medium">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
                   <span>Dhaka • 64 Districts</span>

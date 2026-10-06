@@ -54,6 +54,12 @@ function notifyListeners(ride: RideRequest | null) {
     } catch (e) {
       console.warn('Error auto-saving completed ride to history:', e);
     }
+  } else if (ride && ride.status === 'cancelled') {
+    try {
+      saveCancelledRideToHistory(ride, ride.cancellationReason);
+    } catch (e) {
+      console.warn('Error auto-saving cancelled ride to history:', e);
+    }
   }
 
   listeners.forEach((listener) => {
@@ -240,7 +246,9 @@ export interface StoredRealTrip {
   passengerPhone?: string;
   paymentMethod: PaymentMethod;
   transactionRef: string;
-  status: 'completed';
+  status: 'completed' | 'cancelled';
+  cancellationReason?: string;
+  tipTaka?: number;
   completedAt?: number;
   durationMinutes?: number;
 }
@@ -317,6 +325,65 @@ export function saveCompletedRideToHistory(ride: RideRequest): StoredRealTrip | 
     status: 'completed',
     completedAt: now.getTime(),
     durationMinutes: ride.durationMinutes,
+  };
+
+  saveRealTrip(tripRecord);
+
+  // Sync to server history endpoint
+  fetch('/api/rides/history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(tripRecord),
+  }).catch(() => {});
+
+  return tripRecord;
+}
+
+/**
+ * Saves a cancelled ride into history so passengers & drivers can audit past cancellations
+ */
+export function saveCancelledRideToHistory(ride: RideRequest, reason?: string): StoredRealTrip | null {
+  if (!ride || !ride.id) return null;
+
+  const now = new Date(ride.updatedAt || Date.now());
+  const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const dateStr = now.toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' });
+  const cancelReason = reason || ride.cancellationReason || 'Cancelled by passenger';
+
+  const tripRecord: StoredRealTrip = {
+    id: ride.id,
+    date: dateStr,
+    time: timeStr,
+    timestamp: now.getTime(),
+    pickup: ride.pickup?.formatted || ride.pickup?.addressLine1 || 'Pickup Spot',
+    dropoff: ride.dropoff?.formatted || ride.dropoff?.addressLine1 || 'Destination',
+    pickupCoords: ride.pickup ? { lat: ride.pickup.lat, lon: ride.pickup.lon } : undefined,
+    dropoffCoords: ride.dropoff ? { lat: ride.dropoff.lat, lon: ride.dropoff.lon } : undefined,
+    distanceKm: ride.distanceKm || 1,
+    actualTraveledKm: 0,
+    fareTaka: 0,
+    finalFareTaka: 0,
+    riderEarningsTaka: 0,
+    tipTaka: 0,
+    vehicleType: ride.vehicleType || 'bike',
+    tier: 'moto',
+    tierName: 'BeeGo Moto',
+    ratePerKm: RATE_PER_KM_TAKA,
+    vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
+    plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
+    driverId: ride.riderId || 'DRV-9073',
+    driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
+    driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
+    driverPhone: ride.driverDetails?.phone,
+    passengerId: ride.passengerId,
+    passengerName: ride.passengerName || 'Passenger',
+    passengerPhone: ride.passengerPhone,
+    paymentMethod: ride.paymentMethod || 'cash',
+    transactionRef: `CANCELLED-${ride.id.replace('RIDE-', '')}`,
+    status: 'cancelled',
+    cancellationReason: cancelReason,
+    completedAt: now.getTime(),
+    durationMinutes: 0,
   };
 
   saveRealTrip(tripRecord);
@@ -622,12 +689,19 @@ export function cancelRide(reason?: string): void {
   const current = getStoredRide();
   if (!current) return;
 
+  const cancelReason = reason || 'Cancelled by passenger';
   const updated: RideRequest = {
     ...current,
     status: 'cancelled',
-    cancellationReason: reason || 'Cancelled by passenger',
+    cancellationReason: cancelReason,
     updatedAt: Date.now(),
   };
+
+  try {
+    saveCancelledRideToHistory(updated, cancelReason);
+  } catch (e) {
+    console.warn('Error saving cancelled ride in cancelRide:', e);
+  }
 
   saveAndBroadcastRide(updated);
 
@@ -637,7 +711,7 @@ export function cancelRide(reason?: string): void {
     body: JSON.stringify({
       rideId: updated.id,
       status: 'cancelled',
-      cancellationReason: reason || 'Cancelled by passenger',
+      cancellationReason: cancelReason,
     }),
   }).catch(() => {});
 }

@@ -41,7 +41,8 @@ export interface HistoryRideItem {
   driverRating: number;
   driverPhone?: string;
   paymentMethod: string;
-  status: 'completed';
+  status: 'completed' | 'cancelled';
+  cancellationReason?: string;
 }
 
 interface RideHistorySectionProps {
@@ -57,31 +58,36 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
   onCancelRide,
   onViewLiveTracking,
 }) => {
-  const [vehicleFilter, setVehicleFilter] = useState<'bike' | 'car' | 'all'>('bike');
+  const [vehicleFilter, setVehicleFilter] = useState<'bike' | 'car' | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
   const [selectedReceipt, setSelectedReceipt] = useState<HistoryRideItem | null>(null);
   const [reportingTrip, setReportingTrip] = useState<HistoryRideItem | null>(null);
 
   const formatStoredTrips = (realHistory: StoredRealTrip[]): HistoryRideItem[] => {
     if (!realHistory || realHistory.length === 0) return [];
-    return realHistory.map((h, i) => ({
-      id: h.id || `real-${i}`,
-      date: h.date || new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
-      time: h.time || new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      pickup: h.pickup,
-      dropoff: h.dropoff,
-      distanceKm: h.distanceKm,
-      fareTaka: h.fareTaka,
-      vehicleType: (h.vehicleType as 'bike' | 'car') || 'bike',
-      tierName: h.tierName || (h.vehicleType === 'car' ? 'Comfort AC' : 'Bee Moto'),
-      ratePerKm: h.ratePerKm || RATE_PER_KM_TAKA,
-      vehicleModel: h.vehicleModel || 'Voltx Eco Electric',
-      plateNumber: h.plateNumber || 'Dhaka Metro 45-8921',
-      driverName: h.driverName || 'Captain Tanvir',
-      driverRating: h.driverRating || 4.9,
-      driverPhone: h.driverPhone,
-      paymentMethod: h.paymentMethod ? h.paymentMethod.toUpperCase() : 'Cash',
-      status: 'completed',
-    }));
+    return realHistory.map((h, i) => {
+      const isCancelled = h.status === 'cancelled';
+      return {
+        id: h.id || `real-${i}`,
+        date: h.date || new Date(h.timestamp).toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+        time: h.time || new Date(h.timestamp).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        pickup: h.pickup,
+        dropoff: h.dropoff,
+        distanceKm: h.distanceKm || 1,
+        fareTaka: isCancelled ? 0 : (h.fareTaka || h.finalFareTaka || 0),
+        vehicleType: (h.vehicleType as 'bike' | 'car') || 'bike',
+        tierName: h.tierName || (h.vehicleType === 'car' ? 'Comfort AC' : 'Bee Moto'),
+        ratePerKm: h.ratePerKm || RATE_PER_KM_TAKA,
+        vehicleModel: h.vehicleModel || 'Voltx Eco Electric',
+        plateNumber: h.plateNumber || 'Dhaka Metro 45-8921',
+        driverName: h.driverName || 'Captain Tanvir',
+        driverRating: h.driverRating || 4.9,
+        driverPhone: h.driverPhone,
+        paymentMethod: isCancelled ? 'No Charge' : (h.paymentMethod ? h.paymentMethod.toUpperCase() : 'Cash'),
+        status: isCancelled ? 'cancelled' : 'completed',
+        cancellationReason: h.cancellationReason || (isCancelled ? 'Cancelled by passenger' : undefined),
+      };
+    });
   };
 
   const [trips, setTrips] = useState<HistoryRideItem[]>(() => formatStoredTrips(getRealTripHistory()));
@@ -111,9 +117,11 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
     };
   }, [activeRide?.status]);
 
-  const filteredTrips = trips.filter(
-    (t) => vehicleFilter === 'all' || t.vehicleType === vehicleFilter
-  );
+  const filteredTrips = trips.filter((t) => {
+    const matchesVehicle = vehicleFilter === 'all' || t.vehicleType === vehicleFilter;
+    const matchesStatus = statusFilter === 'all' || t.status === statusFilter;
+    return matchesVehicle && matchesStatus;
+  });
 
   const isOngoing =
     activeRide &&
@@ -132,7 +140,7 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
           </div>
           <div>
             <h1 className="text-base font-black text-[#1A1A1A]">Activity</h1>
-            <p className="text-[11px] text-zinc-500 font-medium">Your ongoing and completed trips</p>
+            <p className="text-[11px] text-zinc-500 font-medium">Your ongoing, completed and cancelled trips</p>
           </div>
         </div>
 
@@ -220,45 +228,85 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
         </div>
       )}
 
-      {/* 3. FILTER TABS (Bike is default) */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xs font-black uppercase tracking-wider text-zinc-400">
-          Past Trips
-        </h2>
+      {/* 3. FILTER TABS (Vehicle + Status) */}
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-400">
+            Trip History
+          </h2>
 
-        <div className="flex items-center gap-1 p-1 bg-zinc-200/60 rounded-xl">
+          <div className="flex items-center gap-1 p-0.5 bg-zinc-200/70 rounded-xl">
+            <button
+              type="button"
+              onClick={() => setStatusFilter('all')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                statusFilter === 'all'
+                  ? 'bg-white text-black shadow-xs'
+                  : 'text-zinc-600 hover:text-black'
+              }`}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('completed')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                statusFilter === 'completed'
+                  ? 'bg-white text-black shadow-xs'
+                  : 'text-zinc-600 hover:text-black'
+              }`}
+            >
+              Completed
+            </button>
+            <button
+              type="button"
+              onClick={() => setStatusFilter('cancelled')}
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all cursor-pointer ${
+                statusFilter === 'cancelled'
+                  ? 'bg-rose-500 text-white shadow-xs'
+                  : 'text-zinc-600 hover:text-rose-600'
+              }`}
+            >
+              Cancelled
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setVehicleFilter('all')}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer ${
+              vehicleFilter === 'all'
+                ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
+                : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300'
+            }`}
+          >
+            All Vehicles
+          </button>
           <button
             type="button"
             onClick={() => setVehicleFilter('bike')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
               vehicleFilter === 'bike'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
+                ? 'bg-[#F5C518] text-black border-[#F5C518] shadow-xs'
+                : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300'
             }`}
           >
-            Bike
+            <Bike className="w-3 h-3" />
+            <span>Moto</span>
           </button>
           <button
             type="button"
             onClick={() => setVehicleFilter('car')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            className={`px-3 py-1 rounded-full text-[11px] font-bold border transition-all cursor-pointer flex items-center gap-1 ${
               vehicleFilter === 'car'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
+                ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
+                : 'bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300'
             }`}
           >
-            Car
-          </button>
-          <button
-            type="button"
-            onClick={() => setVehicleFilter('all')}
-            className={`px-3 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-              vehicleFilter === 'all'
-                ? 'bg-white text-black shadow-xs'
-                : 'text-zinc-600 hover:text-black'
-            }`}
-          >
-            All
+            <Car className="w-3 h-3" />
+            <span>Sedan</span>
           </button>
         </div>
       </div>
@@ -267,90 +315,121 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
       <div className="space-y-3">
         {filteredTrips.length === 0 ? (
           <div className="p-8 text-center bg-white rounded-3xl border border-zinc-200 text-zinc-400 text-xs">
-            No completed {vehicleFilter} trips found.
+            No {statusFilter !== 'all' ? statusFilter : ''} {vehicleFilter !== 'all' ? vehicleFilter : ''} trips found.
           </div>
         ) : (
-          filteredTrips.map((trip) => (
-            <div
-              key={trip.id}
-              className="p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-xs hover:border-[#F5C518] hover:shadow-md transition-all flex flex-col gap-3 group"
-            >
-              {/* Top row: Date, Vehicle, Fare */}
-              <div className="flex items-center justify-between border-b border-zinc-100 pb-2.5">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-xl bg-[#FFF9E6] text-[#E6A800] flex items-center justify-center">
-                    {trip.vehicleType === 'bike' ? (
-                      <Bike className="w-4 h-4" />
+          filteredTrips.map((trip) => {
+            const isCancelled = trip.status === 'cancelled';
+            return (
+              <div
+                key={trip.id}
+                className={`p-4 rounded-3xl bg-white border shadow-xs transition-all flex flex-col gap-3 group ${
+                  isCancelled
+                    ? 'border-zinc-200 hover:border-rose-300 bg-gradient-to-br from-white to-zinc-50/50'
+                    : 'border-zinc-200/90 hover:border-[#F5C518] hover:shadow-md'
+                }`}
+              >
+                {/* Top row: Date, Vehicle, Fare / Status */}
+                <div className="flex items-center justify-between border-b border-zinc-100 pb-2.5">
+                  <div className="flex items-center gap-2">
+                    <div
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                        isCancelled
+                          ? 'bg-rose-50 text-rose-500'
+                          : 'bg-[#FFF9E6] text-[#E6A800]'
+                      }`}
+                    >
+                      {trip.vehicleType === 'bike' ? (
+                        <Bike className="w-4 h-4" />
+                      ) : (
+                        <Car className="w-4 h-4" />
+                      )}
+                    </div>
+                    <div>
+                      <span className="text-xs font-black text-[#1A1A1A] block">
+                        {trip.tierName}
+                      </span>
+                      <span className="text-[10px] text-zinc-400 font-medium">
+                        {trip.date} • {trip.time}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="text-right">
+                    <span
+                      className={`text-sm font-black font-mono block ${
+                        isCancelled ? 'text-zinc-400 line-through' : 'text-[#1A1A1A]'
+                      }`}
+                    >
+                      ৳{trip.fareTaka}
+                    </span>
+                    {isCancelled ? (
+                      <span className="text-[10px] text-rose-600 font-bold bg-rose-50 px-2 py-0.5 rounded-md inline-block">
+                        Cancelled
+                      </span>
                     ) : (
-                      <Car className="w-4 h-4" />
+                      <span className="text-[10px] text-emerald-600 font-bold">
+                        Completed • {trip.paymentMethod}
+                      </span>
                     )}
                   </div>
-                  <div>
-                    <span className="text-xs font-black text-[#1A1A1A] block">
-                      {trip.tierName}
-                    </span>
-                    <span className="text-[10px] text-zinc-400 font-medium">
-                      {trip.date} • {trip.time}
-                    </span>
+                </div>
+
+                {/* Route snippet */}
+                <div className="flex flex-col gap-1.5 text-xs">
+                  <div className="flex items-center gap-2 text-zinc-500 truncate">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
+                    <span className="truncate">{trip.pickup}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-zinc-900 font-bold truncate">
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${isCancelled ? 'bg-zinc-400' : 'bg-[#F5C518]'}`} />
+                    <span className="truncate">{trip.dropoff}</span>
                   </div>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-sm font-black font-mono text-[#1A1A1A] block">
-                    ৳{trip.fareTaka}
-                  </span>
-                  <span className="text-[10px] text-emerald-600 font-bold">
-                    Completed • {trip.paymentMethod}
-                  </span>
-                </div>
-              </div>
+                {/* Cancellation Reason note if cancelled */}
+                {isCancelled && trip.cancellationReason && (
+                  <div className="px-2.5 py-1.5 rounded-xl bg-zinc-50 border border-zinc-100 text-[11px] text-zinc-600 flex items-center gap-1.5">
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                    <span className="truncate">Reason: {trip.cancellationReason}</span>
+                  </div>
+                )}
 
-              {/* Route snippet */}
-              <div className="flex flex-col gap-1.5 text-xs">
-                <div className="flex items-center gap-2 text-zinc-500 truncate">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
-                  <span className="truncate">{trip.pickup}</span>
-                </div>
-                <div className="flex items-center gap-2 text-zinc-900 font-bold truncate">
-                  <span className="w-2 h-2 rounded-full bg-[#F5C518] shrink-0" />
-                  <span className="truncate">{trip.dropoff}</span>
-                </div>
-              </div>
+                {/* Rider details & Request Again action button */}
+                <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
+                    <span>Captain: <strong className="text-zinc-800">{trip.driverName}</strong></span>
+                    <span className="flex items-center text-[#E6A800] font-bold">
+                      <Star className="w-3 h-3 fill-[#F5C518] inline ml-1" />
+                      {trip.driverRating}
+                    </span>
+                  </div>
 
-              {/* Rider details & Request Again action button */}
-              <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[11px] text-zinc-500">
-                  <span>Captain: <strong className="text-zinc-800">{trip.driverName}</strong></span>
-                  <span className="flex items-center text-[#E6A800] font-bold">
-                    <Star className="w-3 h-3 fill-[#F5C518] inline ml-1" />
-                    {trip.driverRating}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSelectedReceipt(trip)}
-                    className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
-                    title="View Receipt"
-                  >
-                    <Receipt className="w-4 h-4" />
-                  </button>
-
-                  {onRebookRide && (
+                  <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={() => onRebookRide(trip.dropoff)}
-                      className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                      onClick={() => setSelectedReceipt(trip)}
+                      className="p-1.5 rounded-lg text-zinc-400 hover:text-zinc-700 transition-colors cursor-pointer"
+                      title={isCancelled ? "View Details" : "View Receipt"}
                     >
-                      <RotateCcw className="w-3 h-3 stroke-[2.5]" />
-                      <span>Request Again</span>
+                      <Receipt className="w-4 h-4" />
                     </button>
-                  )}
+
+                    {onRebookRide && (
+                      <button
+                        type="button"
+                        onClick={() => onRebookRide(trip.dropoff)}
+                        className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-all cursor-pointer shadow-xs active:scale-95 flex items-center gap-1"
+                      >
+                        <RotateCcw className="w-3 h-3 stroke-[2.5]" />
+                        <span>{isCancelled ? 'Rebook Ride' : 'Request Again'}</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -372,15 +451,17 @@ export const RideHistorySection: React.FC<RideHistorySectionProps> = ({
               </button>
             </div>
 
-            <div className="text-center py-2 bg-[#F8F9FA] rounded-2xl border border-zinc-200/60">
+            <div className="text-center py-2.5 bg-[#F8F9FA] rounded-2xl border border-zinc-200/60">
               <span className="text-[10px] uppercase font-mono font-bold text-zinc-400 block">
-                Total Paid
+                {selectedReceipt.status === 'cancelled' ? 'Trip Status' : 'Total Paid'}
               </span>
-              <span className="text-2xl font-black text-[#1A1A1A]">
-                ৳{selectedReceipt.fareTaka}
+              <span className={`text-2xl font-black ${selectedReceipt.status === 'cancelled' ? 'text-rose-600' : 'text-[#1A1A1A]'}`}>
+                {selectedReceipt.status === 'cancelled' ? 'Cancelled' : `৳${selectedReceipt.fareTaka}`}
               </span>
-              <span className="text-[11px] text-emerald-600 font-bold block mt-0.5">
-                Paid in Cash to Captain
+              <span className={`text-[11px] font-bold block mt-0.5 ${selectedReceipt.status === 'cancelled' ? 'text-rose-500' : 'text-emerald-600'}`}>
+                {selectedReceipt.status === 'cancelled'
+                  ? (selectedReceipt.cancellationReason || 'No fee charged to account')
+                  : 'Paid in Cash to Captain'}
               </span>
             </div>
 

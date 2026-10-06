@@ -325,8 +325,9 @@ async function startServer() {
         passengerName: rideOrTrip.passengerName || 'Passenger',
         passengerPhone: rideOrTrip.passengerPhone || '',
         paymentMethod: rideOrTrip.paymentMethod || 'cash',
-        transactionRef: rideOrTrip.transactionRef || `TXN-BD-${rideOrTrip.id.replace('RIDE-', '')}-${finalFare}`,
-        status: 'completed',
+        transactionRef: rideOrTrip.transactionRef || (rideOrTrip.status === 'cancelled' ? `CANCEL-${rideOrTrip.id.replace('RIDE-', '')}` : `TXN-BD-${rideOrTrip.id.replace('RIDE-', '')}-${finalFare}`),
+        status: rideOrTrip.status === 'cancelled' ? 'cancelled' : 'completed',
+        cancellationReason: rideOrTrip.cancellationReason || (rideOrTrip.status === 'cancelled' ? 'Cancelled by passenger' : undefined),
         completedAt: rideOrTrip.completedAt || now.getTime(),
       };
 
@@ -1923,8 +1924,8 @@ async function startServer() {
       if (liveTracking) targetRide.liveTracking = liveTracking;
       targetRide.updatedAt = Date.now();
 
-      // If ride is completed, automatically save to trip history for both passenger & driver!
-      if (status === 'completed' || targetRide.status === 'completed') {
+      // If ride is completed or cancelled, automatically save to trip history for both passenger & driver!
+      if (status === 'completed' || targetRide.status === 'completed' || status === 'cancelled' || targetRide.status === 'cancelled') {
         targetRide.completedAt = targetRide.completedAt || Date.now();
         saveTripToHistoryFile(targetRide);
       }

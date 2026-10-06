@@ -466,36 +466,6 @@ export const DriverAuthModal: React.FC<DriverAuthModalProps> = ({
               </div>
             </div>
 
-            {/* Quick Demo / Verification Code Assistant */}
-            {devOtp && (
-              <div className="p-3.5 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/60 flex items-center justify-between shadow-2xs animate-in fade-in">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-xl bg-[#F5C518] text-black flex items-center justify-center shrink-0">
-                    <Sparkles className="w-4 h-4" />
-                  </div>
-                  <div>
-                    <div className="text-[10px] font-mono font-black uppercase tracking-wider text-amber-900">
-                      Verification Code
-                    </div>
-                    <div className="text-base font-black font-mono tracking-widest text-zinc-950">
-                      {devOtp}
-                    </div>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const digits = devOtp.slice(0, 6).split('');
-                    setOtpDigits(digits);
-                    handleVerifyOtp(devOtp);
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black shadow-xs transition-all cursor-pointer"
-                >
-                  Autofill & Verify
-                </button>
-              </div>
-            )}
-
             {/* 6 Digit Boxes */}
             <div className="grid grid-cols-6 gap-2" onPaste={handleDigitPaste}>
               {otpDigits.map((digit, index) => (

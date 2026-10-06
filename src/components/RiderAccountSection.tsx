@@ -1102,19 +1102,6 @@ export const RiderAccountSection: React.FC<RiderAccountSectionProps> = ({
               </div>
             )}
 
-            {resetDevOtp && (
-              <div className="p-2.5 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/50 text-xs flex items-center justify-between font-mono font-bold text-amber-900">
-                <span>Verification OTP: {resetDevOtp}</span>
-                <button
-                  type="button"
-                  onClick={() => setResetOtp(resetDevOtp)}
-                  className="text-[11px] underline text-[#E6A800] cursor-pointer"
-                >
-                  Auto-fill
-                </button>
-              </div>
-            )}
-
             {resetStep === 'email' ? (
               <form onSubmit={handleSendResetOtp} className="flex flex-col gap-3">
                 <div className="space-y-1">

@@ -465,77 +465,19 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
         </div>
       )}
 
-      {/* 1. ONLINE / OFFLINE BIG YELLOW TOGGLE SWITCH */}
-      <div className="p-4 bg-white border-b border-zinc-200 shrink-0">
-        <div className="flex items-center justify-between p-3.5 rounded-2xl bg-[#F8F9FA] border border-zinc-200">
-          <div className="flex items-center gap-3">
-            <div
-              className={`w-11 h-11 rounded-2xl flex items-center justify-center transition-all ${
-                isOnline
-                  ? 'bg-[#F5C518] text-black shadow-md shadow-amber-400/25'
-                  : 'bg-zinc-200 text-zinc-500'
-              }`}
-            >
-              <Power className="w-5 h-5 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-black text-[#1A1A1A]">
-                  {isUnderReview
-                    ? 'Offline (Verification Pending)'
-                    : isOnline
-                    ? 'You are Online'
-                    : 'You are Offline'}
-                </span>
-                <span
-                  className={`w-2 h-2 rounded-full ${
-                    isOnline ? 'bg-emerald-500 animate-pulse' : 'bg-zinc-400'
-                  }`}
-                />
-              </div>
-              <p className="text-xs text-zinc-500 mt-0.5">
-                {isUnderReview
-                  ? 'Locked: Approval required before accepting rides'
-                  : isOnline
-                  ? `Accepting passenger rides at flat ৳${RATE_PER_KM_TAKA}/km`
-                  : 'Go online to start receiving trip requests'}
-              </p>
-            </div>
-          </div>
-
-          {/* Big Yellow Switch Toggle */}
-          <button
-            type="button"
-            id="rider-online-toggle-switch"
-            onClick={() => setIsOnline(!isOnline)}
-            className={`w-14 h-8 flex items-center rounded-full p-1 cursor-pointer transition-colors duration-300 shadow-inner ${
-              isOnline ? 'bg-[#F5C518]' : 'bg-zinc-300'
-            }`}
-            title="Toggle Online Status"
-          >
-            <div
-              className={`bg-white w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 flex items-center justify-center text-[10px] font-bold ${
-                isOnline ? 'translate-x-6 text-[#E6A800]' : 'translate-x-0 text-zinc-400'
-              }`}
-            >
-              {isOnline ? 'ON' : 'OFF'}
-            </div>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. THE MAP STARTS RIGHT AFTER "YOU ARE ONLINE" (Increased from upside into the gap) */}
+      {/* 1. TOP MAP AREA (Increased upward to top of dashboard with simple turn-off button in top right) */}
       <div className="w-full relative bg-zinc-100 border-b border-zinc-200 shrink-0">
-        {/* Top Floating Map Radar Banner */}
+        {/* Top Floating Map Radar Banner & Turn Off Button */}
         <div className="absolute top-2.5 left-3 right-3 z-10 flex items-center justify-between pointer-events-none gap-2">
-          <div className="px-3 py-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center gap-2 pointer-events-auto min-w-0 flex-1">
+          {/* Live GPS Radar & City Toggle */}
+          <div className="px-2.5 py-1.5 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center gap-2 pointer-events-auto min-w-0 flex-1">
             <div className="w-6 h-6 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#E6A800] shrink-0">
               <Compass className="w-3.5 h-3.5" />
             </div>
             <div className="min-w-0 flex-1">
               <span className="text-[9px] uppercase font-mono font-bold text-[#E6A800] flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Live GPS Radar
+                Live Radar
               </span>
               <span className="text-xs font-black text-[#1A1A1A] block truncate">
                 {riderAddress}
@@ -553,7 +495,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                     : 'text-zinc-500 hover:text-black'
                 }`}
               >
-                Chittagong
+                CTG
               </button>
               <button
                 type="button"
@@ -564,23 +506,63 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
                     : 'text-zinc-500 hover:text-black'
                 }`}
               >
-                Dhaka
+                DHK
               </button>
             </div>
           </div>
 
-          <button
-            type="button"
-            onClick={handleRecenterGps}
-            title="Recenter GPS"
-            className="w-9 h-9 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-700 hover:text-black cursor-pointer pointer-events-auto active:scale-95 transition-all shrink-0"
-          >
-            <LocateFixed className={`w-4 h-4 ${isLocating ? 'animate-spin text-[#E6A800]' : ''}`} />
-          </button>
+          {/* Simple Turn Off / Turn On Button in Top Right */}
+          <div className="flex items-center gap-1.5 pointer-events-auto shrink-0">
+            {isOnline ? (
+              <button
+                type="button"
+                id="rider-online-turn-off-btn"
+                onClick={() => setIsOnline(false)}
+                className="px-3 py-1.5 rounded-2xl bg-zinc-900/90 hover:bg-black text-white text-xs font-bold backdrop-blur-md border border-white/20 shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all group"
+                title="You are Online - Click to turn off"
+              >
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] font-black text-emerald-400">Online</span>
+                <span className="text-[10px] font-medium text-zinc-400 border-l border-zinc-700 pl-1.5 group-hover:text-rose-400 transition-colors">
+                  Turn Off
+                </span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                id="rider-online-turn-on-btn"
+                onClick={() => setIsOnline(true)}
+                className="px-3.5 py-1.5 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] text-black text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+                title="Click to go Online"
+              >
+                <Power className="w-3.5 h-3.5 stroke-[2.5]" />
+                <span>Go Online</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={handleRecenterGps}
+              title="Recenter GPS"
+              className="w-8 h-8 rounded-2xl bg-white/95 backdrop-blur-md border border-zinc-200 shadow-md flex items-center justify-center text-zinc-700 hover:text-black cursor-pointer active:scale-95 transition-all"
+            >
+              <LocateFixed className={`w-3.5 h-3.5 ${isLocating ? 'animate-spin text-[#E6A800]' : ''}`} />
+            </button>
+          </div>
         </div>
 
-        {/* Leaflet Map Frame (Prominent height occupying the top space) */}
-        <div className="w-full h-72 sm:h-80 relative overflow-hidden">
+        {/* Offline Overlay Pill if Driver is turned off */}
+        {!isOnline && (
+          <div className="absolute top-14 left-3 right-3 z-10 pointer-events-none flex justify-center animate-in fade-in">
+            <div className="px-3.5 py-1.5 rounded-full bg-zinc-950/85 backdrop-blur-md text-white border border-white/10 shadow-lg text-[11px] font-semibold flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-zinc-500" />
+              <span>You are Offline • Tap <strong>Go Online</strong> to receive ride requests</span>
+            </div>
+          </div>
+        )}
+
+        {/* Leaflet Map Frame (Increased upward to top of screen: h-96 sm:h-[450px]) */}
+        <div className="w-full h-96 sm:h-[450px] relative overflow-hidden">
           <div
             ref={mapContainerRef}
             onPointerDown={() => setIsCameraLocked(false)}
