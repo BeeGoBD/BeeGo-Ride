@@ -17,6 +17,92 @@ const DEFAULT_DRIVER = {
   phone: '+880 1712-345678',
 };
 
+export const RIDE_STATUS_RANK: Record<string, number> = {
+  requested: 1,
+  accepted: 2,
+  arrived_at_pickup: 3,
+  in_transit: 4,
+  completed: 5,
+  cancelled: 6,
+  declined: 6,
+};
+
+export function canTransitionStatus(
+  currentStatus: RideStatus | string | undefined | null,
+  incomingStatus: RideStatus | string | undefined | null
+): boolean {
+  if (!incomingStatus) return false;
+  if (!currentStatus) return true;
+  if (currentStatus === incomingStatus) return true;
+
+  // Terminal states cannot be reverted by active states
+  if (['completed', 'cancelled', 'declined'].includes(currentStatus)) {
+    return false;
+  }
+
+  // Cancelled or declined can terminate any active ride
+  if (incomingStatus === 'cancelled' || incomingStatus === 'declined') {
+    return true;
+  }
+
+  const currentRank = RIDE_STATUS_RANK[currentStatus] || 0;
+  const incomingRank = RIDE_STATUS_RANK[incomingStatus] || 0;
+
+  // Prevent regressing backwards (e.g. arrived_at_pickup -> accepted is strictly forbidden)
+  return incomingRank >= currentRank;
+}
+
+export function mergeRideUpdates(
+  current: RideRequest | null,
+  incoming: RideRequest | null
+): RideRequest | null {
+  if (!incoming) return current;
+  if (!current) return incoming;
+  if (current.id !== incoming.id) return incoming;
+
+  const currentRank = RIDE_STATUS_RANK[current.status] || 0;
+  const incomingRank = RIDE_STATUS_RANK[incoming.status] || 0;
+
+  // If incoming has an older/regressed status, preserve current's advanced status
+  if (!canTransitionStatus(current.status, incoming.status)) {
+    return {
+      ...incoming,
+      status: current.status,
+      updatedAt: Math.max(
+        (current as any).updatedAt || 0,
+        (incoming as any).updatedAt || 0,
+        Date.now()
+      ),
+      chatMessages:
+        (incoming.chatMessages?.length || 0) >= (current.chatMessages?.length || 0)
+          ? incoming.chatMessages
+          : current.chatMessages,
+    };
+  }
+
+  // If status is strictly progressing forward, accept incoming
+  if (incomingRank > currentRank) {
+    return {
+      ...incoming,
+      updatedAt: Math.max((incoming as any).updatedAt || 0, Date.now()),
+    };
+  }
+
+  // Same status rank: preserve most up-to-date fields
+  const currentUpdated = (current as any).updatedAt || current.createdAt || 0;
+  const incomingUpdated = (incoming as any).updatedAt || incoming.createdAt || 0;
+
+  return {
+    ...incoming,
+    chatMessages:
+      (incoming.chatMessages?.length || 0) >= (current.chatMessages?.length || 0)
+        ? incoming.chatMessages
+        : current.chatMessages,
+    liveTracking: incoming.liveTracking || current.liveTracking,
+    updatedAt: Math.max(currentUpdated, incomingUpdated),
+  };
+}
+
 type RideListener = (ride: RideRequest | null) => void;
 const listeners = new Set<RideListener>();
 
@@ -26,7 +112,13 @@ if (typeof window !== 'undefined' && 'BroadcastChannel' in window) {
     broadcastChannel = new BroadcastChannel(CHANNEL_NAME);
     broadcastChannel.onmessage = (event) => {
       const updatedRide = event.data as RideRequest | null;
-      notifyListeners(updatedRide);
+      const current = getStoredRide();
+      const merged = mergeRideUpdates(current, updatedRide);
+      if (merged) {
+        notifyListeners(merged);
+      } else if (!updatedRide && current && ['completed', 'cancelled', 'declined'].includes(current.status)) {
+        notifyListeners(null);
+      }
     };
   } catch (e) {
     console.warn('BroadcastChannel not available, using storage events');
@@ -39,7 +131,15 @@ if (typeof window !== 'undefined') {
     if (e.key === STORAGE_KEY) {
       try {
         const parsed = e.newValue ? (JSON.parse(e.newValue) as RideRequest) : null;
-        notifyListeners(parsed);
+        const current = getStoredRide();
+        if (parsed && current && current.id === parsed.id) {
+          if (!canTransitionStatus(current.status, parsed.status)) {
+            // Drop stale status from older storage write
+            return;
+          }
+        }
+        const merged = mergeRideUpdates(current, parsed);
+        notifyListeners(merged);
       } catch (err) {
         console.error('Error parsing storage ride update', err);
       }
@@ -48,6 +148,12 @@ if (typeof window !== 'undefined') {
 }
 
 function notifyListeners(ride: RideRequest | null) {
+  if (ride && typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(ride));
+    } catch {}
+  }
+
   if (ride && ride.status === 'completed') {
     try {
       saveCompletedRideToHistory(ride);
@@ -85,16 +191,40 @@ async function syncActiveRideFromServer() {
 
     // Check if server ride has updates
     if (serverRide) {
-      const serverUpdated = (serverRide as any).updatedAt || serverRide.createdAt || 0;
-      const localUpdated = (localRide as any)?.updatedAt || localRide?.createdAt || 0;
-      const serverMsgs = serverRide.chatMessages?.length || 0;
-      const localMsgs = localRide?.chatMessages?.length || 0;
-
-      if (!localRide || localRide.id !== serverRide.id || localRide.status !== serverRide.status || serverUpdated > localUpdated || serverMsgs !== localMsgs) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(serverRide));
+      if (localRide && localRide.id === serverRide.id) {
+        // If local ride has already advanced to a higher stage (e.g. arrived_at_pickup),
+        // do not regress to server's stale status!
+        if (!canTransitionStatus(localRide.status, serverRide.status)) {
+          // Re-affirm the advanced status to the server so server catches up
+          fetch('/api/rides/status', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ rideId: localRide.id, status: localRide.status }),
+          }).catch(() => {});
+          return;
         }
-        notifyListeners(serverRide);
+      }
+
+      const merged = mergeRideUpdates(localRide, serverRide);
+      if (merged) {
+        const serverUpdated = (merged as any).updatedAt || merged.createdAt || 0;
+        const localUpdated = (localRide as any)?.updatedAt || localRide?.createdAt || 0;
+        const serverMsgs = merged.chatMessages?.length || 0;
+        const localMsgs = localRide?.chatMessages?.length || 0;
+
+        const hasChanged =
+          !localRide ||
+          localRide.id !== merged.id ||
+          localRide.status !== merged.status ||
+          serverUpdated > localUpdated ||
+          serverMsgs !== localMsgs;
+
+        if (hasChanged) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          }
+          notifyListeners(merged);
+        }
       }
     } else if (localRide && (localRide as any)._syncedToBackend) {
       // Server has cleared or finished this ride
@@ -179,13 +309,25 @@ export function subscribeToRideUpdates(callback: RideListener): () => void {
   const unsubCloud = cloudRealtime.subscribeRide((cloudRide) => {
     const current = getStoredRide();
     if (cloudRide) {
-      const cloudUpdated = (cloudRide as any).updatedAt || cloudRide.createdAt || 0;
-      const currentUpdated = (current as any)?.updatedAt || current?.createdAt || 0;
-      if (!current || current.id !== cloudRide.id || current.status !== cloudRide.status || cloudUpdated > currentUpdated) {
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(cloudRide));
+      if (current && current.id === cloudRide.id) {
+        // Strictly prevent regression from older cloud messages
+        if (!canTransitionStatus(current.status, cloudRide.status)) {
+          return;
         }
-        notifyListeners(cloudRide);
+      }
+      const merged = mergeRideUpdates(current, cloudRide);
+      if (merged) {
+        const hasChanged =
+          !current ||
+          current.id !== merged.id ||
+          current.status !== merged.status ||
+          (merged as any).updatedAt !== (current as any)?.updatedAt;
+        if (hasChanged) {
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+          }
+          notifyListeners(merged);
+        }
       }
     } else if (current && ['completed', 'cancelled', 'declined'].includes(current.status)) {
       if (typeof window !== 'undefined') {
@@ -195,9 +337,31 @@ export function subscribeToRideUpdates(callback: RideListener): () => void {
     }
   });
 
+  // Dedicated Realtime Telemetry Subscription
+  const unsubTracking = cloudRealtime.subscribeTracking(({ rideId, tracking }) => {
+    const current = getStoredRide();
+    if (current && current.id === rideId) {
+      const updated: RideRequest = {
+        ...current,
+        liveTracking: tracking,
+      };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+        } catch {}
+      }
+      listeners.forEach((l) => {
+        try {
+          l(updated);
+        } catch (e) {}
+      });
+    }
+  });
+
   return () => {
     listeners.delete(callback);
     unsubCloud();
+    unsubTracking();
   };
 }
 
@@ -524,12 +688,14 @@ export function acceptRide(
         }
       : current.driverDetails || DEFAULT_DRIVER);
 
+  const now = Date.now();
   const updated: RideRequest = {
     ...current,
     riderId,
     status: 'accepted',
     pickupRouteData: pickupRouteData || current.pickupRouteData,
     driverDetails: assignedDriver,
+    updatedAt: now,
   };
 
   saveAndBroadcastRide(updated);
@@ -561,9 +727,31 @@ export function updateLiveTracking(tracking: LiveTrackingData): void {
     liveTracking: tracking,
   };
 
-  saveAndBroadcastRide(updated);
+  // 1. Update localStorage without touching status or triggering global ride recreation
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    } catch {}
+  }
 
-  // Sync to server API periodically
+  // 2. Broadcast through BroadcastChannel if active
+  if (broadcastChannel) {
+    try {
+      broadcastChannel.postMessage(updated);
+    } catch {}
+  }
+
+  // 3. Publish to dedicated real-time telemetry channel (DO NOT publish full ride with retain on TOPIC_ACTIVE_RIDE)
+  cloudRealtime.publishTracking(current.id, tracking);
+
+  // 4. Notify active listeners so vehicle marker moves smoothly on map
+  listeners.forEach((listener) => {
+    try {
+      listener(updated);
+    } catch (e) {}
+  });
+
+  // 5. Throttled server tracking sync
   fetch('/api/rides/tracking', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -581,18 +769,32 @@ export function arriveAtPickupSpot(): RideRequest | null {
   const current = getStoredRide();
   if (!current) return null;
 
+  const now = Date.now();
   const updated: RideRequest = {
     ...current,
     status: 'arrived_at_pickup',
+    updatedAt: now,
   };
 
   saveAndBroadcastRide(updated);
 
+  // Sync to server API with response acknowledgement
   fetch('/api/rides/status', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rideId: updated.id, status: 'arrived_at_pickup' }),
-  }).catch(() => {});
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data?.ride) {
+        const cur = getStoredRide();
+        const merged = mergeRideUpdates(cur, data.ride);
+        if (merged && merged.status !== cur?.status) {
+          saveAndBroadcastRide(merged);
+        }
+      }
+    })
+    .catch((err) => console.warn('[Rides Sync] Status update network error:', err));
 
   return updated;
 }
@@ -604,9 +806,11 @@ export function startTripToDestination(): RideRequest | null {
   const current = getStoredRide();
   if (!current) return null;
 
+  const now = Date.now();
   const updated: RideRequest = {
     ...current,
     status: 'in_transit',
+    updatedAt: now,
   };
 
   saveAndBroadcastRide(updated);
@@ -615,7 +819,18 @@ export function startTripToDestination(): RideRequest | null {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ rideId: updated.id, status: 'in_transit' }),
-  }).catch(() => {});
+  })
+    .then((res) => (res.ok ? res.json() : null))
+    .then((data) => {
+      if (data?.ride) {
+        const cur = getStoredRide();
+        const merged = mergeRideUpdates(cur, data.ride);
+        if (merged && merged.status !== cur?.status) {
+          saveAndBroadcastRide(merged);
+        }
+      }
+    })
+    .catch((err) => console.warn('[Rides Sync] Start trip status error:', err));
 
   return updated;
 }

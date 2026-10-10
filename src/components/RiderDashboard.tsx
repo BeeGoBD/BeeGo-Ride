@@ -27,7 +27,7 @@ import {
   Plus,
   Minus,
 } from 'lucide-react';
-import { LocationPoint, RideRequest, RouteData, DriverProfile, DriverVerificationStatus } from '../types';
+import { LocationPoint, RideRequest, RideStatus, RouteData, DriverProfile, DriverVerificationStatus } from '../types';
 import { SwipeActionSlider } from './SwipeActionSlider';
 import {
   acceptRide,
@@ -38,6 +38,8 @@ import {
   clearCurrentRide,
   sendInRideChatMessage,
   RATE_PER_KM_TAKA,
+  RIDE_STATUS_RANK,
+  canTransitionStatus,
 } from '../services/rideSync';
 import { calculateRoute, reverseGeocode, DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import {
@@ -95,6 +97,27 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
   // In-Ride Chat drawer state
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [chatInputText, setChatInputText] = useState('');
+
+  // Local optimistic status override to prevent UI rollback during network/polling latency
+  const [localStatusOverride, setLocalStatusOverride] = useState<RideStatus | null>(null);
+
+  // Clear localStatusOverride when activeRide transitions or changes
+  useEffect(() => {
+    if (!activeRide) {
+      setLocalStatusOverride(null);
+    } else if (localStatusOverride) {
+      const activeRank = RIDE_STATUS_RANK[activeRide.status] || 0;
+      const overrideRank = RIDE_STATUS_RANK[localStatusOverride] || 0;
+      if (activeRank >= overrideRank) {
+        setLocalStatusOverride(null);
+      }
+    }
+  }, [activeRide?.status, activeRide?.id, localStatusOverride]);
+
+  const rawStatus = activeRide?.status || 'idle';
+  const effectiveStatus = (localStatusOverride && canTransitionStatus(rawStatus, localStatusOverride))
+    ? localStatusOverride
+    : rawStatus;
 
   // Real-time synchronization of driver verification from local storage & admin updates
   useEffect(() => {
@@ -320,14 +343,14 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
       // Determine which route to display (pickup route vs destination route)
       const currentCoords =
-        activeRide.status === 'accepted' && activeRide.pickupRouteData?.coordinates?.length
+        effectiveStatus === 'accepted' && activeRide.pickupRouteData?.coordinates?.length
           ? activeRide.pickupRouteData.coordinates
           : activeRide.routeData?.coordinates?.length
           ? activeRide.routeData.coordinates
           : null;
 
       // Only fit bounds ONCE per stage or ride id to let driver freely zoom & pan without interruption
-      const stageKey = `${activeRide.id}-${activeRide.status}`;
+      const stageKey = `${activeRide.id}-${effectiveStatus}`;
       const shouldFitBounds = hasFittedRouteRef.current !== stageKey;
 
       if (currentCoords && currentCoords.length > 0) {
@@ -397,7 +420,7 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
 
   const quickPhrases = ['I have arrived', 'On my way', 'Please wait 2 mins', 'Where are you?', 'Ready at pickup'];
 
-  const status = activeRide?.status || 'idle';
+  const status = effectiveStatus;
   const hasIncomingRequest = isOnline && activeRide && status === 'requested';
   const isEnRouteToPickup = isOnline && activeRide && status === 'accepted';
   const isAtPickup = isOnline && activeRide && status === 'arrived_at_pickup';
@@ -907,7 +930,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             <SwipeActionSlider
               key="rider-step-1-arrived"
               label="Slide: I Have Arrived at Pickup Spot"
-              onConfirm={() => arriveAtPickupSpot()}
+              onConfirm={() => {
+                setLocalStatusOverride('arrived_at_pickup');
+                arriveAtPickupSpot();
+              }}
               stepNumber={1}
               totalSteps={3}
               icon={<CheckCircle2 className="w-5 h-5 text-black" />}
@@ -987,7 +1013,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             <SwipeActionSlider
               key="rider-step-2-start-trip"
               label="Slide: Passenger On Board (Start Trip)"
-              onConfirm={() => startTripToDestination()}
+              onConfirm={() => {
+                setLocalStatusOverride('in_transit');
+                startTripToDestination();
+              }}
               stepNumber={2}
               totalSteps={3}
               icon={<Navigation className="w-5 h-5 fill-black" />}
@@ -1062,7 +1091,10 @@ export const RiderDashboard: React.FC<RiderDashboardProps> = ({
             <SwipeActionSlider
               key="rider-step-3-complete-ride"
               label="Slide: Reached Destination (Complete Ride)"
-              onConfirm={() => completeTrip(activeRide.distanceKm)}
+              onConfirm={() => {
+                setLocalStatusOverride('completed');
+                completeTrip(activeRide.distanceKm);
+              }}
               stepNumber={3}
               totalSteps={3}
               icon={<CheckCircle2 className="w-5 h-5 text-black" />}

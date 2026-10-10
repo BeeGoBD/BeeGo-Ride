@@ -40,7 +40,7 @@ import {
 import { ReportIssueModal } from './ReportIssueModal';
 import { SwipeActionSlider } from './SwipeActionSlider';
 import { CancelRideModal } from './CancelRideModal';
-import { LocationPoint, RideRequest, RouteData, UserRole, LiveTrackingData } from '../types';
+import { LocationPoint, RideRequest, RideStatus, RouteData, UserRole, LiveTrackingData } from '../types';
 import {
   arriveAtPickupSpot,
   startTripToDestination,
@@ -50,6 +50,8 @@ import {
   updateLiveTracking,
   sendInRideChatMessage,
   RATE_PER_KM_TAKA,
+  RIDE_STATUS_RANK,
+  canTransitionStatus,
 } from '../services/rideSync';
 import { DEFAULT_GEOAPIFY_KEY } from '../services/geoapify';
 import {
@@ -148,7 +150,27 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
     window.location.href = `tel:${cleanPhone}`;
   };
 
-  const status = activeRide.status;
+  // Local optimistic status override to prevent UI rollback during network/polling latency
+  const [localStatusOverride, setLocalStatusOverride] = useState<RideStatus | null>(null);
+
+  // Clear localStatusOverride when activeRide transitions or changes
+  useEffect(() => {
+    if (!activeRide) {
+      setLocalStatusOverride(null);
+    } else if (localStatusOverride) {
+      const activeRank = RIDE_STATUS_RANK[activeRide.status] || 0;
+      const overrideRank = RIDE_STATUS_RANK[localStatusOverride] || 0;
+      if (activeRank >= overrideRank) {
+        setLocalStatusOverride(null);
+      }
+    }
+  }, [activeRide?.status, activeRide?.id, localStatusOverride]);
+
+  const rawStatus = activeRide.status;
+  const status = (localStatusOverride && canTransitionStatus(rawStatus, localStatusOverride))
+    ? localStatusOverride
+    : rawStatus;
+
   const isEnRouteToPickup = status === 'accepted';
   const isAtPickup = status === 'arrived_at_pickup';
   const isInTransit = status === 'in_transit';
@@ -476,13 +498,19 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
             updatedAt: Date.now(),
           };
 
-          updateLiveTracking(liveData);
+          if (role === 'rider') {
+            updateLiveTracking(liveData);
+          }
         } else {
           // Reached the end of this stage
-          if (isEnRouteToPickup) {
-            arriveAtPickupSpot();
-          } else if (isInTransit) {
-            completeTrip(activeRide.distanceKm);
+          if (role === 'rider') {
+            if (isEnRouteToPickup) {
+              setLocalStatusOverride('arrived_at_pickup');
+              arriveAtPickupSpot();
+            } else if (isInTransit) {
+              setLocalStatusOverride('completed');
+              completeTrip(activeRide.distanceKm);
+            }
           }
           return;
         }
@@ -953,7 +981,10 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   <SwipeActionSlider
                     key="uber-step-1-arrived"
                     label="Slide: I Have Arrived at Pickup Spot"
-                    onConfirm={() => arriveAtPickupSpot()}
+                    onConfirm={() => {
+                      setLocalStatusOverride('arrived_at_pickup');
+                      arriveAtPickupSpot();
+                    }}
                     stepNumber={1}
                     totalSteps={3}
                     icon={<CheckCircle className="w-5 h-5 text-black stroke-[3]" />}
@@ -965,7 +996,10 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   <SwipeActionSlider
                     key="uber-step-2-start-trip"
                     label="Slide: Passenger On Board (Start Trip)"
-                    onConfirm={() => startTripToDestination()}
+                    onConfirm={() => {
+                      setLocalStatusOverride('in_transit');
+                      startTripToDestination();
+                    }}
                     stepNumber={2}
                     totalSteps={3}
                     icon={<Navigation className="w-5 h-5 fill-black" />}
@@ -977,7 +1011,10 @@ export const UberLiveTracking: React.FC<UberLiveTrackingProps> = ({
                   <SwipeActionSlider
                     key="uber-step-3-complete-ride"
                     label="Slide: Reached Destination (Complete Ride)"
-                    onConfirm={() => completeTrip(traveledKm)}
+                    onConfirm={() => {
+                      setLocalStatusOverride('completed');
+                      completeTrip(traveledKm);
+                    }}
                     stepNumber={3}
                     totalSteps={3}
                     icon={<CheckCircle className="w-5 h-5 text-black stroke-[3]" />}

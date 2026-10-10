@@ -1885,8 +1885,20 @@ async function startServer() {
         return res.status(404).json({ error: 'Ride request not found or expired.' });
       }
 
+      const SERVER_STATUS_RANK: Record<string, number> = {
+        requested: 1,
+        accepted: 2,
+        arrived_at_pickup: 3,
+        in_transit: 4,
+        completed: 5,
+        cancelled: 6,
+        declined: 6,
+      };
+
       targetRide.riderId = riderId || targetRide.riderId;
-      targetRide.status = 'accepted';
+      if ((SERVER_STATUS_RANK[targetRide.status] || 0) <= 2) {
+        targetRide.status = 'accepted';
+      }
       targetRide.driverDetails = driverDetails || targetRide.driverDetails;
       if (pickupRouteData) targetRide.pickupRouteData = pickupRouteData;
       targetRide.updatedAt = Date.now();
@@ -1917,7 +1929,26 @@ async function startServer() {
         return res.status(404).json({ error: 'Ride not found.' });
       }
 
-      if (status) targetRide.status = status;
+      const SERVER_STATUS_RANK: Record<string, number> = {
+        requested: 1,
+        accepted: 2,
+        arrived_at_pickup: 3,
+        in_transit: 4,
+        completed: 5,
+        cancelled: 6,
+        declined: 6,
+      };
+
+      if (status) {
+        const currentRank = SERVER_STATUS_RANK[targetRide.status] || 0;
+        const incomingRank = SERVER_STATUS_RANK[status] || 0;
+        // Never allow regressing status backwards (unless terminal cancel/decline)
+        if (status === 'cancelled' || status === 'declined' || incomingRank >= currentRank) {
+          targetRide.status = status;
+        } else {
+          console.warn(`[Rides API] Ignored status regression for ${targetRide.id}: ${targetRide.status} -> ${status}`);
+        }
+      }
       if (cancellationReason) targetRide.cancellationReason = cancellationReason;
       if (finalFareTaka !== undefined) targetRide.finalFareTaka = finalFareTaka;
       if (actualTraveledKm !== undefined) targetRide.actualTraveledKm = actualTraveledKm;
