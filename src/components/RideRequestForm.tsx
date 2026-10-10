@@ -766,38 +766,7 @@ export const RideRequestForm: React.FC<RideRequestFormProps> = ({
                   <Eye className="w-3.5 h-3.5 text-[#E6A800]" />
                   <span>View Map</span>
                 </button>
-              ) : (
-                <div className="flex items-center gap-1 bg-zinc-100 p-0.5 rounded-xl border border-zinc-200">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreferredCity('chattogram');
-                      window.location.reload();
-                    }}
-                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition-all cursor-pointer ${
-                      getPreferredCity() === 'chattogram'
-                        ? 'bg-[#F5C518] text-black shadow-xs'
-                        : 'text-zinc-500 hover:text-black'
-                    }`}
-                  >
-                    Chittagong
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPreferredCity('dhaka');
-                      window.location.reload();
-                    }}
-                    className={`px-2 py-0.5 rounded-lg text-[9px] font-black transition-all cursor-pointer ${
-                      getPreferredCity() === 'dhaka'
-                        ? 'bg-[#F5C518] text-black shadow-xs'
-                        : 'text-zinc-500 hover:text-black'
-                    }`}
-                  >
-                    Dhaka
-                  </button>
-                </div>
-              )}
+              ) : null}
             </div>
 
             {/* Input fields container with vertical transit line & Swap */}

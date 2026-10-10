@@ -78,8 +78,8 @@ export const OffersSection: React.FC<OffersSectionProps> = ({
           </div>
         </div>
 
-        <span className="text-[10px] font-mono font-bold bg-zinc-100 text-zinc-600 border border-zinc-200 px-2.5 py-1 rounded-full">
-          0 Demo Offers
+        <span className="text-[10px] font-mono font-bold bg-[#FFF9E6] text-[#B38000] border border-[#F5C518]/30 px-2.5 py-1 rounded-full">
+          Verified Vouchers
         </span>
       </div>
 

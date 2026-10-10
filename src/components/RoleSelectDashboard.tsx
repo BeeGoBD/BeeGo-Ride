@@ -66,45 +66,47 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
         </div>
       </div>
 
-      {/* 2. HERO WELCOME SECTION */}
-      <div className="my-auto py-5 flex flex-col gap-5 relative z-10">
+      {/* 2. HERO WELCOME & ROLE SELECTION SECTION */}
+      <div className="my-auto py-3 flex flex-col gap-4 relative z-10">
         <div className="text-center px-1">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF9E6] border border-[#F5C518]/40 text-[#B38000] text-[10px] font-mono font-black uppercase tracking-wider mb-2.5 shadow-2xs">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#FFF9E6] border border-[#F5C518]/30 text-[#B38000] text-[10px] font-mono font-bold uppercase tracking-wider mb-2">
             <Zap className="w-3 h-3 fill-[#F5C518] text-[#B38000]" />
-            <span>100% Electric Mobility Bangladesh</span>
+            <span>100% Electric Mobility • Bangladesh</span>
           </div>
 
           <h1 className="text-2xl sm:text-[26px] font-black text-zinc-950 tracking-tight leading-tight">
-            How would you like to continue?
+            Choose Your Role
           </h1>
 
-          <p className="text-xs text-zinc-500 mt-1.5 max-w-[320px] mx-auto leading-relaxed">
-            Experience smart battery-swapped EV rides or start earning daily as a verified Captain.
+          <p className="text-xs text-zinc-500 mt-1 max-w-[310px] mx-auto leading-relaxed font-medium">
+            Book zero-surge electric rides or earn daily income as a verified Voltx Captain.
           </p>
         </div>
 
-        {/* Feature Highlights Pills */}
-        <div className="grid grid-cols-3 gap-2 px-1">
-          <div className="p-2 rounded-2xl bg-zinc-50/90 border border-zinc-200/70 text-center flex flex-col items-center gap-0.5">
-            <span className="text-xs font-black text-zinc-900">৳25/km</span>
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Flat Fare</span>
+        {/* Feature Highlights Metric Strip */}
+        <div className="grid grid-cols-3 gap-2 px-0.5">
+          <div className="p-2.5 rounded-2xl bg-white border border-zinc-200/80 shadow-xs text-center flex flex-col items-center justify-center gap-0.5 transition-all hover:border-[#F5C518]">
+            <span className="text-xs font-black font-mono text-zinc-950">৳70/km</span>
+            <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Flat Fare</span>
           </div>
-          <div className="p-2 rounded-2xl bg-zinc-50/90 border border-zinc-200/70 text-center flex flex-col items-center gap-0.5">
-            <span className="text-xs font-black text-amber-600 flex items-center gap-0.5">
-              <Zap className="w-3 h-3 fill-amber-500" /> 30s
+          <div className="p-2.5 rounded-2xl bg-white border border-zinc-200/80 shadow-xs text-center flex flex-col items-center justify-center gap-0.5 transition-all hover:border-[#F5C518]">
+            <span className="text-xs font-black font-mono text-amber-700 flex items-center gap-0.5">
+              <Zap className="w-3 h-3 fill-[#F5C518] text-amber-600" />
+              <span>30 Sec</span>
             </span>
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Swap Hub</span>
+            <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Swap Hub</span>
           </div>
-          <div className="p-2 rounded-2xl bg-zinc-50/90 border border-zinc-200/70 text-center flex flex-col items-center gap-0.5">
-            <span className="text-xs font-black text-emerald-600 flex items-center gap-0.5">
-              <ShieldCheck className="w-3 h-3" /> Safe
+          <div className="p-2.5 rounded-2xl bg-white border border-zinc-200/80 shadow-xs text-center flex flex-col items-center justify-center gap-0.5 transition-all hover:border-[#F5C518]">
+            <span className="text-xs font-black font-mono text-emerald-700 flex items-center gap-0.5">
+              <ShieldCheck className="w-3 h-3 text-emerald-600" />
+              <span>100% EV</span>
             </span>
-            <span className="text-[9px] text-zinc-500 font-bold uppercase tracking-wider">Verified</span>
+            <span className="text-[9px] text-zinc-400 font-bold uppercase tracking-wider">Zero Surge</span>
           </div>
         </div>
 
         {/* 3. TWO LARGE ROLE CARDS */}
-        <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-3">
           {/* CARD 1: PASSENGER CARD */}
           <div
             id="role-select-passenger-card"
@@ -115,45 +117,58 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                 onSelectRole('passenger');
               }
             }}
-            className="group w-full p-4.5 rounded-3xl bg-white border-2 border-zinc-200/80 hover:border-[#F5C518] shadow-sm hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col gap-3.5 relative overflow-hidden cursor-pointer"
+            className="group w-full p-4.5 rounded-3xl bg-white border-2 border-zinc-200 hover:border-[#F5C518] shadow-sm hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col gap-3 relative overflow-hidden cursor-pointer"
           >
-            <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-[#FFF9E6] to-transparent rounded-bl-full -z-0 pointer-events-none group-hover:scale-110 transition-transform" />
+            <div className="absolute top-0 right-0 w-28 h-28 bg-gradient-to-bl from-[#FFF9E6] via-[#FFF9E6]/30 to-transparent rounded-bl-full -z-0 pointer-events-none group-hover:scale-105 transition-transform duration-300" />
 
             <div className="relative z-10 flex items-start justify-between">
-              <div className="w-13 h-13 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/40 flex items-center justify-center text-[#B38000] shadow-2xs">
-                <User className="w-6 h-6 stroke-[2.4]" />
+              <div className="w-11 h-11 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#B38000] shadow-2xs group-hover:scale-105 transition-transform">
+                <User className="w-5.5 h-5.5 stroke-[2.4]" />
               </div>
-              <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200/80">
+              <span className="text-[9px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 text-amber-900 border border-amber-200/70 shadow-2xs">
                 Passenger
               </span>
             </div>
 
             <div className="relative z-10">
-              <div className="text-base font-black text-zinc-950 flex items-center gap-1.5">
+              <h2 className="text-sm font-black text-zinc-950 flex items-center gap-1.5">
                 <span>Continue as Passenger</span>
-              </div>
-              <p className="text-xs text-zinc-500 mt-1 leading-relaxed font-medium">
-                Book instant electric rides, track live drivers, and enjoy guaranteed zero-surge pricing.
+              </h2>
+              <p className="text-[11px] text-zinc-500 mt-0.5 leading-relaxed font-medium">
+                Book instant electric rides, track live drivers, and enjoy guaranteed zero-surge flat ৳70/km fares.
               </p>
             </div>
 
-            {/* Passenger Action: Single Unified Yellow Button */}
-            <div className="relative z-10 pt-2.5 border-t border-zinc-100">
+            {/* Micro Feature Indicators */}
+            <div className="relative z-10 flex items-center gap-2 text-[10px] text-zinc-400 font-medium">
+              <span className="flex items-center gap-1 text-zinc-600 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                Zero Surge
+              </span>
+              <span>•</span>
+              <span>Live Tracking</span>
+              <span>•</span>
+              <span>Cash on Arrival</span>
+            </div>
+
+            {/* Passenger Action Button */}
+            <div className="relative z-10 pt-1.5 border-t border-zinc-100">
               <button
                 type="button"
                 id="role-continue-passenger-btn"
-                onClick={() => {
+                onClick={(e) => {
+                  e.stopPropagation();
                   if (onOpenPassengerAuth) {
                     onOpenPassengerAuth('login');
                   } else {
                     onSelectRole('passenger');
                   }
                 }}
-                className="w-full py-3.5 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-sm font-black text-black text-center transition-all cursor-pointer shadow-md shadow-amber-500/20 flex items-center justify-center gap-2"
+                className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-xs font-black text-black text-center transition-all cursor-pointer shadow-md shadow-amber-500/15 flex items-center justify-center gap-2"
               >
                 <User className="w-4 h-4 stroke-[2.5]" />
                 <span>Continue as Passenger</span>
-                <ArrowRight className="w-4 h-4 stroke-[2.8]" />
+                <ArrowRight className="w-4 h-4 stroke-[2.8] group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
           </div>
@@ -161,30 +176,42 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
           {/* CARD 2: DRIVER / CAPTAIN CARD (STEALTH GRAPHITE HIGH-CONTRAST) */}
           <div
             id="role-select-rider-card"
-            className="group w-full p-4.5 rounded-3xl bg-gradient-to-br from-zinc-950 via-zinc-900 to-zinc-950 text-white border-2 border-zinc-800 hover:border-[#F5C518] shadow-md hover:shadow-xl hover:shadow-black/20 transition-all duration-200 text-left flex flex-col gap-3.5 relative overflow-hidden"
+            className="group w-full p-4.5 rounded-3xl bg-gradient-to-br from-zinc-950 via-zinc-900 to-black text-white border-2 border-zinc-800 hover:border-[#F5C518] shadow-md hover:shadow-xl hover:shadow-black/20 transition-all duration-200 text-left flex flex-col gap-3 relative overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-28 h-28 bg-[#F5C518]/10 rounded-bl-full -z-0 pointer-events-none group-hover:scale-110 transition-transform" />
+            <div className="absolute top-0 right-0 w-28 h-28 bg-[#F5C518]/10 rounded-bl-full -z-0 pointer-events-none group-hover:scale-105 transition-transform duration-300" />
 
             <div className="relative z-10 flex items-start justify-between">
-              <div className="w-13 h-13 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-md shadow-amber-500/20">
-                <Bike className="w-6 h-6 stroke-[2.4]" />
+              <div className="w-11 h-11 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-md shadow-amber-500/20 group-hover:scale-105 transition-transform">
+                <Bike className="w-5.5 h-5.5 stroke-[2.4]" />
               </div>
-              <span className="text-[10px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/10 text-[#F5C518] border border-[#F5C518]/30">
+              <span className="text-[9px] font-mono font-black uppercase tracking-wider px-2.5 py-1 rounded-full bg-white/10 text-[#F5C518] border border-[#F5C518]/30">
                 Earn ৳1,500+/day
               </span>
             </div>
 
             <div className="relative z-10">
-              <div className="text-base font-black text-white flex items-center gap-1.5">
+              <h2 className="text-sm font-black text-white flex items-center gap-1.5">
                 <span>Continue as Captain (Driver)</span>
-              </div>
-              <p className="text-xs text-zinc-400 mt-1 leading-relaxed font-medium">
-                Accept trips, earn flexible income, and swap batteries in 30 seconds at any Voltx station.
+              </h2>
+              <p className="text-[11px] text-zinc-400 mt-0.5 leading-relaxed font-medium">
+                Accept trips, earn 85% fare + 100% tips, and swap batteries in 30 seconds at any Voltx station.
               </p>
             </div>
 
+            {/* Micro Feature Indicators */}
+            <div className="relative z-10 flex items-center gap-2 text-[10px] text-zinc-400 font-medium">
+              <span className="flex items-center gap-1 text-emerald-400 font-semibold">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                85% Payout
+              </span>
+              <span>•</span>
+              <span>100% Tips Kept</span>
+              <span>•</span>
+              <span>30s Swap Hubs</span>
+            </div>
+
             {/* Driver Action Split: Login or Register */}
-            <div className="relative z-10 pt-2.5 border-t border-zinc-800 flex items-center gap-2">
+            <div className="relative z-10 pt-1.5 border-t border-zinc-800/80 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -194,7 +221,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                     onSelectRole('rider');
                   }
                 }}
-                className="flex-1 py-2.5 px-3 rounded-2xl bg-zinc-800/90 hover:bg-zinc-700 active:scale-95 text-xs font-black text-white text-center transition-all cursor-pointer border border-zinc-700/80 flex items-center justify-center gap-1.5"
+                className="flex-1 py-2.5 px-3 rounded-2xl bg-zinc-800 hover:bg-zinc-700 active:scale-95 text-xs font-black text-white text-center transition-all cursor-pointer border border-zinc-700 flex items-center justify-center gap-1.5"
               >
                 <LogIn className="w-3.5 h-3.5 text-zinc-400" />
                 <span>Captain Login</span>
@@ -212,7 +239,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                 className="flex-1 py-2.5 px-3 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-95 text-xs font-black text-black text-center transition-all cursor-pointer shadow-md shadow-amber-500/15 flex items-center justify-center gap-1.5"
               >
                 <span>Register & Drive</span>
-                <ArrowRight className="w-3 h-3 stroke-[2.5]" />
+                <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
               </button>
             </div>
           </div>

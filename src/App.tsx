@@ -520,17 +520,21 @@ export default function App() {
   // 3 MOCK ONBOARDING SLIDES: Fast electric rides, 30s battery swap, zero-surge fares
   if (introState === 'onboarding') {
     return (
-      <BeegoOnboarding
-        onFinish={() => {
-          if (typeof window !== 'undefined') {
-            try {
-              localStorage.setItem('beego_intro_completed', 'true');
-              sessionStorage.setItem('beego_intro_completed', 'true');
-            } catch {}
-          }
-          setIntroState('ready');
-        }}
-      />
+      <div className="w-full h-[100dvh] max-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:p-2 sm:py-3 overflow-hidden font-sans text-[#1A1A1A]">
+        <div className="w-full max-w-[430px] h-full sm:h-full sm:max-h-[880px] sm:rounded-[32px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
+          <BeegoOnboarding
+            onFinish={() => {
+              if (typeof window !== 'undefined') {
+                try {
+                  localStorage.setItem('beego_intro_completed', 'true');
+                  sessionStorage.setItem('beego_intro_completed', 'true');
+                } catch {}
+              }
+              setIntroState('ready');
+            }}
+          />
+        </div>
+      </div>
     );
   }
 

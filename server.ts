@@ -7,7 +7,7 @@ import { createServer as createViteServer } from 'vite';
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT) || 3000;
 
   // Permissions Policy & CORS headers for WebViews, PWAs, and Native App Wrappers
   app.use((req, res, next) => {
