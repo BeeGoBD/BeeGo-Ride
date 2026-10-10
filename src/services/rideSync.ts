@@ -9,12 +9,12 @@ export const REAL_TRIP_HISTORY_KEY = 'beego_real_trip_history';
 const LEGACY_TRIP_HISTORY_KEY = 'bigo_real_trip_history';
 
 const DEFAULT_DRIVER = {
-  name: 'Tanvir Hossain',
+  name: 'Voltx Captain',
   vehicleType: 'bike' as const,
-  vehicleModel: 'Yamaha FZ-S FI (Midnight Black) - Bike',
-  plateNumber: 'DHAKA METRO-HA 52-8910',
-  rating: 4.95,
-  phone: '+880 1712-345678',
+  vehicleModel: 'Voltx Eco Speed (Electric)',
+  plateNumber: 'Dhaka Metro-Ha 45-8921',
+  rating: 5.0,
+  phone: '',
 };
 
 type RideListener = (ride: RideRequest | null) => void;
@@ -313,7 +313,7 @@ export function saveCompletedRideToHistory(ride: RideRequest): StoredRealTrip | 
     ratePerKm: RATE_PER_KM_TAKA,
     vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
     plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
-    driverId: ride.riderId || 'DRV-9073',
+    driverId: ride.riderId || '',
     driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
     driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
     driverPhone: ride.driverDetails?.phone,
@@ -371,7 +371,7 @@ export function saveCancelledRideToHistory(ride: RideRequest, reason?: string): 
     ratePerKm: RATE_PER_KM_TAKA,
     vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
     plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
-    driverId: ride.riderId || 'DRV-9073',
+    driverId: ride.riderId || '',
     driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
     driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
     driverPhone: ride.driverDetails?.phone,

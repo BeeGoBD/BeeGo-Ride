@@ -42,23 +42,45 @@ type AppIntroState = 'onboarding' | 'ready';
 export default function App() {
   const sdk = useDescope();
 
-  // One-time cleanup of legacy mock/demo user data on initial mount
+  // Clean purge of any legacy mock/demo accounts, test sessions, and dummy history
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const legacyKeys = [
+        const legacyMockKeys = [
           'beego_demo_users',
           'beego_mock_passengers',
           'beego_old_accounts',
           'beego_local_passwords',
+          'bigo_real_trip_history',
+          'geoapify_active_ride',
         ];
-        legacyKeys.forEach((k) => localStorage.removeItem(k));
+        legacyMockKeys.forEach((k) => localStorage.removeItem(k));
+
+        // Purge mock drivers (e.g. Tanvir, Test User, or placeholder accounts)
+        const rawDriver = localStorage.getItem('beego_current_driver');
+        if (rawDriver) {
+          try {
+            const drv = JSON.parse(rawDriver);
+            if (
+              !drv.phone ||
+              drv.name?.includes('Test') ||
+              drv.id === 'DRV-9073' ||
+              drv.name === 'Tanvir Hossain'
+            ) {
+              localStorage.removeItem('beego_current_driver');
+              localStorage.removeItem('beego_drivers_registry');
+              if (localStorage.getItem('beego_user_role') === 'rider') {
+                localStorage.removeItem('beego_user_role');
+              }
+            }
+          } catch (e) {}
+        }
 
         // Wipe empty-email dummy passengers
         const rawPax = localStorage.getItem('beego_active_passenger');
         if (rawPax) {
           const parsed = JSON.parse(rawPax);
-          if (!parsed?.email || typeof parsed.email !== 'string' || !parsed.email.trim()) {
+          if (!parsed?.email || typeof parsed.email !== 'string' || !parsed.email.trim() || parsed.email.includes('arif@gmail.com') || parsed.name === 'Arif Hasan') {
             localStorage.removeItem('beego_active_passenger');
             localStorage.removeItem('beego_descope_user');
             if (localStorage.getItem('beego_user_role') === 'passenger') {
