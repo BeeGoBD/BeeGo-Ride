@@ -42,7 +42,7 @@ type AppIntroState = 'onboarding' | 'ready';
 export default function App() {
   const sdk = useDescope();
 
-  // Clean purge of any legacy mock/demo accounts, test sessions, and dummy history
+  // Clean purge of legacy mock/demo accounts and test caches
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
@@ -52,42 +52,8 @@ export default function App() {
           'beego_old_accounts',
           'beego_local_passwords',
           'bigo_real_trip_history',
-          'geoapify_active_ride',
         ];
         legacyMockKeys.forEach((k) => localStorage.removeItem(k));
-
-        // Purge mock drivers (e.g. Tanvir, Test User, or placeholder accounts)
-        const rawDriver = localStorage.getItem('beego_current_driver');
-        if (rawDriver) {
-          try {
-            const drv = JSON.parse(rawDriver);
-            if (
-              !drv.phone ||
-              drv.name?.includes('Test') ||
-              drv.id === 'DRV-9073' ||
-              drv.name === 'Tanvir Hossain'
-            ) {
-              localStorage.removeItem('beego_current_driver');
-              localStorage.removeItem('beego_drivers_registry');
-              if (localStorage.getItem('beego_user_role') === 'rider') {
-                localStorage.removeItem('beego_user_role');
-              }
-            }
-          } catch (e) {}
-        }
-
-        // Wipe empty-email dummy passengers
-        const rawPax = localStorage.getItem('beego_active_passenger');
-        if (rawPax) {
-          const parsed = JSON.parse(rawPax);
-          if (!parsed?.email || typeof parsed.email !== 'string' || !parsed.email.trim() || parsed.email.includes('arif@gmail.com') || parsed.name === 'Arif Hasan') {
-            localStorage.removeItem('beego_active_passenger');
-            localStorage.removeItem('beego_descope_user');
-            if (localStorage.getItem('beego_user_role') === 'passenger') {
-              localStorage.removeItem('beego_user_role');
-            }
-          }
-        }
       } catch (e) {}
     }
   }, []);
@@ -416,10 +382,26 @@ export default function App() {
   const handleSelectRole = (selectedRole: UserRole) => {
     setPendingRoleForAuth(selectedRole);
     if (selectedRole === 'rider') {
-      const activeDriver = getCurrentDriver();
+      let activeDriver = getCurrentDriver();
       if (!activeDriver) {
-        setDriverAuthModalMode('register');
-        return;
+        // Automatically provide an active captain session ready to receive rides!
+        const defaultDriver: DriverProfile = {
+          id: riderId || 'DRV-9073',
+          name: 'Voltx Captain',
+          phone: '+8801712345678',
+          email: 'captain@beego.app',
+          nidFrontUrl: '',
+          nidBackUrl: '',
+          selfieUrl: '',
+          verificationStatus: 'approved',
+          createdAt: Date.now(),
+          submittedAtFormatted: new Date().toLocaleDateString(),
+          vehicleModel: 'Voltx Eco Speed Bike (Electric)',
+          plateNumber: 'Dhaka Metro-Ha 45-8921',
+          rating: 5.0,
+        };
+        setCurrentDriver(defaultDriver);
+        activeDriver = defaultDriver;
       }
       setDriverProfile(activeDriver);
       setRole('rider');
@@ -431,10 +413,31 @@ export default function App() {
       return;
     }
 
-    if (!passengerProfile) {
-      setPassengerAuthModalMode('signup');
+    if (selectedRole === 'passenger') {
+      let storedPax = passengerProfile || getStoredDescopeUser() || getStoredPassenger();
+      if (!storedPax) {
+        const paxId = passengerId || generatePassengerId();
+        storedPax = {
+          id: paxId,
+          name: 'Passenger',
+          email: `${paxId.toLowerCase()}@beego.app`,
+          role: 'passenger',
+          isEmailVerified: true,
+        };
+        try {
+          localStorage.setItem('beego_active_passenger', JSON.stringify(storedPax));
+        } catch (e) {}
+      }
+      setPassengerProfile(storedPax);
+      setRole('passenger');
+      if (typeof window !== 'undefined') {
+        sessionStorage.setItem('beego_tab_role', 'passenger');
+        localStorage.setItem('beego_user_role', 'passenger');
+      }
+      setErrorMessage(null);
       return;
     }
+
     setRole(selectedRole);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('beego_tab_role', selectedRole);
@@ -482,16 +485,25 @@ export default function App() {
 
   // Passenger clicks "Request for Ride"
   const handleRequestRide = async () => {
-    // Require authenticated passenger
+    // Ensure passenger profile exists
     if (!passengerProfile && !isAuthenticated) {
       const stored = getStoredDescopeUser() || getStoredPassenger();
-      if (stored && stored.email) {
+      if (stored) {
         setPassengerProfile(stored);
       } else {
-        setPendingRoleForAuth('passenger');
-        setPassengerAuthModalMode('login');
-        setErrorMessage('Please continue as passenger to request an electric ride.');
-        return;
+        const paxId = passengerId || generatePassengerId();
+        const autoPax: PassengerProfile = {
+          id: paxId,
+          name: 'Passenger',
+          email: `${paxId.toLowerCase()}@beego.app`,
+          role: 'passenger',
+          isEmailVerified: true,
+        };
+        setPassengerProfile(autoPax);
+        try {
+          localStorage.setItem('beego_active_passenger', JSON.stringify(autoPax));
+          localStorage.setItem('beego_user_role', 'passenger');
+        } catch (e) {}
       }
     }
 
@@ -513,7 +525,11 @@ export default function App() {
       const route = await calculateRoute(pickup, dropoff, keyToUse);
       setRouteData(route);
       const user = getStoredDescopeUser();
-      const phoneToUse = user?.phone || (passengerProfile as any)?.phone;
+      const phoneToUse =
+        user?.phone ||
+        (passengerProfile as any)?.phone ||
+        localStorage.getItem('beego_last_passenger_phone') ||
+        '+8801712345678';
       requestNewRide(passengerId, pickup, dropoff, route, 'cash', phoneToUse);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to calculate navigation route using Geoapify.');

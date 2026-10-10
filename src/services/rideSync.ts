@@ -96,31 +96,24 @@ async function syncActiveRideFromServer() {
         }
         notifyListeners(serverRide);
       }
-    } else if (localRide && (localRide as any)._syncedToBackend) {
-      // Server has cleared or finished this ride
-      if (typeof window !== 'undefined') {
-        localStorage.removeItem(STORAGE_KEY);
-      }
-      notifyListeners(null);
-    } else if (localRide && localRide.status === 'requested') {
-      // Initial sync of locally requested ride to server
-      (localRide as any)._syncedToBackend = true;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(localRide));
-      }
-      fetch('/api/rides/request', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(localRide),
-      }).catch(() => {});
-    } else if (localRide && ['completed', 'cancelled', 'declined'].includes(localRide.status)) {
-      // Completed or cancelled ride cleared after 15 seconds
-      const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
-      if (ageMs > 15000) {
-        if (typeof window !== 'undefined') {
-          localStorage.removeItem(STORAGE_KEY);
+    } else if (localRide) {
+      const isInFlight = ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(localRide.status);
+      if (isInFlight) {
+        // In-flight ride locally (e.g. newly requested by passenger) -> Ensure server is aware so drivers can receive it!
+        fetch('/api/rides/request', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(localRide),
+        }).catch(() => {});
+      } else if (['completed', 'cancelled', 'declined'].includes(localRide.status)) {
+        // Completed or cancelled ride cleared after 20 seconds grace period
+        const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
+        if (ageMs > 20000) {
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem(STORAGE_KEY);
+          }
+          notifyListeners(null);
         }
-        notifyListeners(null);
       }
     }
   } catch (err) {
@@ -449,7 +442,7 @@ export function requestNewRide(
   const newRide: RideRequest = {
     id: generateRideId(),
     passengerId,
-    passengerPhone,
+    passengerPhone: passengerPhone || '+8801712345678',
     vehicleType: 'bike',
     paymentMethod,
     pickup,
@@ -459,13 +452,13 @@ export function requestNewRide(
     fareTaka,
     status: 'requested',
     createdAt: Date.now(),
+    updatedAt: Date.now(),
     routeData,
   };
-  (newRide as any)._syncedToBackend = true;
 
   saveAndBroadcastRide(newRide);
 
-  // Sync to server API
+  // Sync to server API immediately
   fetch('/api/rides/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

@@ -111,11 +111,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
           <div
             id="role-select-passenger-card"
             onClick={() => {
-              if (onOpenPassengerAuth) {
-                onOpenPassengerAuth('login');
-              } else {
-                onSelectRole('passenger');
-              }
+              onSelectRole('passenger');
             }}
             className="group w-full p-4.5 rounded-3xl bg-white border-2 border-zinc-200 hover:border-[#F5C518] shadow-sm hover:shadow-lg hover:shadow-amber-500/10 transition-all duration-200 text-left flex flex-col gap-3 relative overflow-hidden cursor-pointer"
           >
@@ -158,11 +154,7 @@ export const RoleSelectDashboard: React.FC<RoleSelectDashboardProps> = ({
                 id="role-continue-passenger-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  if (onOpenPassengerAuth) {
-                    onOpenPassengerAuth('login');
-                  } else {
-                    onSelectRole('passenger');
-                  }
+                  onSelectRole('passenger');
                 }}
                 className="w-full py-3 px-4 rounded-2xl bg-[#F5C518] hover:bg-[#E6A800] active:scale-[0.98] text-xs font-black text-black text-center transition-all cursor-pointer shadow-md shadow-amber-500/15 flex items-center justify-center gap-2"
               >
