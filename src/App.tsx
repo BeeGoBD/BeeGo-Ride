@@ -42,18 +42,30 @@ type AppIntroState = 'onboarding' | 'ready';
 export default function App() {
   const sdk = useDescope();
 
-  // Clean purge of legacy mock/demo accounts and test caches
+  // One-time cleanup of legacy mock/demo user data on initial mount
   useEffect(() => {
     if (typeof window !== 'undefined') {
       try {
-        const legacyMockKeys = [
+        const legacyKeys = [
           'beego_demo_users',
           'beego_mock_passengers',
           'beego_old_accounts',
           'beego_local_passwords',
-          'bigo_real_trip_history',
         ];
-        legacyMockKeys.forEach((k) => localStorage.removeItem(k));
+        legacyKeys.forEach((k) => localStorage.removeItem(k));
+
+        // Wipe empty-email dummy passengers
+        const rawPax = localStorage.getItem('beego_active_passenger');
+        if (rawPax) {
+          const parsed = JSON.parse(rawPax);
+          if (!parsed?.email || typeof parsed.email !== 'string' || !parsed.email.trim()) {
+            localStorage.removeItem('beego_active_passenger');
+            localStorage.removeItem('beego_descope_user');
+            if (localStorage.getItem('beego_user_role') === 'passenger') {
+              localStorage.removeItem('beego_user_role');
+            }
+          }
+        }
       } catch (e) {}
     }
   }, []);
@@ -382,26 +394,10 @@ export default function App() {
   const handleSelectRole = (selectedRole: UserRole) => {
     setPendingRoleForAuth(selectedRole);
     if (selectedRole === 'rider') {
-      let activeDriver = getCurrentDriver();
+      const activeDriver = getCurrentDriver();
       if (!activeDriver) {
-        // Automatically provide an active captain session ready to receive rides!
-        const defaultDriver: DriverProfile = {
-          id: riderId || 'DRV-9073',
-          name: 'Voltx Captain',
-          phone: '+8801712345678',
-          email: 'captain@beego.app',
-          nidFrontUrl: '',
-          nidBackUrl: '',
-          selfieUrl: '',
-          verificationStatus: 'approved',
-          createdAt: Date.now(),
-          submittedAtFormatted: new Date().toLocaleDateString(),
-          vehicleModel: 'Voltx Eco Speed Bike (Electric)',
-          plateNumber: 'Dhaka Metro-Ha 45-8921',
-          rating: 5.0,
-        };
-        setCurrentDriver(defaultDriver);
-        activeDriver = defaultDriver;
+        setDriverAuthModalMode('register');
+        return;
       }
       setDriverProfile(activeDriver);
       setRole('rider');
@@ -413,31 +409,10 @@ export default function App() {
       return;
     }
 
-    if (selectedRole === 'passenger') {
-      let storedPax = passengerProfile || getStoredDescopeUser() || getStoredPassenger();
-      if (!storedPax) {
-        const paxId = passengerId || generatePassengerId();
-        storedPax = {
-          id: paxId,
-          name: 'Passenger',
-          email: `${paxId.toLowerCase()}@beego.app`,
-          role: 'passenger',
-          isEmailVerified: true,
-        };
-        try {
-          localStorage.setItem('beego_active_passenger', JSON.stringify(storedPax));
-        } catch (e) {}
-      }
-      setPassengerProfile(storedPax);
-      setRole('passenger');
-      if (typeof window !== 'undefined') {
-        sessionStorage.setItem('beego_tab_role', 'passenger');
-        localStorage.setItem('beego_user_role', 'passenger');
-      }
-      setErrorMessage(null);
+    if (!passengerProfile) {
+      setPassengerAuthModalMode('signup');
       return;
     }
-
     setRole(selectedRole);
     if (typeof window !== 'undefined') {
       sessionStorage.setItem('beego_tab_role', selectedRole);
@@ -485,25 +460,16 @@ export default function App() {
 
   // Passenger clicks "Request for Ride"
   const handleRequestRide = async () => {
-    // Ensure passenger profile exists
+    // Require authenticated passenger
     if (!passengerProfile && !isAuthenticated) {
       const stored = getStoredDescopeUser() || getStoredPassenger();
-      if (stored) {
+      if (stored && stored.email) {
         setPassengerProfile(stored);
       } else {
-        const paxId = passengerId || generatePassengerId();
-        const autoPax: PassengerProfile = {
-          id: paxId,
-          name: 'Passenger',
-          email: `${paxId.toLowerCase()}@beego.app`,
-          role: 'passenger',
-          isEmailVerified: true,
-        };
-        setPassengerProfile(autoPax);
-        try {
-          localStorage.setItem('beego_active_passenger', JSON.stringify(autoPax));
-          localStorage.setItem('beego_user_role', 'passenger');
-        } catch (e) {}
+        setPendingRoleForAuth('passenger');
+        setPassengerAuthModalMode('login');
+        setErrorMessage('Please continue as passenger to request an electric ride.');
+        return;
       }
     }
 
@@ -525,11 +491,7 @@ export default function App() {
       const route = await calculateRoute(pickup, dropoff, keyToUse);
       setRouteData(route);
       const user = getStoredDescopeUser();
-      const phoneToUse =
-        user?.phone ||
-        (passengerProfile as any)?.phone ||
-        localStorage.getItem('beego_last_passenger_phone') ||
-        '+8801712345678';
+      const phoneToUse = user?.phone || (passengerProfile as any)?.phone;
       requestNewRide(passengerId, pickup, dropoff, route, 'cash', phoneToUse);
     } catch (err: any) {
       setErrorMessage(err.message || 'Failed to calculate navigation route using Geoapify.');
@@ -558,21 +520,17 @@ export default function App() {
   // 3 MOCK ONBOARDING SLIDES: Fast electric rides, 30s battery swap, zero-surge fares
   if (introState === 'onboarding') {
     return (
-      <div className="w-full h-[100dvh] max-h-[100dvh] bg-[#F1F3F5] flex items-center justify-center p-0 sm:p-2 sm:py-3 overflow-hidden font-sans text-[#1A1A1A]">
-        <div className="w-full max-w-[430px] h-full sm:h-full sm:max-h-[880px] sm:rounded-[32px] bg-[#FFFFFF] shadow-2xl flex flex-col overflow-hidden relative border border-zinc-200/80">
-          <BeegoOnboarding
-            onFinish={() => {
-              if (typeof window !== 'undefined') {
-                try {
-                  localStorage.setItem('beego_intro_completed', 'true');
-                  sessionStorage.setItem('beego_intro_completed', 'true');
-                } catch {}
-              }
-              setIntroState('ready');
-            }}
-          />
-        </div>
-      </div>
+      <BeegoOnboarding
+        onFinish={() => {
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('beego_intro_completed', 'true');
+              sessionStorage.setItem('beego_intro_completed', 'true');
+            } catch {}
+          }
+          setIntroState('ready');
+        }}
+      />
     );
   }
 

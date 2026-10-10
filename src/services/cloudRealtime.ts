@@ -14,10 +14,9 @@ const BROKERS = [
   'wss://broker.emqx.io:8084/mqtt',
 ];
 
-const APPLET_ID = '20b4d090-bee0-4eb2-a55b-6542d42c5502';
-const TOPIC_ACTIVE_RIDE = `beego/${APPLET_ID}/rides/active`;
-const TOPIC_TRACKING = `beego/${APPLET_ID}/rides/tracking`;
-const TOPIC_CHAT = `beego/${APPLET_ID}/rides/chat`;
+const TOPIC_ACTIVE_RIDE = 'beego/voltx/rides/v1/active';
+const TOPIC_TRACKING = 'beego/voltx/rides/v1/tracking';
+const TOPIC_CHAT = 'beego/voltx/rides/v1/chat';
 
 type RideUpdateHandler = (ride: RideRequest | null) => void;
 type TrackingHandler = (data: { rideId: string; tracking: LiveTrackingData }) => void;

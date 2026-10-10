@@ -345,16 +345,9 @@ async function startServer() {
   // Get active ride in flight (status: requested, accepted, arrived_at_pickup, in_transit, or recent completed)
   function getActiveRideRecord(): any | null {
     const rides = loadRides();
-    const activeList = Object.values(rides).filter((r: any) => {
-      if (!r || !['requested', 'accepted', 'arrived_at_pickup', 'in_transit', 'completed'].includes(r.status)) {
-        return false;
-      }
-      const age = Date.now() - (r.updatedAt || r.createdAt || 0);
-      if (r.status === 'requested' && age > 45 * 60 * 1000) {
-        return false;
-      }
-      return true;
-    });
+    const activeList = Object.values(rides).filter((r: any) =>
+      r && ['requested', 'accepted', 'arrived_at_pickup', 'in_transit', 'completed'].includes(r.status)
+    );
     if (activeList.length === 0) return null;
 
     // Prefer in-flight rides, then sort by latest update

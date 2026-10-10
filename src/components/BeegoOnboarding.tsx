@@ -54,10 +54,11 @@ const TrafficWeavingAnimation: React.FC = () => {
       <div className="absolute inset-0 bg-gradient-to-b from-zinc-900 via-zinc-950 to-black" />
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-64 h-64 rounded-full bg-[#F5C518]/10 blur-3xl pointer-events-none" />
 
-      {/* Perspective Highway Roadway */}
-      <div className="relative w-64 h-full border-x border-zinc-700/60 bg-zinc-900/60 shadow-inner overflow-hidden">
-        {/* Animated Dashed Highway Centerline */}
-        <div className="absolute left-1/2 -translate-x-1/2 w-0.5 h-[200%] border-r-2 border-dashed border-zinc-500/80 animate-[moveDown_1.2s_linear_infinite]" />
+      {/* 3-Lane Perspective Roadway */}
+      <div className="relative w-64 h-full flex justify-between px-6 border-x border-zinc-700/60 bg-zinc-900/60 shadow-inner overflow-hidden">
+        {/* Animated Dashed Lane Dividers */}
+        <div className="w-0.5 h-[200%] border-r-2 border-dashed border-zinc-600/70 animate-[moveDown_1.2s_linear_infinite]" />
+        <div className="w-0.5 h-[200%] border-r-2 border-dashed border-zinc-600/70 animate-[moveDown_1.2s_linear_infinite]" />
 
         {/* Traffic Vehicle 1 (Commuter Car on Left Lane) */}
         <div className="absolute left-8 top-8 w-11 h-18 rounded-xl bg-zinc-700/90 border border-zinc-500 shadow-md flex flex-col items-center justify-between p-1.5 animate-[trafficSlow_3.5s_ease-in-out_infinite]">

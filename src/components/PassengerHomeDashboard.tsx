@@ -173,39 +173,57 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
     return 'dhaka';
   }, [userLiveAddress]);
 
-  // 4 Core Clean Services (Uber / Pathao style)
+  // Primary 4 Featured Services
   const primaryServices = [
     {
       id: 'bike',
       name: 'Bee Moto',
-      desc: 'Flat ৳25/km',
+      desc: 'Fastest in traffic',
+      badge: '৳25/km',
       icon: Bike,
       accentBg: 'bg-[#FFF9E6]',
-      accentColor: 'text-[#B38000]',
+      accentColor: 'text-[#E6A800]',
+      highlight: true,
+      disabled: false,
       onClick: () => {
         setSelectedService('bike');
         onTakeRide();
       },
     },
     {
+      id: 'car',
+      name: 'Bee Comfort',
+      desc: 'AC & 4 seats',
+      badge: 'Coming Soon',
+      icon: Car,
+      accentBg: 'bg-zinc-100',
+      accentColor: 'text-zinc-500',
+      highlight: false,
+      disabled: true,
+      onClick: () => {}, // Frozen
+    },
+    {
       id: 'power_station',
       name: 'Power Hub',
-      desc: '12+ Swap Bays',
+      desc: '90s Battery swap',
+      badge: 'Coming Soon',
       icon: Zap,
-      accentBg: 'bg-emerald-50',
-      accentColor: 'text-emerald-600',
-      onClick: () => {
-        setSelectedService('power_station');
-        onOpenPowerStations();
-      },
+      accentBg: 'bg-zinc-100',
+      accentColor: 'text-zinc-500',
+      highlight: false,
+      disabled: true,
+      onClick: () => {}, // Frozen
     },
     {
       id: 'hour_station',
       name: 'Hourly Rent',
-      desc: 'Flexible EV',
+      desc: 'Flexible EV rental',
+      badge: 'Coming Soon',
       icon: Clock,
       accentBg: 'bg-amber-50',
       accentColor: 'text-amber-700',
+      highlight: false,
+      disabled: false,
       onClick: () => {
         setSelectedService('hour_station');
         if (onOpenHourlyRent) {
@@ -213,16 +231,44 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         }
       },
     },
+  ];
+
+  // Secondary Services row
+  const secondaryServices = [
     {
-      id: 'offers',
-      name: 'Rewards',
-      desc: 'Zero Surge',
-      icon: Sparkles,
-      accentBg: 'bg-zinc-100',
-      accentColor: 'text-zinc-800',
+      id: 'parcel',
+      name: 'Parcel Express',
+      icon: Package,
       onClick: () => {
-        setSelectedService('offers');
+        setSelectedService('parcel');
+        onTakeRide(detectedDistrict === 'chittagong' ? 'Chattogram GPO' : 'Dhaka GPO / Parcel Center');
+      },
+    },
+    {
+      id: 'team',
+      name: 'Corporate Team',
+      icon: Users,
+      onClick: () => {
+        setSelectedService('team');
+        onTakeRide();
+      },
+    },
+    {
+      id: 'view_hour',
+      name: 'Fare Rates',
+      icon: Eye,
+      onClick: () => {
+        setSelectedService('view_hour');
         onOpenOffers();
+      },
+    },
+    {
+      id: 'all',
+      name: 'All Services',
+      icon: Grid,
+      onClick: () => {
+        setSelectedService('all');
+        onTakeRide();
       },
     },
   ];
@@ -307,17 +353,17 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="w-full flex-1 flex flex-col justify-start px-4 py-3 gap-3.5 select-none relative pb-10 bg-[#FAFAFA] text-[#1A1A1A]"
+      className="w-full flex-1 flex flex-col justify-start px-4 py-3 gap-4 select-none relative pb-8 bg-[#F8F9FA]"
     >
-      {/* Pull to refresh spinner */}
+      {/* Pull to refresh spinner indicator */}
       {(pullY > 0 || isRefreshing) && (
         <div
           style={{ height: `${pullY}px` }}
           className="w-full flex items-center justify-center overflow-hidden transition-all duration-150"
         >
-          <div className="w-8 h-8 rounded-full bg-white shadow-md border border-zinc-200/80 flex items-center justify-center text-[#E6A800]">
+          <div className="w-9 h-9 rounded-full bg-white shadow-lg shadow-amber-500/10 border border-zinc-200/80 flex items-center justify-center text-[#E6A800]">
             <RefreshCw
-              className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`}
+              className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`}
               style={{ transform: `rotate(${pullY * 3}deg)` }}
             />
           </div>
@@ -325,32 +371,34 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
       )}
 
       {/* 1. TOP GREETING & CITY HUB SELECTOR */}
-      <div className="flex items-center justify-between pt-0.5 px-0.5">
+      <div className="flex items-center justify-between pt-1 px-0.5">
         <div>
-          <h1 className="text-lg font-black text-zinc-950 tracking-tight">
+          <h1 className="text-xl font-black text-[#1A1A1A] tracking-tight">
             {greeting} 👋
           </h1>
-          <p className="text-[11px] text-zinc-500 font-medium flex items-center gap-1.5 mt-0.5">
+          <p className="text-[11px] text-zinc-500 font-medium flex items-center gap-1 mt-0.5">
             <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span>{passengerName ? `${passengerName} • 100% Electric EV` : 'Fast Electric EV Dispatch'}</span>
+            <span>
+              {passengerName ? `${passengerName} • Fast Electric Ride Dispatch` : 'Fast Electric Ride Dispatch'}
+            </span>
           </p>
         </div>
 
-        {/* Minimal City Selector */}
-        <div className="flex items-center bg-zinc-100 p-0.5 rounded-xl border border-zinc-200/80 text-[10px] font-bold">
+        {/* City Hub Selector */}
+        <div className="flex items-center gap-1 bg-white border border-zinc-200/90 rounded-2xl p-1 shadow-2xs">
           <button
             type="button"
             onClick={() => {
               setPreferredCity('chattogram');
               window.location.reload();
             }}
-            className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
               getPreferredCity() === 'chattogram'
-                ? 'bg-[#F5C518] text-black shadow-2xs font-black'
+                ? 'bg-[#F5C518] text-black shadow-xs'
                 : 'text-zinc-500 hover:text-black'
             }`}
           >
-            CTG
+            Chittagong
           </button>
           <button
             type="button"
@@ -358,60 +406,61 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               setPreferredCity('dhaka');
               window.location.reload();
             }}
-            className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+            className={`px-2.5 py-1 rounded-xl text-[10px] font-black transition-all cursor-pointer ${
               getPreferredCity() === 'dhaka'
-                ? 'bg-[#F5C518] text-black shadow-2xs font-black'
+                ? 'bg-[#F5C518] text-black shadow-xs'
                 : 'text-zinc-500 hover:text-black'
             }`}
           >
-            DHK
+            Dhaka
           </button>
         </div>
       </div>
 
-      {/* 2. WHERE TO? HERO SEARCH BAR */}
+      {/* 2. UBER / PATHAO SIGNATURE "WHERE TO?" HERO SEARCH BAR */}
       <div className="space-y-2">
         <div
           onClick={() => onTakeRide()}
-          className="w-full p-3.5 rounded-3xl bg-white border border-zinc-200/90 shadow-sm hover:border-[#F5C518] hover:shadow-md transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99]"
+          className="w-full p-4 rounded-3xl bg-white border-2 border-zinc-200/90 shadow-[0_8px_30px_rgba(0,0,0,0.06)] hover:border-[#F5C518] hover:shadow-xl hover:shadow-amber-500/10 transition-all duration-200 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.99]"
         >
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform shrink-0">
-              <Search className="w-4.5 h-4.5 stroke-[2.5]" />
+          <div className="flex items-center gap-3.5 min-w-0">
+            <div className="w-11 h-11 rounded-2xl bg-[#F5C518] text-black flex items-center justify-center shadow-md shadow-amber-400/30 group-hover:scale-105 transition-transform shrink-0">
+              <Search className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div className="min-w-0">
-              <div className="text-sm font-black text-zinc-950 tracking-tight group-hover:text-[#E6A800] transition-colors">
+              <div className="text-base font-black text-[#1A1A1A] tracking-tight group-hover:text-[#E6A800] transition-colors">
                 Where to?
               </div>
-              <p className="text-[11px] text-zinc-400 truncate font-medium mt-0.5">
+              <p className="text-xs text-zinc-400 truncate font-medium">
                 {userLiveAddress ? `Pickup at ${userLiveAddress.split(',')[0]}` : 'Search destination or hotspot'}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 shrink-0">
-            <div className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-zinc-100 group-hover:bg-[#FFF9E6] text-[11px] font-bold text-zinc-700 group-hover:text-[#E6A800] transition-colors">
-              <Timer className="w-3 h-3 stroke-[2.2]" />
+          {/* Time Picker / Now Indicator */}
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-zinc-100 group-hover:bg-[#FFF9E6] border border-zinc-200 group-hover:border-[#F5C518]/50 text-xs font-bold text-zinc-700 group-hover:text-[#E6A800] transition-colors">
+              <Timer className="w-3.5 h-3.5 stroke-[2.2]" />
               <span>Now</span>
             </div>
-            <div className="w-7 h-7 rounded-full bg-zinc-900 group-hover:bg-[#F5C518] text-white group-hover:text-black flex items-center justify-center transition-colors">
-              <ArrowRight className="w-3.5 h-3.5 stroke-[2.5]" />
+            <div className="w-8 h-8 rounded-full bg-zinc-900 group-hover:bg-[#F5C518] text-white group-hover:text-black flex items-center justify-center transition-colors">
+              <ArrowRight className="w-4 h-4 stroke-[2.5]" />
             </div>
           </div>
         </div>
 
-        {/* Clean Destination Shortcut Chips */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        {/* Quick Destination Shortcut Pills */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-0.5">
           {destinationShortcuts.map((sc, i) => {
             const Icon = sc.icon;
             return (
               <button
                 key={i}
                 type="button"
-                onClick={() => onTakeRide(sc.query)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-[#FFF9E6] border border-zinc-200/80 hover:border-[#F5C518] shadow-2xs text-[11px] font-semibold text-zinc-700 hover:text-black transition-all shrink-0 cursor-pointer active:scale-95"
+                onClick={() => onTakeRide()}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white hover:bg-[#FFF9E6] border border-zinc-200 hover:border-[#F5C518] shadow-2xs text-xs font-bold text-zinc-700 hover:text-[#1A1A1A] transition-all shrink-0 cursor-pointer active:scale-95"
               >
-                <Icon className="w-3 h-3 text-[#E6A800]" />
+                <Icon className="w-3.5 h-3.5 text-[#E6A800]" />
                 <span>{sc.label}</span>
               </button>
             );
@@ -419,58 +468,109 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         </div>
       </div>
 
-      {/* 3. STREAMLINED 4-SERVICES ROW (Uber/Grab Style) */}
-      <div className="space-y-1.5 pt-0.5">
+      {/* 3. SUGGESTIONS: 4 PRIMARY SERVICES GRID (Uber / Pathao Style) */}
+      <div className="space-y-2 pt-0.5">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
-            Services
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">
+            Suggestions
           </h2>
-          <span className="text-[10px] font-mono font-bold text-[#B38000] bg-[#FFF9E6] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
+          <span className="text-[10px] font-mono font-bold text-[#E6A800] bg-[#FFF9E6] px-2 py-0.5 rounded-full border border-[#F5C518]/30">
             Flat ৳25/km
           </span>
         </div>
 
-        <div className="grid grid-cols-4 gap-2">
+        {/* 4 Cards Grid */}
+        <div className="grid grid-cols-2 gap-2.5">
           {primaryServices.map((service) => {
             const Icon = service.icon;
+            const isSelected = selectedService === service.id;
             return (
               <button
                 key={service.id}
                 type="button"
-                onClick={service.onClick}
-                className="p-2.5 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200/80 hover:border-[#F5C518] shadow-2xs flex flex-col items-center justify-between text-center gap-1.5 transition-all cursor-pointer active:scale-95 group"
+                onClick={service.disabled ? undefined : service.onClick}
+                disabled={service.disabled}
+                className={`p-3.5 rounded-3xl border-2 transition-all duration-200 flex flex-col justify-between text-left group relative overflow-hidden ${
+                  service.disabled
+                    ? 'bg-zinc-50/80 border-zinc-200/70 opacity-60 cursor-not-allowed select-none'
+                    : isSelected
+                    ? 'bg-white border-[#F5C518] shadow-lg shadow-amber-500/10 cursor-pointer active:scale-[0.98]'
+                    : 'bg-white border-zinc-200/80 hover:border-[#F5C518] shadow-xs hover:shadow-md cursor-pointer active:scale-[0.98]'
+                }`}
               >
-                <div
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-105 ${service.accentBg} ${service.accentColor}`}
-                >
-                  <Icon className="w-5 h-5 stroke-[2.2]" />
-                </div>
-                <div className="w-full">
-                  <span className="text-[11px] font-black text-zinc-950 block truncate">
-                    {service.name}
+                <div className="flex items-start justify-between">
+                  <div
+                    className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
+                      service.disabled
+                        ? 'bg-zinc-200 text-zinc-400'
+                        : isSelected
+                        ? 'bg-[#F5C518] text-black shadow-md'
+                        : `${service.accentBg} ${service.accentColor} group-hover:scale-105`
+                    }`}
+                  >
+                    <Icon className="w-6 h-6 stroke-[2.2]" />
+                  </div>
+
+                  <span
+                    className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full border font-mono ${
+                      service.disabled
+                        ? 'bg-zinc-200 text-zinc-500 border-zinc-300'
+                        : 'bg-zinc-100 text-zinc-700 border-zinc-200'
+                    }`}
+                  >
+                    {service.badge}
                   </span>
-                  <span className="text-[9px] font-medium text-zinc-400 block truncate">
+                </div>
+
+                <div className="mt-3">
+                  <div className="text-sm font-black text-[#1A1A1A] group-hover:text-[#E6A800] transition-colors flex items-center gap-1">
+                    <span>{service.name}</span>
+                  </div>
+                  <p className="text-[11px] text-zinc-500 mt-0.5 font-medium leading-tight">
                     {service.desc}
-                  </span>
+                  </p>
                 </div>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Secondary Services Compact Row */}
+        <div className="grid grid-cols-4 gap-2 pt-1">
+          {secondaryServices.map((sec) => {
+            const Icon = sec.icon;
+            return (
+              <button
+                key={sec.id}
+                type="button"
+                onClick={sec.onClick}
+                className="p-2.5 rounded-2xl bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-[#F5C518] shadow-2xs flex flex-col items-center justify-center gap-1.5 text-center cursor-pointer active:scale-95 transition-all group"
+              >
+                <div className="w-8 h-8 rounded-xl bg-zinc-100 group-hover:bg-[#FFF9E6] text-zinc-700 group-hover:text-[#E6A800] flex items-center justify-center transition-colors">
+                  <Icon className="w-4 h-4 stroke-[2]" />
+                </div>
+                <span className="text-[10px] font-bold text-zinc-700 group-hover:text-[#1A1A1A] truncate w-full">
+                  {sec.name}
+                </span>
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* 4. BEEGO SPOTLIGHT CAROUSEL */}
-      <div className="space-y-1.5 pt-1">
+
+      {/* 5. SPOTLIGHT PROMOTIONAL CAROUSEL (Uber One / Pathao Rewards Luxury Style) */}
+      <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <Sparkles className="w-3 h-3 text-[#E6A800]" />
-            <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
+            <Sparkles className="w-3.5 h-3.5 text-[#E6A800]" />
+            <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">
               BeeGo Spotlight
             </h2>
           </div>
 
-          {/* Dots */}
-          <div className="flex items-center gap-1">
+          {/* Carousel Dot Indicators */}
+          <div className="flex items-center gap-1.5">
             {spotlightCards.map((c, i) => (
               <button
                 key={c.id}
@@ -478,14 +578,14 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
                 onClick={() => setSpotlightIndex(i)}
                 aria-label={`Slide ${i + 1}`}
                 className={`h-1.5 rounded-full transition-all duration-300 cursor-pointer ${
-                  i === spotlightIndex ? 'w-4 bg-[#F5C518]' : 'w-1.5 bg-zinc-300'
+                  i === spotlightIndex ? 'w-5 bg-[#F5C518]' : 'w-1.5 bg-zinc-300'
                 }`}
               />
             ))}
           </div>
         </div>
 
-        {/* Carousel Card */}
+        {/* Carousel Card with Touch Swipe Support */}
         {(() => {
           const card = spotlightCards[spotlightIndex];
           return (
@@ -508,7 +608,7 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               }}
               onMouseEnter={() => setIsSpotlightPaused(true)}
               onMouseLeave={() => setIsSpotlightPaused(false)}
-              className="p-3.5 rounded-3xl bg-zinc-950 border border-zinc-800 shadow-md flex flex-col justify-between gap-3 transition-all duration-300 relative overflow-hidden select-none"
+              className={`p-4 rounded-3xl bg-zinc-950 border border-zinc-800 shadow-xl flex flex-col justify-between gap-3.5 transition-all duration-300 relative overflow-hidden select-none`}
             >
               {/* Background Image with Layered Gradient Overlay */}
               <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden">
@@ -526,10 +626,10 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
                   <span className={`text-[9px] font-mono font-black uppercase tracking-wider px-2 py-0.5 rounded-md shadow-xs ${card.badgeBg}`}>
                     {card.tag}
                   </span>
-                  <h3 className={`text-sm font-black mt-1.5 tracking-tight ${card.textColor}`}>
+                  <h3 className={`text-sm font-black mt-2 tracking-tight ${card.textColor}`}>
                     {card.title}
                   </h3>
-                  <p className={`text-[11px] mt-0.5 font-medium leading-relaxed ${card.subTextColor}`}>
+                  <p className={`text-xs mt-0.5 font-medium leading-relaxed ${card.subTextColor}`}>
                     {card.subtitle}
                   </p>
                 </div>
@@ -538,15 +638,15 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
               <div className="flex items-center justify-between pt-1 border-t border-white/10 relative z-10">
                 <div className="flex items-center gap-1.5 text-[10px] text-zinc-400 font-medium">
                   <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Zero-Surge • 64 Districts</span>
+                  <span>Dhaka • 64 Districts</span>
                 </div>
                 <button
                   type="button"
                   onClick={card.action}
-                  className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-xs cursor-pointer active:scale-95 flex items-center gap-1 group"
+                  className="px-3.5 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95 flex items-center gap-1.5 group"
                 >
                   <span>{card.actionText}</span>
-                  <ArrowRight className="w-3 h-3 stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
+                  <ArrowRight className="w-3.5 h-3.5 stroke-[2.5] group-hover:translate-x-0.5 transition-transform" />
                 </button>
               </div>
             </div>
@@ -554,29 +654,29 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
         })()}
       </div>
 
-      {/* 5. POPULAR DESTINATIONS (Curated Top 3 Clean List) */}
-      <div className="space-y-1.5 pt-1">
+      {/* 6. POPULAR & RECENT DESTINATIONS LIST */}
+      <div className="space-y-2 pt-1">
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-[11px] font-black uppercase tracking-wider text-zinc-400">
-            Quick Destinations
+          <h2 className="text-xs font-black uppercase tracking-wider text-zinc-500">
+            Popular Destinations
           </h2>
-          <span className="text-[10px] text-zinc-400 font-medium">1-tap dispatch</span>
+          <span className="text-[10px] text-zinc-400 font-medium">One-tap dispatch</span>
         </div>
 
-        <div className="space-y-1.5">
-          {popularDestinations.slice(0, 3).map((dest, i) => (
+        <div className="space-y-2">
+          {popularDestinations.map((dest, i) => (
             <button
               key={i}
               type="button"
               onClick={() => onTakeRide(dest.name)}
-              className="w-full p-2.5 rounded-2xl bg-white border border-zinc-200/80 hover:border-[#F5C518] hover:shadow-sm text-left transition-all duration-150 shadow-2xs cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3 group"
+              className="w-full p-3 rounded-2xl bg-white border border-zinc-200/80 hover:border-[#F5C518] hover:shadow-md text-left transition-all duration-200 shadow-2xs cursor-pointer active:scale-[0.99] flex items-center justify-between gap-3 group"
             >
-              <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-8 h-8 rounded-xl bg-zinc-100 group-hover:bg-[#FFF9E6] text-zinc-600 group-hover:text-[#E6A800] flex items-center justify-center shrink-0 transition-colors">
-                  <MapPin className="w-3.5 h-3.5 stroke-[2]" />
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-zinc-100 group-hover:bg-[#FFF9E6] text-zinc-700 group-hover:text-[#E6A800] flex items-center justify-center shrink-0 transition-colors">
+                  <MapPin className="w-4 h-4 stroke-[2]" />
                 </div>
                 <div className="min-w-0">
-                  <span className="text-xs font-black text-zinc-950 block truncate group-hover:text-[#E6A800] transition-colors">
+                  <span className="text-xs font-black text-[#1A1A1A] block truncate group-hover:text-[#E6A800] transition-colors">
                     {dest.name}
                   </span>
                   <span className="text-[10px] text-zinc-400 font-medium block truncate">
@@ -585,47 +685,96 @@ export const PassengerHomeDashboard: React.FC<PassengerHomeDashboardProps> = ({
                 </div>
               </div>
 
-              <div className="w-6 h-6 rounded-full bg-zinc-100 group-hover:bg-[#F5C518] text-zinc-500 group-hover:text-black flex items-center justify-center transition-colors shrink-0">
-                <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
+              <div className="flex items-center gap-2 shrink-0 text-right">
+                <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-[#F5C518] text-zinc-600 group-hover:text-black flex items-center justify-center transition-colors">
+                  <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+                </div>
               </div>
             </button>
           ))}
         </div>
       </div>
 
-      {/* 6. CLEAN REFERRAL & PERKS CARD */}
-      <div className="p-3.5 rounded-3xl bg-white border border-zinc-200/90 shadow-2xs flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800] shrink-0">
-            <Gift className="w-4.5 h-4.5 stroke-[2.2]" />
+      {/* 7. VOLTX ECO IMPACT CARD */}
+      <div
+        onClick={onOpenPowerStations}
+        className="p-3.5 rounded-3xl bg-white border border-emerald-200/80 shadow-xs hover:border-emerald-400 hover:shadow-md transition-all cursor-pointer flex items-center justify-between gap-3 group active:scale-[0.99]"
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <Leaf className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div className="min-w-0">
-            <h3 className="text-xs font-black text-zinc-950 truncate">
-              Invite friends, get ৳100 discount
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded">
+                100% Green Mobility
+              </span>
+              <span className="text-[10px] text-zinc-400 font-medium">• 12 Hubs</span>
+            </div>
+            <span className="text-xs font-black text-[#1A1A1A] block truncate mt-0.5">
+              Zero-Emission Electric Commute in Dhaka
+            </span>
+          </div>
+        </div>
+
+        <div className="w-7 h-7 rounded-full bg-zinc-100 group-hover:bg-emerald-500 group-hover:text-white flex items-center justify-center text-zinc-500 transition-colors shrink-0">
+          <ChevronRight className="w-4 h-4 stroke-[2.5]" />
+        </div>
+      </div>
+
+      {/* 8. INVITE FRIENDS CARD */}
+      <div className="p-4 rounded-3xl bg-white border border-zinc-200/90 shadow-xs flex flex-col gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-[#FFF9E6] border border-[#F5C518]/30 flex items-center justify-center text-[#E6A800] shrink-0">
+            <Gift className="w-5 h-5 stroke-[2.2]" />
+          </div>
+          <div>
+            <h3 className="text-xs font-black text-[#1A1A1A]">
+              Invite friends & get ৳100 discount
             </h3>
-            <p className="text-[10px] text-zinc-400 font-medium truncate">
-              Code: <strong className="font-mono text-zinc-800">VOLTX2026</strong>
+            <p className="text-[11px] text-zinc-500 font-medium">
+              Share code with fellow commuters for free ride credit
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={handleCopyReferral}
-          className="px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-[11px] transition-all shadow-2xs cursor-pointer active:scale-95 shrink-0 flex items-center gap-1"
-        >
-          {copiedCode ? (
-            <>
-              <Check className="w-3 h-3 stroke-[2.8]" />
-              <span>Copied</span>
-            </>
-          ) : (
-            <>
-              <Copy className="w-3 h-3 stroke-[2]" />
-              <span>Share</span>
-            </>
-          )}
-        </button>
+        <div className="pt-2 border-t border-zinc-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono font-black text-[#E6A800] bg-[#FFF9E6] px-2.5 py-1 rounded-xl border border-[#F5C518]/40 shadow-xs">
+              VOLTX2026
+            </span>
+            <span className="text-[10px] text-zinc-400 font-medium">Referral Code</span>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCopyReferral}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#F5C518] hover:bg-[#E6A800] text-black font-black text-xs transition-all shadow-sm cursor-pointer active:scale-95"
+          >
+            {copiedCode ? (
+              <>
+                <Check className="w-3.5 h-3.5 text-black stroke-[2.5]" />
+                <span>Copied!</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3.5 h-3.5 stroke-[2.2]" />
+                <span>Share Code</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* 9. FOOTER BRANDING */}
+      <div className="pt-4 pb-2 text-center flex flex-col items-center gap-1.5">
+        <div className="flex items-center gap-1.5 text-xs font-extrabold text-zinc-600">
+          <span>Crafted with love for</span>
+          <span className="text-[#1A1A1A] font-black">BeeGo Voltx</span>
+        </div>
+        <p className="text-[10px] text-zinc-400 font-medium">
+          Electric Ride-Hailing & Battery Swap Hubs across Bangladesh
+        </p>
       </div>
     </div>
   );

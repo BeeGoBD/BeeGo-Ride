@@ -9,12 +9,12 @@ export const REAL_TRIP_HISTORY_KEY = 'beego_real_trip_history';
 const LEGACY_TRIP_HISTORY_KEY = 'bigo_real_trip_history';
 
 const DEFAULT_DRIVER = {
-  name: 'Voltx Captain',
+  name: 'Tanvir Hossain',
   vehicleType: 'bike' as const,
-  vehicleModel: 'Voltx Eco Speed (Electric)',
-  plateNumber: 'Dhaka Metro-Ha 45-8921',
-  rating: 5.0,
-  phone: '',
+  vehicleModel: 'Yamaha FZ-S FI (Midnight Black) - Bike',
+  plateNumber: 'DHAKA METRO-HA 52-8910',
+  rating: 4.95,
+  phone: '+880 1712-345678',
 };
 
 type RideListener = (ride: RideRequest | null) => void;
@@ -96,24 +96,31 @@ async function syncActiveRideFromServer() {
         }
         notifyListeners(serverRide);
       }
-    } else if (localRide) {
-      const isInFlight = ['requested', 'accepted', 'arrived_at_pickup', 'in_transit'].includes(localRide.status);
-      if (isInFlight) {
-        // In-flight ride locally (e.g. newly requested by passenger) -> Ensure server is aware so drivers can receive it!
-        fetch('/api/rides/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(localRide),
-        }).catch(() => {});
-      } else if (['completed', 'cancelled', 'declined'].includes(localRide.status)) {
-        // Completed or cancelled ride cleared after 20 seconds grace period
-        const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
-        if (ageMs > 20000) {
-          if (typeof window !== 'undefined') {
-            localStorage.removeItem(STORAGE_KEY);
-          }
-          notifyListeners(null);
+    } else if (localRide && (localRide as any)._syncedToBackend) {
+      // Server has cleared or finished this ride
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+      notifyListeners(null);
+    } else if (localRide && localRide.status === 'requested') {
+      // Initial sync of locally requested ride to server
+      (localRide as any)._syncedToBackend = true;
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localRide));
+      }
+      fetch('/api/rides/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(localRide),
+      }).catch(() => {});
+    } else if (localRide && ['completed', 'cancelled', 'declined'].includes(localRide.status)) {
+      // Completed or cancelled ride cleared after 15 seconds
+      const ageMs = Date.now() - ((localRide as any).updatedAt || localRide.createdAt || 0);
+      if (ageMs > 15000) {
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem(STORAGE_KEY);
         }
+        notifyListeners(null);
       }
     }
   } catch (err) {
@@ -306,7 +313,7 @@ export function saveCompletedRideToHistory(ride: RideRequest): StoredRealTrip | 
     ratePerKm: RATE_PER_KM_TAKA,
     vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
     plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
-    driverId: ride.riderId || '',
+    driverId: ride.riderId || 'DRV-9073',
     driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
     driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
     driverPhone: ride.driverDetails?.phone,
@@ -364,7 +371,7 @@ export function saveCancelledRideToHistory(ride: RideRequest, reason?: string): 
     ratePerKm: RATE_PER_KM_TAKA,
     vehicleModel: ride.driverDetails?.vehicleModel || DEFAULT_DRIVER.vehicleModel,
     plateNumber: ride.driverDetails?.plateNumber || DEFAULT_DRIVER.plateNumber,
-    driverId: ride.riderId || '',
+    driverId: ride.riderId || 'DRV-9073',
     driverName: ride.driverDetails?.name || DEFAULT_DRIVER.name,
     driverRating: ride.driverDetails?.rating || DEFAULT_DRIVER.rating,
     driverPhone: ride.driverDetails?.phone,
@@ -442,7 +449,7 @@ export function requestNewRide(
   const newRide: RideRequest = {
     id: generateRideId(),
     passengerId,
-    passengerPhone: passengerPhone || '+8801712345678',
+    passengerPhone,
     vehicleType: 'bike',
     paymentMethod,
     pickup,
@@ -452,13 +459,13 @@ export function requestNewRide(
     fareTaka,
     status: 'requested',
     createdAt: Date.now(),
-    updatedAt: Date.now(),
     routeData,
   };
+  (newRide as any)._syncedToBackend = true;
 
   saveAndBroadcastRide(newRide);
 
-  // Sync to server API immediately
+  // Sync to server API
   fetch('/api/rides/request', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
